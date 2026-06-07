@@ -369,10 +369,10 @@ input[type=number] { -moz-appearance: textfield; }
 
 .amount-wrap { position: relative; }
 .amount-wrap .dollar {
-  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
-  color: var(--gold); font-size: 9px; pointer-events: none;
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--gold); font-size: 11px; pointer-events: none;
 }
-.amount-wrap input { padding-left: 42px; }
+.amount-wrap input { padding-left: 28px; }
 
 .select-wrap { position: relative; }
 .select-wrap::after {
