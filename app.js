@@ -127,8 +127,8 @@ function save() {
 ============================================================ */
 const fmt = (n) => {
   const neg = n < 0;
-  const v = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  return (neg ? '-$' : '$') + v;
+  const v = Math.abs(n).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return (neg ? '-Rp' : 'Rp') + v;
 };
 function catInfo(type, id) {
   return CATEGORIES[type].find((c) => c.id === id) || { name: id, icon: '❓' };
@@ -409,8 +409,9 @@ function renderStreak() {
 
 /* ---------------- WORLD MAP CHART (last 6 months) ---------------- */
 function kfmt(n) {
-  if (n >= 1000) return '$' + (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'k';
-  return '$' + Math.round(n);
+  if (n >= 1000000) return 'Rp' + (n / 1000000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'jt';
+  if (n >= 1000) return 'Rp' + (n / 1000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'rb';
+  return 'Rp' + Math.round(n).toLocaleString('id-ID');
 }
 function renderChart() {
   const now = new Date();
