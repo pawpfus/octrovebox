@@ -29,11 +29,11 @@ $MAP = @(
 )
 
 $COLORS = @{
-  'X' = '#2a0a4a'  # outline
-  'B' = '#b06bff'  # body
-  'D' = '#7a35c0'  # shade / tentacle tips
+  'X' = '#7a4f00'  # outline (dark bronze)
+  'B' = '#ffd23f'  # body (gold)
+  'D' = '#c98a00'  # shade / tentacle tips (deep gold)
   'W' = '#ffffff'  # eye white
-  'K' = '#1a0833'  # pupil
+  'K' = '#3a2400'  # pupil
 }
 $NAVY = [System.Drawing.ColorTranslator]::FromHtml('#161635')
 
