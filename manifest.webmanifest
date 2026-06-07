@@ -1,0 +1,16 @@
+{
+  "name": "Coin Quest — 8-Bit Finance Tracker",
+  "short_name": "Coin Quest",
+  "description": "Track your money like a retro NES adventure. Earn gold, fight the Budget Boss, and complete savings quests.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b1f",
+  "theme_color": "#0b0b1f",
+  "categories": ["finance", "productivity", "games"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

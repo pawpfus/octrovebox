@@ -67,14 +67,35 @@ pwsh ./build.ps1      # outputs dist/coin-quest.html
 
 ---
 
+## 📱 Install as an app (PWA)
+
+Coin Quest is a **Progressive Web App** — install it for a home-screen icon, a fullscreen view with no browser chrome, and full **offline** support (a service worker caches the app shell). No app store required.
+
+**Android (Chrome):** open the site → menu (⋮) → **Install app** / **Add to Home screen**.
+
+**iPhone/iPad (Safari):** open the site → Share button → **Add to Home Screen**.
+
+**Desktop (Chrome/Edge):** open the site → click the **install icon** in the address bar.
+
+> The service worker requires HTTPS, so install from the deployed site (e.g. GitHub Pages), not from a local `file://` path.
+
+---
+
 ## 🗂️ Project structure
 
 ```
 coin-quest/
-├── index.html      # markup / structure
-├── styles.css      # the 8-bit theme (palette, pixel bevels, CRT overlay)
-├── app.js          # all logic (state, persistence, rendering, sound)
-├── build.ps1       # inlines everything into dist/coin-quest.html
+├── index.html             # markup / structure
+├── styles.css             # the 8-bit theme (palette, pixel bevels, CRT overlay)
+├── app.js                 # all logic (state, persistence, rendering, sound)
+├── manifest.webmanifest   # PWA manifest (name, icons, theme)
+├── sw.js                  # service worker (offline app-shell cache)
+├── icon-192.png           # app icons
+├── icon-512.png
+├── apple-touch-icon.png
+├── favicon-32.png
+├── build.ps1              # inlines CSS/JS into dist/coin-quest.html
+├── generate-icons.ps1     # regenerates the app icons
 ├── README.md
 └── LICENSE
 ```

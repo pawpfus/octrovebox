@@ -676,3 +676,10 @@ function init() {
   }
 }
 init();
+
+/* ---- PWA: register service worker for offline + installability ---- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* unsupported / file:// */ });
+  });
+}
