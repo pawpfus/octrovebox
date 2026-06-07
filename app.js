@@ -888,7 +888,7 @@ if ('serviceWorker' in navigator) {
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   const CHARS = ['🐙', '👾', '🪙', '⭐', '🍄', '👻', '🎮'];
-  const COUNT = 3;
+  const COUNT = 4;
   const buddies = [];
 
   for (let i = 0; i < COUNT; i++) {
