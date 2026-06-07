@@ -97,18 +97,13 @@ h1 {
   margin-top: 12px;
 }
 
-.coin-spin {
+.logo-octo {
   position: absolute;
-  left: -42px; top: 4px;
-  width: 26px; height: 26px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff6c2, var(--gold) 45%, var(--gold-dk) 100%);
-  box-shadow: 0 0 0 3px var(--shadow), inset -3px -3px 0 rgba(0,0,0,.25);
-  animation: flip 1.3s linear infinite;
-}
-@keyframes flip {
-  0%{ transform: scaleX(1);} 25%{ transform: scaleX(.2);}
-  50%{ transform: scaleX(1);} 75%{ transform: scaleX(.2);} 100%{ transform: scaleX(1);}
+  left: -52px; top: -2px;
+  width: 42px; height: 42px;
+  image-rendering: pixelated;
+  filter: drop-shadow(3px 3px 0 var(--shadow));
+  animation: hover 2.2s ease-in-out infinite;
 }
 
 .player-row {
@@ -516,6 +511,6 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 @media (max-width: 720px) {
   .stats { grid-template-columns: 1fr; }
   .grid { grid-template-columns: 1fr; }
-  .coin-spin { display: none; }
+  .logo-octo { display: none; }
   .cat-row { grid-template-columns: 86px 1fr 60px; }
 }

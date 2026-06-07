@@ -1,46 +1,69 @@
-# generate-icons.ps1 — draws the COIN QUEST app icons (pixel gold coin) as PNGs.
+# generate-icons.ps1 — draws the COIN QUEST app icon: an 8-bit pixel-art octopus.
+# A 16x16 pixel map is rendered, then scaled up with nearest-neighbor (no
+# smoothing) so the pixels stay crisp at every size.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $dir = $PSScriptRoot
 
+# 16x16 pixel map.  legend:
+#   . transparent (shows navy background)   X dark outline
+#   B body (purple)   D darker body / tentacle tips
+#   W eye white       K pupil
+$MAP = @(
+  '................',
+  '.....XXXXXX.....',
+  '...XXBBBBBBXX...',
+  '..XBBBBBBBBBBX..',
+  '.XBBBBBBBBBBBBX.',
+  '.XBBBBBBBBBBBBX.',
+  '.XBBWWBBBBWWBBX.',
+  '.XBBWKBBBBKWBBX.',
+  '.XBBBBBBBBBBBBX.',
+  '.XBBBBBBBBBBBBX.',
+  '.XBBBBBBBBBBBBX.',
+  '.XBBBBBBBBBBBBX.',
+  '.BB.BB.BB.BB.BB.',
+  '.DD.DD.DD.DD.DD.',
+  '................',
+  '................'
+)
+
+$COLORS = @{
+  'X' = '#2a0a4a'  # outline
+  'B' = '#b06bff'  # body
+  'D' = '#7a35c0'  # shade / tentacle tips
+  'W' = '#ffffff'  # eye white
+  'K' = '#1a0833'  # pupil
+}
+$NAVY = [System.Drawing.ColorTranslator]::FromHtml('#161635')
+
+# build the crisp 16x16 source sprite
+$src = New-Object System.Drawing.Bitmap(16, 16)
+for ($y = 0; $y -lt 16; $y++) {
+  $row = $MAP[$y]
+  for ($x = 0; $x -lt 16; $x++) {
+    $ch = $row[$x]
+    if ($ch -eq '.') {
+      $src.SetPixel($x, $y, $NAVY)
+    } else {
+      $src.SetPixel($x, $y, [System.Drawing.ColorTranslator]::FromHtml($COLORS["$ch"]))
+    }
+  }
+}
+
 function New-Icon($size, $path) {
   $bmp = New-Object System.Drawing.Bitmap($size, $size)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
-  $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-  $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+  $g.Clear($NAVY)
+  $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+  $g.PixelOffsetMode   = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
+  $g.SmoothingMode     = [System.Drawing.Drawing2D.SmoothingMode]::None
 
-  $navy   = [System.Drawing.ColorTranslator]::FromHtml('#161635')
-  $gold   = [System.Drawing.ColorTranslator]::FromHtml('#ffd23f')
-  $goldDk = [System.Drawing.ColorTranslator]::FromHtml('#c98a00')
-  $shadow = [System.Drawing.ColorTranslator]::FromHtml('#050510')
-
-  $g.Clear($navy)
-
-  $cx = $size / 2; $cy = $size / 2
-  $r  = $size * 0.33
-  $off = [int]($size * 0.022)
-
-  # hard pixel shadow
-  $bShadow = New-Object System.Drawing.SolidBrush($shadow)
-  $g.FillEllipse($bShadow, $cx - $r + $off, $cy - $r + $off, 2 * $r, 2 * $r)
-
-  # coin body
-  $bGold = New-Object System.Drawing.SolidBrush($gold)
-  $g.FillEllipse($bGold, $cx - $r, $cy - $r, 2 * $r, 2 * $r)
-
-  # inner ring
-  $pen = New-Object System.Drawing.Pen($goldDk, [single]($size * 0.03))
-  $ir = $r * 0.74
-  $g.DrawEllipse($pen, $cx - $ir, $cy - $ir, 2 * $ir, 2 * $ir)
-
-  # $ glyph
-  $bDk = New-Object System.Drawing.SolidBrush($goldDk)
-  $font = New-Object System.Drawing.Font('Arial', [single]($size * 0.36), [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-  $sf = New-Object System.Drawing.StringFormat
-  $sf.Alignment = [System.Drawing.StringAlignment]::Center
-  $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
-  $rect = New-Object System.Drawing.RectangleF(0, 0, $size, $size)
-  $g.DrawString('$', $font, $bDk, $rect, $sf)
+  # draw the sprite into the centre ~88% (maskable safe zone)
+  $inner = [int]($size * 0.88)
+  $off   = [int](($size - $inner) / 2)
+  $dst = New-Object System.Drawing.Rectangle($off, $off, $inner, $inner)
+  $g.DrawImage($src, $dst, 0, 0, 16, 16, [System.Drawing.GraphicsUnit]::Pixel)
 
   $g.Dispose()
   $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
@@ -48,9 +71,10 @@ function New-Icon($size, $path) {
   Write-Host "  $path ($size x $size)"
 }
 
-Write-Host "Generating icons..."
+Write-Host "Generating octopus icons..."
 New-Icon 512 (Join-Path $dir 'icon-512.png')
 New-Icon 192 (Join-Path $dir 'icon-192.png')
 New-Icon 180 (Join-Path $dir 'apple-touch-icon.png')
 New-Icon 32  (Join-Path $dir 'favicon-32.png')
+$src.Dispose()
 Write-Host "Done."
