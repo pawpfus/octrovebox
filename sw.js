@@ -1,6 +1,6 @@
 /* COIN QUEST service worker — offline app shell cache.
    Bump CACHE when you change any shell asset to force an update. */
-const CACHE = 'coinquest-v4';
+const CACHE = 'coinquest-v5';
 const ASSETS = [
   './',
   './index.html',

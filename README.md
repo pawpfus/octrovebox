@@ -38,6 +38,9 @@ A `🔥 X MO` counter in the HUD counts consecutive completed months you stayed 
 ### 📊 World Map — 6-Month History
 A pixel bar chart of the last six months, with paired green (earn) / red (spend) columns and the current month highlighted.
 
+### 📄 Export to PDF
+One click generates a clean, printable financial report — summary, budget status, savings quest, category breakdown, and a full transaction table — then opens your browser's print dialog so you can **Save as PDF**. Works offline and on mobile; no libraries.
+
 ### 🎵 Chiptune sound effects
 Coin pickups, spend blips, error buzzes, boss roars, and victory fanfares — all generated live with the Web Audio API (no audio files). Toggle with the SOUND button.
 

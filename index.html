@@ -206,10 +206,16 @@
     </section>
 
     <footer class="foot">
-      <button class="danger-btn" id="resetBtn">↺ ERASE SAVE FILE</button>
+      <div class="foot-actions">
+        <button class="export-btn" id="exportBtn">⎙ EXPORT PDF</button>
+        <button class="danger-btn" id="resetBtn">↺ ERASE SAVE FILE</button>
+      </div>
       <span class="copyright">© 200X COIN QUEST · INSERT COIN</span>
     </footer>
   </div>
+
+  <!-- print-only report (filled in by exportPDF) -->
+  <div class="print-report" id="printReport" aria-hidden="true"></div>
 
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>

@@ -507,6 +507,60 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 }
 .toast.show { transform: translate(-50%, 0); }
 
+/* =========================== EXPORT BUTTON =========================== */
+.foot-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.export-btn {
+  font-family: inherit; font-size: 8px;
+  padding: 12px 14px; color: #06250f;
+  background: var(--gold); border: 3px solid var(--shadow);
+  cursor: pointer;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.5), inset -2px -2px 0 var(--gold-dk);
+}
+.export-btn:hover { filter: brightness(1.08); }
+
+/* =========================== PRINT / PDF REPORT =========================== */
+.print-report { display: none; }
+
+@media print {
+  .crt, .screen, .toast { display: none !important; }
+  body { background: #fff !important; padding: 0 !important; }
+  .print-report { display: block !important; }
+  @page { margin: 14mm; }
+}
+
+/* report styled like a retro dot-matrix printout (readable VT323) */
+.pr-doc {
+  font-family: 'VT323', monospace;
+  color: #111; background: #fff;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  font-size: 18px; line-height: 1.35;
+}
+.pr-head { text-align: center; border-bottom: 3px double #111; padding-bottom: 10px; margin-bottom: 16px; }
+.pr-title { font-family: 'Press Start 2P', monospace; font-size: 18px; letter-spacing: 1px; }
+.pr-sub { font-size: 16px; letter-spacing: 4px; margin-top: 10px; text-transform: uppercase; }
+.pr-date { font-size: 16px; margin-top: 6px; color: #444; }
+
+.pr-section { margin: 18px 0; }
+.pr-h2 {
+  font-family: 'Press Start 2P', monospace; font-size: 10px; letter-spacing: 1px;
+  border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 10px;
+}
+.pr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+.pr-line { display: flex; justify-content: space-between; border-bottom: 1px dotted #999; padding: 2px 0; }
+.pr-line .k { color: #333; }
+.pr-line .v { font-weight: bold; }
+.pr-big { font-size: 26px; }
+.pr-pos { color: #1f7a32; }
+.pr-neg { color: #b02323; }
+
+.pr-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.pr-table th, .pr-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #ccc; }
+.pr-table th { border-bottom: 2px solid #111; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; }
+.pr-table td.num, .pr-table th.num { text-align: right; white-space: nowrap; }
+.pr-table tr { break-inside: avoid; }
+
+.pr-foot { margin-top: 20px; border-top: 3px double #111; padding-top: 10px; text-align: center; font-size: 15px; color: #555; }
+
 /* =========================== RESPONSIVE =========================== */
 @media (max-width: 720px) {
   .stats { grid-template-columns: 1fr; }

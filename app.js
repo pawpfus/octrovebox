@@ -56,6 +56,7 @@ const els = {
   catBars: $('catBars'), catEmpty: $('catEmpty'),
   filters: $('logFilters'), mute: $('muteBtn'),
   reset: $('resetBtn'), toast: $('toast'),
+  exportBtn: $('exportBtn'), printReport: $('printReport'),
   // boss / budget
   bossPanel: $('bossPanel'), bossTitle: $('bossTitle'), bossSprite: $('bossSprite'),
   bossName: $('bossName'), hpFill: $('hpFill'), hpText: $('hpText'),
@@ -584,6 +585,104 @@ function removeCatBudget(id) {
   renderAll();
 }
 
+/* ---- PDF export (print-to-PDF of a clean report) ---- */
+function buildReport() {
+  const { income, expense, balance } = totals();
+  const now = new Date();
+  const dateStr = now.toLocaleString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  const sign = (n) => (n >= 0 ? 'pr-pos' : 'pr-neg');
+
+  // summary
+  let html = `<div class="pr-doc">
+    <div class="pr-head">
+      <div class="pr-title">COIN QUEST</div>
+      <div class="pr-sub">Financial Report</div>
+      <div class="pr-date">Generated ${dateStr}</div>
+    </div>
+
+    <div class="pr-section">
+      <div class="pr-h2">SUMMARY</div>
+      <div class="pr-line"><span class="k">Balance</span><span class="v pr-big ${sign(balance)}">${fmt(balance)}</span></div>
+      <div class="pr-grid">
+        <div class="pr-line"><span class="k">Total Income</span><span class="v pr-pos">${fmt(income)}</span></div>
+        <div class="pr-line"><span class="k">Total Spent</span><span class="v pr-neg">${fmt(expense)}</span></div>
+        <div class="pr-line"><span class="k">Level</span><span class="v">LV.${levelFor(income)}</span></div>
+        <div class="pr-line"><span class="k">Budget Streak</span><span class="v">${state.budget ? streakMonths() + ' months' : '—'}</span></div>
+      </div>
+    </div>`;
+
+  // budget (current month)
+  if (state.budget) {
+    const spent = monthSpend();
+    const remaining = state.budget - spent;
+    html += `<div class="pr-section">
+      <div class="pr-h2">BUDGET · ${MONTHS[now.getMonth()]} ${now.getFullYear()}</div>
+      <div class="pr-grid">
+        <div class="pr-line"><span class="k">Monthly Limit</span><span class="v">${fmt(state.budget)}</span></div>
+        <div class="pr-line"><span class="k">Spent</span><span class="v">${fmt(spent)}</span></div>
+        <div class="pr-line"><span class="k">Remaining</span><span class="v ${sign(remaining)}">${fmt(remaining)}</span></div>
+        <div class="pr-line"><span class="k">Status</span><span class="v">${remaining < 0 ? 'OVER BUDGET' : 'ON TRACK'}</span></div>
+      </div>
+    </div>`;
+  }
+
+  // savings quest
+  if (state.goal) {
+    const saved = Math.max(0, balance);
+    const pct = Math.min(100, Math.floor((saved / state.goal.target) * 100));
+    html += `<div class="pr-section">
+      <div class="pr-h2">SAVINGS QUEST</div>
+      <div class="pr-grid">
+        <div class="pr-line"><span class="k">Goal</span><span class="v">${escapeHtml(state.goal.name)}</span></div>
+        <div class="pr-line"><span class="k">Target</span><span class="v">${fmt(state.goal.target)}</span></div>
+        <div class="pr-line"><span class="k">Saved</span><span class="v">${fmt(saved)}</span></div>
+        <div class="pr-line"><span class="k">Progress</span><span class="v">${pct}%${saved >= state.goal.target ? ' · COMPLETE' : ''}</span></div>
+      </div>
+    </div>`;
+  }
+
+  // spending by category (all-time)
+  const spend = {};
+  state.transactions.forEach((t) => { if (t.type === 'expense') spend[t.category] = (spend[t.category] || 0) + t.amount; });
+  const cats = Object.entries(spend).sort((a, b) => b[1] - a[1]);
+  if (cats.length) {
+    html += `<div class="pr-section"><div class="pr-h2">SPENDING BY CATEGORY</div>
+      <table class="pr-table"><thead><tr><th>Category</th><th class="num">Amount</th><th class="num">Share</th></tr></thead><tbody>`;
+    cats.forEach(([id, amt]) => {
+      html += `<tr><td>${catInfo('expense', id).name}</td><td class="num">${fmt(amt)}</td><td class="num">${Math.round((amt / expense) * 100)}%</td></tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  // transactions
+  html += `<div class="pr-section"><div class="pr-h2">TRANSACTIONS (${state.transactions.length})</div>`;
+  if (state.transactions.length) {
+    html += `<table class="pr-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="num">Amount</th></tr></thead><tbody>`;
+    state.transactions.slice().sort((a, b) => b.id - a.id).forEach((t) => {
+      const d = new Date(t.id).toLocaleDateString('en-US', { year: '2-digit', month: 'short', day: 'numeric' });
+      const c = catInfo(t.type, t.category);
+      const amt = (t.type === 'income' ? '+' : '-') + fmt(t.amount).replace('-', '');
+      html += `<tr><td>${d}</td><td>${escapeHtml(t.desc)}</td><td>${c.name}</td><td class="num ${t.type === 'income' ? 'pr-pos' : 'pr-neg'}">${amt}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  } else {
+    html += `<p>No transactions recorded.</p>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="pr-foot">Generated by COIN QUEST · 8-bit personal finance tracker</div></div>`;
+  return html;
+}
+
+function exportPDF() {
+  sfx.click();
+  els.printReport.innerHTML = buildReport();
+  showToast('⎙ OPENING PRINT… CHOOSE "SAVE AS PDF"');
+  setTimeout(() => window.print(), 250);
+}
+
 function resetAll() {
   if (!confirm('ERASE YOUR ENTIRE SAVE FILE?\nThis cannot be undone.')) return;
   state.transactions = [];
@@ -621,6 +720,7 @@ els.form.addEventListener('submit', addTx);
 els.btnExpense.addEventListener('click', () => setType('expense'));
 els.btnIncome.addEventListener('click', () => setType('income'));
 els.reset.addEventListener('click', resetAll);
+els.exportBtn.addEventListener('click', exportPDF);
 
 els.editBudgetBtn.addEventListener('click', toggleBudgetEditor);
 els.saveBudgetBtn.addEventListener('click', saveBudget);
