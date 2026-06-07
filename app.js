@@ -887,7 +887,16 @@ if ('serviceWorker' in navigator) {
   // respect users who prefer no motion
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-  const CHARS = ['🐙', '👾', '🪙', '⭐', '🍄', '👻', '🎮'];
+  // Pac-Man cast, drawn as inline SVG so the ghosts get their proper colors
+  const ghost = (c) => `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M12 54 a38 38 0 0 1 76 0 L88 90 L80 81 L68 90 L56 81 L44 90 L32 81 L20 90 L12 81 Z" fill="${c}"/><circle cx="38" cy="50" r="12" fill="#fff"/><circle cx="64" cy="50" r="12" fill="#fff"/><circle cx="34" cy="50" r="6" fill="#1b1b46"/><circle cx="60" cy="50" r="6" fill="#1b1b46"/></svg>`;
+  const PACMAN = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 50 L92 30 A46 46 0 1 0 92 70 Z" fill="#ffd23f"/><circle cx="46" cy="26" r="5.5" fill="#0b0b1f"/></svg>`;
+  const SPRITES = [
+    PACMAN,
+    ghost('#ff5d5d'), // Blinky (red)
+    ghost('#ff6bc4'), // Pinky (pink)
+    ghost('#2fe0e0'), // Inky (cyan)
+    ghost('#ff9f1c'), // Clyde (orange)
+  ];
   const COUNT = 4;
   const buddies = [];
 
@@ -896,12 +905,15 @@ if ('serviceWorker' in navigator) {
     el.className = 'floater';
     const inner = document.createElement('span');
     inner.className = 'fl-inner';
-    inner.textContent = CHARS[Math.floor(Math.random() * CHARS.length)];
+    const size = 24 + Math.random() * 14;
+    inner.innerHTML = SPRITES[Math.floor(Math.random() * SPRITES.length)];
+    const svg = inner.firstChild;
+    svg.setAttribute('width', size);
+    svg.setAttribute('height', size);
+    svg.style.display = 'block';
     el.appendChild(inner);
     document.body.appendChild(el);
 
-    const size = 22 + Math.random() * 16;
-    el.style.fontSize = size + 'px';
     inner.style.animationDelay = (Math.random() * 1.5) + 's';
 
     const ang = Math.random() * Math.PI * 2;
