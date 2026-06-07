@@ -57,6 +57,7 @@ const els = {
   filters: $('logFilters'), mute: $('muteBtn'),
   reset: $('resetBtn'), toast: $('toast'),
   exportBtn: $('exportBtn'), printReport: $('printReport'),
+  updateBar: $('updateBar'), updateBtn: $('updateBtn'),
   // boss / budget
   bossPanel: $('bossPanel'), bossTitle: $('bossTitle'), bossSprite: $('bossSprite'),
   bossName: $('bossName'), hpFill: $('hpFill'), hpText: $('hpText'),
@@ -778,9 +779,47 @@ function init() {
 }
 init();
 
-/* ---- PWA: register service worker for offline + installability ---- */
+/* ---- PWA: service worker + "update ready" banner ---- */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* unsupported / file:// */ });
+  let userWantsUpdate = false;
+  let reloading = false;
+
+  // show the banner; `worker` is the installed-but-waiting service worker
+  const showBanner = (worker) => {
+    if (!worker || !navigator.serviceWorker.controller) return; // first install, not an update
+    els.updateBar.hidden = false;
+    els.updateBtn.onclick = () => {
+      userWantsUpdate = true;
+      els.updateBtn.textContent = '⟳ UPDATING…';
+      worker.postMessage('SKIP_WAITING');
+    };
+  };
+
+  // when the new SW takes control (after the user taps refresh), reload once
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (userWantsUpdate && !reloading) { reloading = true; window.location.reload(); }
+  });
+
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js');
+
+      // Case A: an update finished in a PREVIOUS session and is already waiting.
+      // reg.waiting can be null right when register() resolves, so re-check a few times.
+      const checkWaiting = () => { if (reg.waiting) { showBanner(reg.waiting); return true; } return false; };
+      if (!checkWaiting()) [800, 2000, 4000].forEach((t) => setTimeout(checkWaiting, t));
+
+      // Case B: an update installs while this page is open.
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed') showBanner(nw);  // use the worker directly (avoids reg.waiting race)
+        });
+      });
+
+      // periodically look for a new deploy even without a reload
+      setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+    } catch (e) { /* unsupported / file:// */ }
   });
 }

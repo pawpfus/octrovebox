@@ -82,6 +82,8 @@ Coin Quest is a **Progressive Web App** — install it for a home-screen icon, a
 
 > The service worker requires HTTPS, so install from the deployed site (e.g. GitHub Pages), not from a local `file://` path.
 
+When a new version is deployed, the app shows a **"★ NEW VERSION READY"** banner — tap **REFRESH** to update instantly. No cache-clearing needed.
+
 ---
 
 ## 🗂️ Project structure

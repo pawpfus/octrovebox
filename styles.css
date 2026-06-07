@@ -495,6 +495,28 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .danger-btn:hover { background: var(--red); }
 .copyright { font-size: 7px; color: #4a4a7a; letter-spacing: 1px; }
 
+/* =========================== UPDATE BANNER =========================== */
+.update-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1001;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  flex-wrap: wrap;
+  background: var(--panel); color: var(--gold);
+  border-bottom: 4px solid var(--shadow);
+  font-size: 8px; letter-spacing: 1px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 0 var(--shadow);
+  animation: slideDown .3s ease;
+}
+.update-bar[hidden] { display: none; }
+@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+.update-bar button {
+  font-family: inherit; font-size: 8px; cursor: pointer;
+  background: var(--gold); color: #06250f; border: 3px solid var(--shadow);
+  padding: 8px 12px;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.5), inset -2px -2px 0 var(--gold-dk);
+}
+.update-bar button:active { transform: translateY(2px); }
+
 /* =========================== TOAST =========================== */
 .toast {
   position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 120px);

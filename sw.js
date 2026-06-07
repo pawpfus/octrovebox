@@ -2,7 +2,7 @@
    Network-first means the latest deployed version always wins when online,
    while the cached app shell keeps it working offline.
    Bump CACHE when you change any shell asset. */
-const CACHE = 'coinquest-v7';
+const CACHE = 'coinquest-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -16,9 +16,14 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+  // Precache the shell, but DON'T skipWaiting automatically — the page shows
+  // an "update ready" banner and skips waiting only when the user taps refresh.
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+});
+
+// page asks us to activate the new version immediately
+self.addEventListener('message', (e) => {
+  if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
