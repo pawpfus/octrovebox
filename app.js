@@ -76,9 +76,8 @@ const els = {
   catBudgetSelect: $('catBudgetSelect'), catBudgetInput: $('catBudgetInput'), catBudgetSave: $('catBudgetSave'),
   // world map chart + streak
   chart: $('chart'), monthStreak: $('monthStreak'),
-  // oracle + market
+  // oracle
   oracleText: $('oracleText'), oracleNext: $('oracleNext'),
-  marketList: $('marketList'), marketStatus: $('marketStatus'), marketRefresh: $('marketRefresh'),
 };
 
 /* ============================================================
@@ -802,100 +801,6 @@ function importBackup(file) {
   reader.readAsText(file);
 }
 
-/* ---- MARKET WATCH (live gold + stock prices) ---- */
-const fmtUSD = (n) => '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
-
-// fetch JSON with a hard timeout so a slow/dead endpoint can't hang the panel
-async function fetchJSON(url, ms = 8000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const r = await fetch(url, { signal: ctrl.signal });
-    return await r.json();
-  } finally { clearTimeout(t); }
-}
-
-async function fetchGold() {
-  const j = await fetchJSON('https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd&include_24hr_change=true');
-  const d = j['pax-gold'];
-  return { price: d.usd, chg: d.usd_24h_change };
-}
-async function fetchYahoo(sym) {
-  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=1d&interval=1d';
-  const proxies = [
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-    'https://corsproxy.io/?url=' + encodeURIComponent(url),
-  ];
-  let lastErr;
-  for (const p of proxies) {
-    try {
-      const j = await fetchJSON(p, 8000);
-      const m = j.chart.result[0].meta;
-      const price = m.regularMarketPrice;
-      const prev = m.chartPreviousClose != null ? m.chartPreviousClose : m.previousClose;
-      if (isFinite(price) && isFinite(prev)) return { price, chg: ((price - prev) / prev) * 100 };
-    } catch (e) { lastErr = e; }
-  }
-  throw lastErr || new Error('no data');
-}
-
-const MARKET = [
-  { id: 'gold', name: 'GOLD /oz', ico: '🥇', get: fetchGold },
-  { id: 'spx',  name: 'S&P 500',  ico: '📊', get: () => fetchYahoo('^GSPC') },
-  { id: 'aapl', name: 'APPLE',    ico: '🍎', get: () => fetchYahoo('AAPL') },
-  { id: 'msft', name: 'MICROSOFT',ico: '🪟', get: () => fetchYahoo('MSFT') },
-];
-
-function setMarketRow(a, v) {
-  const row = document.getElementById('mk-' + a.id);
-  if (!row) return false;
-  const priceEl = row.querySelector('.market-price');
-  const chgEl = row.querySelector('.market-chg');
-  if (v && isFinite(v.price)) {
-    priceEl.textContent = fmtUSD(v.price);
-    const dir = v.chg > 0.01 ? 'up' : (v.chg < -0.01 ? 'down' : 'flat');
-    chgEl.className = 'market-chg ' + dir;
-    chgEl.textContent = (v.chg >= 0 ? '+' : '') + (isFinite(v.chg) ? v.chg.toFixed(2) : '0.00') + '%';
-    return true;
-  }
-  row.classList.add('err');
-  priceEl.textContent = 'N/A';
-  chgEl.className = 'market-chg flat';
-  chgEl.textContent = '—';
-  return false;
-}
-
-let marketLoading = false;
-async function loadMarket() {
-  if (marketLoading) return;
-  marketLoading = true;
-  els.marketStatus.textContent = 'LOADING LIVE PRICES…';
-  els.marketList.innerHTML = MARKET.map((a) =>
-    `<div class="market-row" id="mk-${a.id}"><span class="market-name"><span class="market-ico">${a.ico}</span>${a.name}</span><span class="market-price">…</span><span class="market-chg flat">—</span></div>`
-  ).join('');
-
-  let ok = 0;
-  const gold = MARKET.find((m) => m.id === 'gold');
-  const stocks = MARKET.filter((m) => m.id !== 'gold');
-
-  await Promise.all([
-    // gold is reliable and fast — load it in parallel
-    (async () => { try { if (setMarketRow(gold, await gold.get())) ok++; } catch (e) { setMarketRow(gold, null); } })(),
-    // stocks share one flaky proxy — load them sequentially to avoid throttling
-    (async () => {
-      for (const a of stocks) {
-        try { if (setMarketRow(a, await a.get())) ok++; } catch (e) { setMarketRow(a, null); }
-      }
-    })(),
-  ]);
-
-  const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  els.marketStatus.textContent = ok
-    ? 'UPDATED ' + now + ' · DELAYED PRICES · NOT ADVICE'
-    : '⚠ COULD NOT LOAD PRICES (OFFLINE?) — TAP ↻ REFRESH';
-  marketLoading = false;
-}
-
 function exportPDF() {
   sfx.click();
   // Build synchronously and call print() directly inside the tap handler —
@@ -944,7 +849,6 @@ els.reset.addEventListener('click', resetAll);
 els.exportBtn.addEventListener('click', exportPDF);
 els.backupBtn.addEventListener('click', exportBackup);
 els.oracleNext.addEventListener('click', () => { oracleIdx += 1; sfx.click(); renderOracle(); });
-els.marketRefresh.addEventListener('click', () => { sfx.click(); loadMarket(); });
 els.restoreBtn.addEventListener('click', () => els.restoreInput.click());
 els.restoreInput.addEventListener('change', (e) => {
   const f = e.target.files[0];
@@ -1004,8 +908,6 @@ function init() {
   if (state.transactions.length === 0 && !localStorage.getItem(STORE_KEY)) {
     showToast('WELCOME! ADD YOUR FIRST ENTRY ⮞');
   }
-
-  loadMarket(); // best-effort live prices (fails gracefully offline)
 }
 init();
 

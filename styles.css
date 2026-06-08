@@ -495,8 +495,8 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .danger-btn:hover { background: var(--red); }
 .copyright { font-size: 7px; color: #4a4a7a; letter-spacing: 1px; }
 
-/* =========================== ORACLE + MARKET =========================== */
-.oracle-panel, .market-panel { margin-bottom: 18px; }
+/* =========================== ORACLE =========================== */
+.oracle-panel { margin-bottom: 18px; }
 
 .oracle-text {
   font-family: 'VT323', monospace;
@@ -508,20 +508,6 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
   padding: 14px 16px;
 }
 .oracle-note { font-size: 7px; color: var(--ink-dim); margin-top: 12px; letter-spacing: 1px; }
-
-.market-list { display: flex; flex-direction: column; gap: 8px; }
-.market-row {
-  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
-  padding: 11px 12px; background: var(--bg-2); border: 3px solid var(--shadow);
-}
-.market-name { font-size: 8px; display: flex; align-items: center; gap: 8px; }
-.market-ico { font-size: 14px; }
-.market-price { font-family: 'VT323', monospace; font-size: 20px; text-align: right; }
-.market-chg { font-size: 8px; text-align: right; min-width: 64px; }
-.market-chg.up   { color: var(--green); }
-.market-chg.down { color: var(--red); }
-.market-chg.flat { color: var(--ink-dim); }
-.market-row.err .market-price, .market-row.err .market-chg { color: var(--ink-dim); font-size: 9px; }
 
 /* =========================== UPDATE BANNER =========================== */
 .update-bar {
