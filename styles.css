@@ -683,22 +683,8 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 
 .pr-foot { margin-top: 20px; border-top: 3px double #111; padding-top: 10px; text-align: center; font-size: 15px; color: #555; }
 
-/* =========================== BUDDY (pet mascot) =========================== */
-.buddy-stage { display: flex; align-items: center; gap: 14px; }
-.buddy-octo {
-  width: 60px; height: 60px; flex-shrink: 0;
-  image-rendering: pixelated;
-  filter: drop-shadow(3px 3px 0 var(--shadow));
-  animation: hover 2.4s ease-in-out infinite;
-}
-.buddy-octo.happy { animation: buddyHappy .5s ease-in-out infinite; }
-@keyframes buddyHappy { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-7px) rotate(3deg); } }
-.buddy-octo.sad { filter: grayscale(.6) drop-shadow(3px 3px 0 var(--shadow)); animation: buddySad 2.5s ease-in-out infinite; }
-@keyframes buddySad { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(3px) rotate(-4deg); } }
-.buddy-mood { font-size: 22px; margin-bottom: 8px; }
-.buddy-say { font-size: 8px; color: var(--ink); line-height: 1.5; }
-
 /* =========================== DAILY CHEST =========================== */
+.chest-stage { display: flex; align-items: center; gap: 14px; }
 .chest-btn {
   font-family: inherit; font-size: 40px; line-height: 1;
   width: 60px; height: 60px; flex-shrink: 0;

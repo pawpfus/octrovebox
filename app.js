@@ -88,8 +88,7 @@ const els = {
   oracleText: $('oracleText'), oracleNext: $('oracleNext'),
   // side quests
   questList: $('questList'),
-  // buddy + chest + themes
-  buddyOcto: $('buddyOcto'), buddyMood: $('buddyMood'), buddySay: $('buddySay'),
+  // chest + themes
   chestBtn: $('chestBtn'), chestStreak: $('chestStreak'), chestSay: $('chestSay'),
   themeGrid: $('themeGrid'),
 };
@@ -598,28 +597,6 @@ function renderOracle() {
   els.oracleText.textContent = list[oracleIdx] || '';
 }
 
-/* ---------------- PET BUDDY (reacts to your finances) ---------------- */
-function renderBuddy() {
-  const { income, expense, balance } = totals();
-  const overBudget = state.budget && (state.budget - monthSpend()) < 0;
-  let mood = '🙂', say = 'Feed me some entries!', cls = '';
-  if (state.transactions.length === 0) {
-    mood = '🙂'; say = 'Feed me some entries!';
-  } else if (overBudget) {
-    mood = '😱'; say = 'We blew the budget this month!'; cls = 'sad';
-  } else if (income > 0) {
-    const rate = (income - expense) / income;
-    if (rate >= 0.2) { mood = '😄'; say = "I'm so proud of you!"; cls = 'happy'; }
-    else if (rate >= 0) { mood = '😊'; say = 'Doing okay — keep saving!'; }
-    else { mood = '😟'; say = "We're spending more than we earn…"; cls = 'sad'; }
-  } else {
-    mood = '🙂'; say = 'Log some income to get going!';
-  }
-  els.buddyOcto.className = 'buddy-octo ' + cls;
-  els.buddyMood.textContent = mood;
-  els.buddySay.textContent = say;
-}
-
 /* ---------------- DAILY CHEST ---------------- */
 const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD (local)
 const chestAvailable = () => state.lastChest !== todayStr();
@@ -717,7 +694,6 @@ function renderAll(prevLevel) {
   renderChart();
   renderQuests();
   renderOracle();
-  renderBuddy();
   renderThemes();
   renderChest();
 }

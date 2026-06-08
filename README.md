@@ -50,9 +50,6 @@ One click generates a clean, printable financial report — summary, budget stat
 ### 🔮 The Oracle (insights & education)
 A retro advisor that reads **your own tracked data** and gives personalised tips — savings rate, biggest spending category, emergency-fund coverage, budget and goal nudges — plus rotating general education on stocks & gold (diversification, dollar-cost averaging, gold as a hedge). Works offline. *Educational only — not financial advice.*
 
-### 🐙 Pixel pet
-Your octopus mascot reacts live to your finances — happy and bouncing when your savings rate is good, sad and grey when you overspend or blow the budget.
-
 ### 🎁 Daily chest
 Open a treasure chest once per day for a coin-shower animation and a random tip, building a daily-login streak.
 
