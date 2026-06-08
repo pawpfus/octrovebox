@@ -33,8 +33,9 @@ html { background: var(--bg); }
 body {
   font-family: 'Press Start 2P', monospace;
   background:
-    radial-gradient(circle at 50% 0%, #1c1c45 0%, var(--bg) 60%),
+    radial-gradient(circle at 50% 0%, var(--panel) 0%, var(--bg) 60%),
     var(--bg);
+  transition: background-color .3s, color .3s;
   color: var(--ink);
   min-height: 100vh;
   padding: 24px 16px 48px;
@@ -681,6 +682,90 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .pr-table tr { break-inside: avoid; }
 
 .pr-foot { margin-top: 20px; border-top: 3px double #111; padding-top: 10px; text-align: center; font-size: 15px; color: #555; }
+
+/* =========================== BUDDY (pet mascot) =========================== */
+.buddy-stage { display: flex; align-items: center; gap: 14px; }
+.buddy-octo {
+  width: 60px; height: 60px; flex-shrink: 0;
+  image-rendering: pixelated;
+  filter: drop-shadow(3px 3px 0 var(--shadow));
+  animation: hover 2.4s ease-in-out infinite;
+}
+.buddy-octo.happy { animation: buddyHappy .5s ease-in-out infinite; }
+@keyframes buddyHappy { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-7px) rotate(3deg); } }
+.buddy-octo.sad { filter: grayscale(.6) drop-shadow(3px 3px 0 var(--shadow)); animation: buddySad 2.5s ease-in-out infinite; }
+@keyframes buddySad { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(3px) rotate(-4deg); } }
+.buddy-mood { font-size: 22px; margin-bottom: 8px; }
+.buddy-say { font-size: 8px; color: var(--ink); line-height: 1.5; }
+
+/* =========================== DAILY CHEST =========================== */
+.chest-btn {
+  font-family: inherit; font-size: 40px; line-height: 1;
+  width: 60px; height: 60px; flex-shrink: 0;
+  background: transparent; border: none; cursor: pointer;
+  filter: drop-shadow(3px 3px 0 var(--shadow));
+}
+.chest-btn.ready { animation: chestWiggle 1.1s ease-in-out infinite; }
+.chest-btn:disabled { cursor: default; opacity: .55; filter: grayscale(.5) drop-shadow(3px 3px 0 var(--shadow)); }
+@keyframes chestWiggle { 0%,100% { transform: rotate(-7deg) scale(1); } 50% { transform: rotate(7deg) scale(1.12); } }
+.chest-streak { font-size: 9px; color: var(--gold); margin-bottom: 8px; }
+.chest-say { font-size: 8px; color: var(--ink); line-height: 1.5; }
+
+/* =========================== THEME PICKER =========================== */
+.theme-panel { margin-bottom: 18px; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.theme-btn {
+  font-family: inherit; font-size: 8px; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px; color: var(--ink);
+  background: var(--bg-2); border: 3px solid var(--shadow);
+}
+.theme-btn .sw { width: 22px; height: 22px; flex-shrink: 0; border: 2px solid var(--shadow); display: grid; grid-template-columns: 1fr 1fr; }
+.theme-btn .sw i { display: block; }
+.theme-btn.active { border-color: var(--gold); }
+.theme-btn.locked { cursor: not-allowed; color: var(--ink-dim); opacity: .7; }
+.theme-btn .lock { margin-left: auto; font-size: 7px; color: var(--ink-dim); }
+.theme-btn.active .lock { color: var(--gold); }
+
+/* =========================== COIN RAIN =========================== */
+.coin-rain {
+  position: fixed; top: -40px; z-index: 600; pointer-events: none;
+  animation: coinFall linear forwards;
+}
+@keyframes coinFall { to { transform: translateY(112vh) rotate(540deg); } }
+
+/* =========================== RAINBOW (konami) =========================== */
+body.rainbow { animation: rainbow 6s linear infinite; }
+@keyframes rainbow { to { filter: hue-rotate(360deg); } }
+
+/* =========================== THEME PALETTES =========================== */
+body[data-theme="gameboy"] {
+  --bg: #0f380f; --bg-2: #0b2a0b; --panel: #1e4d1e; --panel-lt: #306230;
+  --ink: #d7f78a; --ink-dim: #8bac0f;
+  --gold: #9bbc0f; --gold-dk: #557a0a;
+  --green: #9bbc0f; --green-dk: #557a0a;
+  --red: #e0b020; --red-dk: #9a7400;
+  --blue: #8bac0f; --purple: #6d8a0c; --pink: #c8e060;
+  --shadow: #04140a;
+}
+body[data-theme="snes"] {
+  --bg: #211a3a; --bg-2: #2d2350; --panel: #3a2e69; --panel-lt: #4a3d85;
+  --ink: #efeaff; --ink-dim: #b3a6e0;
+  --gold: #b6a6ff; --gold-dk: #6f5fc0;
+  --green: #7be0a4; --green-dk: #2f8a5a;
+  --red: #ff7a9c; --red-dk: #b03a58;
+  --blue: #79b8ff; --purple: #c08bff; --pink: #ff9ed6;
+  --shadow: #120d24;
+}
+body[data-theme="arcade"] {
+  --bg: #05050a; --bg-2: #0e0e1a; --panel: #14142a; --panel-lt: #22224a;
+  --ink: #eafcff; --ink-dim: #7aa0b0;
+  --gold: #ffe14d; --gold-dk: #b89a00;
+  --green: #39ff14; --green-dk: #1f9a0c;
+  --red: #ff2f6d; --red-dk: #b01044;
+  --blue: #2ff0ff; --purple: #c54dff; --pink: #ff2fd0;
+  --shadow: #000006;
+}
 
 /* =========================== RESPONSIVE =========================== */
 @media (max-width: 720px) {

@@ -41,6 +41,10 @@ let state = {
   goalCelebrated: false,// fired the "quest complete" jingle already?
   catBudgets: {},       // { categoryId: monthlyLimit } — mini-bosses
   questsDone: [],       // ids of completed side quests
+  theme: 'default',     // unlockable skin
+  lastChest: null,      // YYYY-MM-DD of last daily-chest open
+  chestStreak: 0,       // consecutive days opening the chest
+  rainbow: false,       // konami-code rainbow mode
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -84,6 +88,10 @@ const els = {
   oracleText: $('oracleText'), oracleNext: $('oracleNext'),
   // side quests
   questList: $('questList'),
+  // buddy + chest + themes
+  buddyOcto: $('buddyOcto'), buddyMood: $('buddyMood'), buddySay: $('buddySay'),
+  chestBtn: $('chestBtn'), chestStreak: $('chestStreak'), chestSay: $('chestSay'),
+  themeGrid: $('themeGrid'),
 };
 
 /* ============================================================
@@ -590,6 +598,114 @@ function renderOracle() {
   els.oracleText.textContent = list[oracleIdx] || '';
 }
 
+/* ---------------- PET BUDDY (reacts to your finances) ---------------- */
+function renderBuddy() {
+  const { income, expense, balance } = totals();
+  const overBudget = state.budget && (state.budget - monthSpend()) < 0;
+  let mood = '🙂', say = 'Feed me some entries!', cls = '';
+  if (state.transactions.length === 0) {
+    mood = '🙂'; say = 'Feed me some entries!';
+  } else if (overBudget) {
+    mood = '😱'; say = 'We blew the budget this month!'; cls = 'sad';
+  } else if (income > 0) {
+    const rate = (income - expense) / income;
+    if (rate >= 0.2) { mood = '😄'; say = "I'm so proud of you!"; cls = 'happy'; }
+    else if (rate >= 0) { mood = '😊'; say = 'Doing okay — keep saving!'; }
+    else { mood = '😟'; say = "We're spending more than we earn…"; cls = 'sad'; }
+  } else {
+    mood = '🙂'; say = 'Log some income to get going!';
+  }
+  els.buddyOcto.className = 'buddy-octo ' + cls;
+  els.buddyMood.textContent = mood;
+  els.buddySay.textContent = say;
+}
+
+/* ---------------- DAILY CHEST ---------------- */
+const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD (local)
+const chestAvailable = () => state.lastChest !== todayStr();
+const CHEST_REWARDS = [
+  'A penny saved is a penny earned!',
+  'Future You says thanks for saving today.',
+  'Tip: automate savings so you never forget.',
+  'Small daily habits beat big rare efforts.',
+  'You showed up today — that\'s the real win!',
+  'Tip: track every expense for one week — it\'s eye-opening.',
+  'Compound interest is the 8th wonder of the world.',
+  'Pay yourself first, then spend the rest.',
+];
+function renderChest() {
+  const avail = chestAvailable();
+  els.chestBtn.classList.toggle('ready', avail);
+  els.chestBtn.disabled = !avail;
+  els.chestStreak.textContent = state.chestStreak > 0 ? 'DAY ' + state.chestStreak + ' STREAK 🔥' : 'NO STREAK YET';
+  els.chestSay.textContent = avail ? "Tap to open today's chest!" : 'Opened! Come back tomorrow.';
+}
+function openChest() {
+  if (!chestAvailable()) { sfx.error(); return; }
+  const yest = new Date(); yest.setDate(yest.getDate() - 1);
+  state.chestStreak = (state.lastChest === yest.toLocaleDateString('en-CA')) ? state.chestStreak + 1 : 1;
+  state.lastChest = todayStr();
+  save();
+  sfx.victory();
+  coinRain(28);
+  showToast('🎁 ' + CHEST_REWARDS[Math.floor(Math.random() * CHEST_REWARDS.length)]);
+  renderChest();
+}
+
+/* ---------------- UNLOCKABLE THEMES ---------------- */
+const THEMES = [
+  { id: 'default', name: 'CLASSIC',  lv: 1, sw: ['#0b0b1f', '#ffd23f'] },
+  { id: 'gameboy', name: 'GAME BOY', lv: 2, sw: ['#0f380f', '#9bbc0f'] },
+  { id: 'snes',    name: 'SNES',     lv: 4, sw: ['#211a3a', '#b6a6ff'] },
+  { id: 'arcade',  name: 'ARCADE',   lv: 6, sw: ['#05050a', '#ff2fd0'] },
+];
+function applyTheme(id) {
+  if (id && id !== 'default') document.body.dataset.theme = id;
+  else delete document.body.dataset.theme;
+}
+function renderThemes() {
+  const level = levelFor(totals().income);
+  els.themeGrid.innerHTML = '';
+  THEMES.forEach((t) => {
+    const unlocked = level >= t.lv;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'theme-btn' + (state.theme === t.id ? ' active' : '') + (unlocked ? '' : ' locked');
+    btn.innerHTML = `<span class="sw"><i style="background:${t.sw[0]}"></i><i style="background:${t.sw[1]}"></i><i style="background:${t.sw[1]}"></i><i style="background:${t.sw[0]}"></i></span>${t.name}<span class="lock">${unlocked ? (state.theme === t.id ? '✓' : '') : '🔒 LV.' + t.lv}</span>`;
+    if (unlocked) {
+      btn.addEventListener('click', () => {
+        state.theme = t.id; save(); applyTheme(t.id); sfx.click(); renderThemes();
+        showToast('🎨 SKIN: ' + t.name);
+      });
+    } else {
+      btn.addEventListener('click', () => { sfx.error(); showToast('🔒 REACH LV.' + t.lv + ' TO UNLOCK ' + t.name); });
+    }
+    els.themeGrid.appendChild(btn);
+  });
+}
+
+/* ---------------- COIN RAIN + KONAMI CHEAT ---------------- */
+function coinRain(n = 24) {
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('div');
+    c.className = 'coin-rain';
+    c.textContent = '🪙';
+    c.style.left = (Math.random() * 100) + 'vw';
+    c.style.fontSize = (16 + Math.random() * 18) + 'px';
+    c.style.animationDuration = (1.6 + Math.random() * 1.6) + 's';
+    c.style.animationDelay = (Math.random() * 0.6) + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 3800);
+  }
+}
+function activateCheat() {
+  state.rainbow = !state.rainbow;
+  save();
+  document.body.classList.toggle('rainbow', state.rainbow);
+  if (state.rainbow) { coinRain(44); sfx.victory(); showToast('🌈 CHEAT ACTIVATED — RAINBOW MODE!'); }
+  else { sfx.click(); showToast('RAINBOW MODE OFF'); }
+}
+
 function renderAll(prevLevel) {
   renderStats(prevLevel);
   renderList();
@@ -601,6 +717,9 @@ function renderAll(prevLevel) {
   renderChart();
   renderQuests();
   renderOracle();
+  renderBuddy();
+  renderThemes();
+  renderChest();
 }
 
 /* ============================================================
@@ -864,6 +983,12 @@ function importBackup(file) {
       : null;
     state.catBudgets = (data.catBudgets && typeof data.catBudgets === 'object') ? data.catBudgets : {};
     state.questsDone = Array.isArray(data.questsDone) ? data.questsDone : [];
+    state.theme = data.theme || 'default';
+    state.lastChest = data.lastChest || null;
+    state.chestStreak = Number(data.chestStreak) || 0;
+    state.rainbow = !!data.rainbow;
+    applyTheme(state.theme);
+    document.body.classList.toggle('rainbow', state.rainbow);
     state.soundOn = data.soundOn !== false;
     state.budgetBreached = !!data.budgetBreached;
     state.goalCelebrated = !!data.goalCelebrated;
@@ -937,6 +1062,25 @@ els.reset.addEventListener('click', resetAll);
 els.exportBtn.addEventListener('click', exportPDF);
 els.backupBtn.addEventListener('click', exportBackup);
 els.oracleNext.addEventListener('click', () => { oracleIdx += 1; sfx.click(); renderOracle(); });
+els.chestBtn.addEventListener('click', openChest);
+
+// Konami code (keyboard) → rainbow cheat
+const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
+let kbuf = [];
+window.addEventListener('keydown', (e) => {
+  kbuf.push(e.key.toLowerCase());
+  if (kbuf.length > KONAMI.length) kbuf.shift();
+  if (KONAMI.length === kbuf.length && KONAMI.every((k, i) => kbuf[i] === k)) { kbuf = []; activateCheat(); }
+});
+// mobile secret: tap the title 8 times quickly
+let titleTaps = 0, titleTimer;
+const h1 = document.querySelector('h1');
+if (h1) h1.addEventListener('click', () => {
+  titleTaps += 1;
+  clearTimeout(titleTimer);
+  titleTimer = setTimeout(() => { titleTaps = 0; }, 1500);
+  if (titleTaps >= 8) { titleTaps = 0; activateCheat(); }
+});
 els.restoreBtn.addEventListener('click', () => els.restoreInput.click());
 els.restoreInput.addEventListener('change', (e) => {
   const f = e.target.files[0];
@@ -988,6 +1132,8 @@ els.mute.addEventListener('click', () => {
 function init() {
   load();
   els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
+  applyTheme(state.theme);
+  document.body.classList.toggle('rainbow', !!state.rainbow);
   fillCategories();
   fillCatBudgetSelect();
   renderAll();

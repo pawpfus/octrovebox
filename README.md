@@ -50,6 +50,18 @@ One click generates a clean, printable financial report — summary, budget stat
 ### 🔮 The Oracle (insights & education)
 A retro advisor that reads **your own tracked data** and gives personalised tips — savings rate, biggest spending category, emergency-fund coverage, budget and goal nudges — plus rotating general education on stocks & gold (diversification, dollar-cost averaging, gold as a hedge). Works offline. *Educational only — not financial advice.*
 
+### 🐙 Pixel pet
+Your octopus mascot reacts live to your finances — happy and bouncing when your savings rate is good, sad and grey when you overspend or blow the budget.
+
+### 🎁 Daily chest
+Open a treasure chest once per day for a coin-shower animation and a random tip, building a daily-login streak.
+
+### 🎨 Unlockable skins
+Retro theme palettes — Classic, Game Boy, SNES, Arcade — that unlock as you level up and re-skin the whole app.
+
+### 🌈 Secret cheat
+Enter the Konami code (↑↑↓↓←→←→ B A) on a keyboard, or tap the title 8 times on mobile, to toggle rainbow mode with a coin rain.
+
 ### 👾 Roaming buddies
 Pac-Man and the four ghosts (drawn as crisp SVG sprites) drift and bounce freely around the screen for extra retro charm — and **scatter in surprise whenever you log a transaction**, then settle back down. They never block clicks, and they respect your "reduced motion" setting.
 
