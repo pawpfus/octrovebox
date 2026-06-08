@@ -769,9 +769,9 @@ body[data-theme="midas"] {
   .quest-row { grid-template-columns: 1fr; }
   .logo-octo { display: none; }
   .cat-row { grid-template-columns: 86px 1fr 60px; }
-  /* skins become one inline, horizontally-scrollable row */
-  .theme-grid { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
-  .theme-btn { flex: 0 0 auto; }
-  .theme-grid::-webkit-scrollbar { height: 6px; }
-  .theme-grid::-webkit-scrollbar-thumb { background: var(--panel-lt); }
+  /* skins: one compact inline row that fits without scrolling (swatches only) */
+  .theme-grid { display: flex; flex-wrap: nowrap; gap: 6px; }
+  .theme-btn { flex: 1 1 0; min-width: 0; justify-content: center; gap: 4px; padding: 9px 4px; }
+  .theme-name { display: none; }
+  .theme-btn .lock { margin-left: 0; }
 }

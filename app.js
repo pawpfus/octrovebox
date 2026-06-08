@@ -656,14 +656,14 @@ function renderThemes() {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'theme-btn' + (state.theme === t.id ? ' active' : '') + (unlocked ? '' : ' locked');
-    btn.innerHTML = `<span class="sw"><i style="background:${t.sw[0]}"></i><i style="background:${t.sw[1]}"></i><i style="background:${t.sw[1]}"></i><i style="background:${t.sw[0]}"></i></span>${t.name}<span class="lock">${unlocked ? (state.theme === t.id ? '✓' : '') : '🔒 ' + themeReq(t)}</span>`;
+    btn.innerHTML = `<span class="sw"><i style="background:${t.sw[0]}"></i><i style="background:${t.sw[1]}"></i><i style="background:${t.sw[1]}"></i><i style="background:${t.sw[0]}"></i></span><span class="theme-name">${t.name}</span><span class="lock">${unlocked ? (state.theme === t.id ? '✓' : '') : '🔒'}</span>`;
     if (unlocked) {
       btn.addEventListener('click', () => {
         state.theme = t.id; save(); applyTheme(t.id); sfx.click(); renderThemes();
         showToast('🎨 SKIN: ' + t.name);
       });
     } else {
-      btn.addEventListener('click', () => { sfx.error(); showToast('🔒 UNLOCK ' + t.name + ': ' + themeReq(t)); });
+      btn.addEventListener('click', () => { sfx.error(); showToast('🔒 LOCKED — KEEP PLAYING TO UNLOCK!'); });
     }
     els.themeGrid.appendChild(btn);
   });
