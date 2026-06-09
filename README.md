@@ -18,12 +18,6 @@ A fully client-side personal finance tracker with a retro Nintendo 8-bit theme. 
 ### 🗺️ Side Quests
 A panel of auto-tracked challenges (log 5 entries, spend in 3 categories, reach a $5,000 balance, hit a 3-month budget streak, complete a savings quest, and more). Each shows live progress and fires a celebration when you complete it.
 
-### 🧙 Character class
-Pick a class — 🛡️ Saver Knight, 🔮 Investor Mage, or 🗡️ Hustle Rogue — that sets your title and grants a perk (Knight shields the Budget Boss, Mage gets investing-focused Oracle tips, Rogue gets bigger daily-chest loot). Chosen on first run; change anytime.
-
-### ❤️ Player HP
-A vitality bar where your HP = how many months of expenses your balance covers (emergency-fund strength) — green when 3+ months, draining red when low.
-
 ### 🎒 Relic Vault
 Collect pixel relics (Gem of Thrift, Blade of Income, Crown of Wealth, Quest Trophy…) earned at milestones, shown with locked silhouettes until unlocked.
 
