@@ -439,27 +439,6 @@ input[type=number] { -moz-appearance: textfield; }
 }
 select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 
-/* repeat-monthly checkbox */
-.repeat-field {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 8px; color: var(--ink-dim); cursor: pointer;
-  margin-bottom: 16px; letter-spacing: 1px;
-}
-.repeat-field input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--gold); cursor: pointer; padding: 0; }
-
-/* recurring list */
-.recurring-row {
-  display: grid; grid-template-columns: 28px 1fr auto auto; align-items: center; gap: 10px;
-  padding: 10px; background: var(--bg-2); border: 3px solid var(--shadow); margin-bottom: 8px;
-}
-.recurring-row .r-ico { font-size: 16px; text-align: center; }
-.recurring-row .r-name { font-size: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recurring-row .r-amt { font-size: 9px; white-space: nowrap; }
-.recurring-row .r-amt.income { color: var(--green); }
-.recurring-row .r-amt.expense { color: var(--red); }
-.recurring-row .r-del { font-family: inherit; font-size: 10px; background: transparent; border: none; color: #5b5b8f; cursor: pointer; }
-.recurring-row .r-del:hover { color: var(--red); }
-
 /* big action button */
 .submit-btn {
   font-family: inherit;

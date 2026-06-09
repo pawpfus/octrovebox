@@ -38,8 +38,8 @@ Set a named savings goal and watch a golden treasure bar fill toward it:
 ### 📜 Monthly Recap
 A "LEVEL COMPLETE" results card for the current month — earned, spent, saved, savings-rate grade (S/A/B/C/D), budget result, and top category — styled to screenshot and share.
 
-### ✏️ Edit & 🔁 Recurring entries
-Tap ✎ on any entry to edit it (not just delete). Tick "repeat monthly" when adding salary/rent and it auto-adds each new month.
+### ✏️ Edit entries
+Tap ✎ on any entry to edit its name, amount, category, or type — not just delete.
 
 ### 🔥 Streak Tracking
 A `🔥 X MO` counter in the HUD counts consecutive completed months you stayed under your Budget Boss limit.

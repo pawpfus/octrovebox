@@ -47,7 +47,6 @@ let state = {
   lastChest: null,      // YYYY-MM-DD of last daily-chest open
   chestStreak: 0,       // consecutive days opening the chest
   rainbow: false,       // konami-code rainbow mode
-  recurring: [],        // monthly auto-add templates {id,type,desc,amount,category,lastMonth}
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -92,8 +91,6 @@ const els = {
   oracleText: $('oracleText'), oracleNext: $('oracleNext'),
   // side quests
   questList: $('questList'),
-  // recurring
-  repeatInput: $('repeatInput'), recurringList: $('recurringList'), recurringEmpty: $('recurringEmpty'),
   // chest + themes
   chestBtn: $('chestBtn'), chestStreak: $('chestStreak'), chestSay: $('chestSay'),
   themeGrid: $('themeGrid'),
@@ -171,7 +168,6 @@ function levelFor(income) {
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
 const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-const curMonthIdx = () => { const n = new Date(); return n.getFullYear() * 12 + n.getMonth(); };
 
 // income + expense totals for a given year/month (optionally a single category)
 function monthTotals(y, m, category) {
@@ -633,40 +629,6 @@ function renderOracle() {            // instant update from renderAll — don't 
 }
 function typeOracle() { typewrite(els.oracleText, currentTip()); } // animated (NEXT / first load)
 
-/* ---------------- RECURRING ENTRIES ---------------- */
-function applyRecurring() {
-  const idx = curMonthIdx();
-  let added = 0;
-  state.recurring.forEach((r, i) => {
-    if (r.lastMonth !== idx) {
-      state.transactions.push({ id: Date.now() + i + 1, type: r.type, desc: r.desc, amount: r.amount, category: r.category });
-      r.lastMonth = idx;
-      added += 1;
-    }
-  });
-  if (added) save();
-  return added;
-}
-function renderRecurring() {
-  els.recurringEmpty.style.display = state.recurring.length ? 'none' : 'block';
-  els.recurringList.innerHTML = '';
-  state.recurring.forEach((r) => {
-    const c = catInfo(r.type, r.category);
-    const row = document.createElement('div');
-    row.className = 'recurring-row';
-    row.innerHTML = `
-      <span class="r-ico">${c.icon}</span>
-      <span class="r-name">${escapeHtml(r.desc)} · ${c.name}</span>
-      <span class="r-amt ${r.type}">${r.type === 'income' ? '+' : '-'}${fmt(r.amount).replace('-', '')}/mo</span>
-      <button class="r-del" title="Remove" data-id="${r.id}">✕</button>`;
-    els.recurringList.appendChild(row);
-  });
-}
-function removeRecurring(id) {
-  state.recurring = state.recurring.filter((r) => r.id !== Number(id));
-  save(); sfx.delete(); renderRecurring();
-}
-
 /* ---------------- DAILY CHEST ---------------- */
 const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD (local)
 const chestAvailable = () => state.lastChest !== todayStr();
@@ -777,7 +739,6 @@ function renderAll(prevLevel) {
   renderStreak();
   renderChart();
   renderQuests();
-  renderRecurring();
   renderOracle();
   renderThemes();
   renderChest();
@@ -815,7 +776,6 @@ function startEdit(id) {
   if (!tx) return;
   editingId = tx.id;
   setType(tx.type);
-  if (els.repeatInput) els.repeatInput.checked = false;
   els.desc.value = tx.desc;
   els.amount.value = tx.amount;
   els.category.value = tx.category;
@@ -852,11 +812,6 @@ function addTx(e) {
     amount,
     category: els.category.value,
   });
-  // optionally register as a monthly recurring template
-  if (els.repeatInput && els.repeatInput.checked) {
-    state.recurring.push({ id: Date.now() + 1, type: currentType, desc, amount, category: els.category.value, lastMonth: curMonthIdx() });
-    els.repeatInput.checked = false;
-  }
   save();
 
   currentType === 'income' ? sfx.coin() : sfx.spend();
@@ -1078,7 +1033,6 @@ function importBackup(file) {
       : null;
     state.catBudgets = (data.catBudgets && typeof data.catBudgets === 'object') ? data.catBudgets : {};
     state.questsDone = Array.isArray(data.questsDone) ? data.questsDone : [];
-    state.recurring = Array.isArray(data.recurring) ? data.recurring : [];
     state.theme = data.theme || 'default';
     state.themesSeen = Array.isArray(data.themesSeen) ? data.themesSeen : [];
     state.lastChest = data.lastChest || null;
@@ -1259,10 +1213,6 @@ els.list.addEventListener('click', (e) => {
   const del = e.target.closest('.tx-del');
   if (del) deleteTx(del.dataset.id);
 });
-els.recurringList.addEventListener('click', (e) => {
-  const b = e.target.closest('.r-del');
-  if (b) removeRecurring(b.dataset.id);
-});
 
 els.filters.addEventListener('click', (e) => {
   const btn = e.target.closest('.filter-btn');
@@ -1285,7 +1235,6 @@ els.mute.addEventListener('click', () => {
 ============================================================ */
 function init() {
   load();
-  const recurAdded = applyRecurring(); // auto-add any monthly entries due
   els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
   applyTheme(state.theme);
   document.body.classList.toggle('rainbow', !!state.rainbow);
@@ -1299,7 +1248,6 @@ function init() {
   }
   appReady = true; // from now on, completing a side quest celebrates
   typeOracle();    // type out the first Oracle tip for that RPG-textbox feel
-  if (recurAdded) showToast('🔁 ADDED ' + recurAdded + ' RECURRING ENTR' + (recurAdded > 1 ? 'IES' : 'Y') + ' FOR THIS MONTH');
 }
 init();
 
