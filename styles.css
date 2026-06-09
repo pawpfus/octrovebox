@@ -852,7 +852,9 @@ body[data-theme="midas"] {
   .theme-btn { flex: 1 1 0; min-width: 0; justify-content: center; gap: 4px; padding: 9px 4px; }
   .theme-name { display: none; }
   .theme-btn .lock { margin-left: 0; }
-  /* footer: shrink so RECAP/BACKUP/RESTORE share one row (3 per line) */
-  .foot-actions { grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  /* footer: row 1 = RECAP/BACKUP/RESTORE (3 equal), row 2 = EXPORT/ERASE (2 equal) */
+  .foot-actions { grid-template-columns: repeat(6, 1fr); gap: 7px; }
   .foot-actions button { font-size: 6.5px; padding: 10px 3px; letter-spacing: 0; }
+  .foot-actions button:nth-child(-n+3) { grid-column: span 2; } /* recap/backup/restore */
+  .foot-actions button:nth-child(4), .foot-actions button:nth-child(5) { grid-column: span 3; } /* export pdf / erase */
 }
