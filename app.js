@@ -502,7 +502,7 @@ const EDU_TIPS = [
   '💡 Index funds let you own a slice of hundreds of companies at once, with low fees — popular for beginners.',
   '💡 Only invest money you won\'t need for 5+ years in stocks; keep short-term savings in cash or gold.',
   '💡 Gold pays no dividends or interest — it\'s a store of value, not an income source. Balance it with assets that grow.',
-  '💡 Beware lifestyle creep: like a daily caffeine habit or a government boondoggle, small recurring waste quietly compounds into doom.',
+  '💡 All good until our daily caffeine spending & government boondoggle foreshadows doom.',
 ];
 
 function distinctMonths() {
