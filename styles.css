@@ -68,9 +68,18 @@ body {
   background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
 }
 
+/* parallax starfield, painted behind all content */
+.stars {
+  position: fixed; inset: 0; z-index: -1;
+  width: 100%; height: 100%;
+  pointer-events: none; display: block;
+}
+
 .screen {
   max-width: 880px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 /* =========================== HEADER =========================== */

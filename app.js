@@ -35,6 +35,7 @@ const CAT_COLORS = {
 let state = {
   transactions: [],
   soundOn: true,
+  musicOn: false,
   budget: 0,            // monthly spending limit (0 = none)
   goal: null,           // { name, target }
   budgetBreached: false,// fired the "over budget" warning already?
@@ -62,7 +63,7 @@ const els = {
   btnExpense: $('btnExpense'), btnIncome: $('btnIncome'), submit: $('submitBtn'),
   list: $('txList'), emptyState: $('emptyState'),
   catBars: $('catBars'), catEmpty: $('catEmpty'),
-  filters: $('logFilters'), mute: $('muteBtn'),
+  filters: $('logFilters'), mute: $('muteBtn'), music: $('musicBtn'),
   reset: $('resetBtn'), toast: $('toast'),
   exportBtn: $('exportBtn'), printReport: $('printReport'),
   updateBar: $('updateBar'), updateBtn: $('updateBtn'),
@@ -98,10 +99,15 @@ const els = {
    SOUND — tiny Web Audio chiptune blips, no assets needed
 ============================================================ */
 let audioCtx;
+function getAudio() {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
 function beep(freqs, dur = 0.09, type = 'square', gain = 0.05) {
   if (!state.soundOn) return;
   try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    getAudio();
     let t = audioCtx.currentTime;
     freqs.forEach((f) => {
       const osc = audioCtx.createOscillator();
@@ -982,6 +988,9 @@ function importBackup(file) {
     applyTheme(state.theme);
     document.body.classList.toggle('rainbow', state.rainbow);
     state.soundOn = data.soundOn !== false;
+    state.musicOn = !!data.musicOn;
+    setMusicLabel();
+    if (state.musicOn) startMusic(); else stopMusic();
     state.budgetBreached = !!data.budgetBreached;
     state.goalCelebrated = !!data.goalCelebrated;
     save();
@@ -1267,4 +1276,100 @@ if ('serviceWorker' in navigator) {
     });
     requestAnimationFrame(step);
   })(performance.now());
+})();
+
+/* ============================================================
+   CHIPTUNE BACKGROUND MUSIC (generated live, looping)
+============================================================ */
+const N2F = (n) => 440 * Math.pow(2, (n - 69) / 12); // MIDI note -> frequency
+const MEL  = [72, 76, 79, 84, 81, 79, 76, 0, 74, 72, 76, 79, 76, 74, 72, 0]; // C-major pentatonic
+const BASS = [48, 0, 0, 0, 45, 0, 0, 0, 43, 0, 0, 0, 45, 0, 0, 0];
+const STEP_MS = 200;
+const music = { timer: null, step: 0 };
+
+function mNote(freq, dur, type, vol) {
+  try {
+    const ctx = getAudio();
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(t); osc.stop(t + dur + 0.03);
+  } catch (e) { /* audio unavailable */ }
+}
+function musicTick() {
+  const m = MEL[music.step % MEL.length];
+  const b = BASS[music.step % BASS.length];
+  if (m) mNote(N2F(m), 0.18, 'square', 0.035);
+  if (b) mNote(N2F(b), 0.42, 'triangle', 0.045);
+  music.step += 1;
+}
+function startMusic() {
+  if (music.timer) return;
+  try { getAudio(); } catch (e) { return; }
+  musicTick();
+  music.timer = setInterval(musicTick, STEP_MS);
+}
+function stopMusic() {
+  if (music.timer) { clearInterval(music.timer); music.timer = null; }
+}
+function setMusicLabel() { els.music.textContent = '♫ MUSIC: ' + (state.musicOn ? 'ON' : 'OFF'); }
+function toggleMusic() {
+  state.musicOn = !state.musicOn;
+  save();
+  setMusicLabel();
+  if (state.musicOn) startMusic(); else stopMusic();
+}
+els.music.addEventListener('click', toggleMusic);
+setMusicLabel();
+// browsers block audio until a gesture — if music was on last session, start on first interaction
+if (state.musicOn) {
+  const kick = () => { startMusic(); window.removeEventListener('pointerdown', kick); window.removeEventListener('keydown', kick); };
+  window.addEventListener('pointerdown', kick);
+  window.addEventListener('keydown', kick);
+}
+
+/* ============================================================
+   PARALLAX STARFIELD (behind everything)
+============================================================ */
+(function starfield() {
+  const cv = document.getElementById('stars');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const COLORS = ['#ffffff', '#ffffff', '#ffd23f', '#4fa9ff', '#b06bff'];
+  let w, h, stars;
+  function resize() {
+    w = cv.width = window.innerWidth;
+    h = cv.height = window.innerHeight;
+    const count = Math.max(28, Math.round((w * h) / 14000));
+    stars = [];
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * w, y: Math.random() * h,
+        s: Math.random() < 0.85 ? 1 : 2,
+        sp: 0.12 + Math.random() * 0.5,
+        c: COLORS[Math.floor(Math.random() * COLORS.length)],
+        tw: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+  function paint(animate) {
+    ctx.clearRect(0, 0, w, h);
+    for (const st of stars) {
+      if (animate) { st.y += st.sp; if (st.y > h) { st.y = -2; st.x = Math.random() * w; } st.tw += 0.05; }
+      ctx.globalAlpha = animate ? 0.45 + 0.55 * Math.abs(Math.sin(st.tw)) : 0.8;
+      ctx.fillStyle = st.c;
+      ctx.fillRect(st.x | 0, st.y | 0, st.s, st.s);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function loop() { paint(true); requestAnimationFrame(loop); }
+  resize();
+  window.addEventListener('resize', resize);
+  if (reduce) paint(false); else requestAnimationFrame(loop);
 })();

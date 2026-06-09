@@ -62,6 +62,12 @@ Enter the Konami code (↑↑↓↓←→←→ B A) on a keyboard, or tap the t
 ### 👾 Roaming buddies
 Pac-Man and the four ghosts (drawn as crisp SVG sprites) drift and bounce freely around the screen for extra retro charm — and **scatter in surprise whenever you log a transaction**, then settle back down. They never block clicks, and they respect your "reduced motion" setting.
 
+### 🎶 Chiptune background music
+A gentle looping 8-bit melody generated live with the Web Audio API (no audio files), with its own on/off toggle.
+
+### ✨ Parallax starfield
+Slow-drifting pixel stars twinkle behind the panels for depth and atmosphere (respects reduced-motion).
+
 ### 🎵 Chiptune sound effects
 Coin pickups, spend blips, error buzzes, boss roars, and victory fanfares — all generated live with the Web Audio API (no audio files). Toggle with the SOUND button.
 
