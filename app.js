@@ -36,6 +36,7 @@ let state = {
   transactions: [],
   soundOn: true,
   musicOn: false,
+  musicTrack: 0,
   budget: 0,            // monthly spending limit (0 = none)
   goal: null,           // { name, target }
   budgetBreached: false,// fired the "over budget" warning already?
@@ -1091,6 +1092,7 @@ function importBackup(file) {
     document.body.classList.toggle('rainbow', state.rainbow);
     state.soundOn = data.soundOn !== false;
     state.musicOn = !!data.musicOn;
+    state.musicTrack = Number(data.musicTrack) || 0;
     setMusicLabel();
     if (state.musicOn) startMusic(); else stopMusic();
     state.budgetBreached = !!data.budgetBreached;
@@ -1435,12 +1437,23 @@ if ('serviceWorker' in navigator) {
    CHIPTUNE BACKGROUND MUSIC (generated live, looping)
 ============================================================ */
 const N2F = (n) => 440 * Math.pow(2, (n - 69) / 12); // MIDI note -> frequency
-// calm/hopeful: warm major sine pads (C–G–Am–F), gentle rising lead, soft twinkles
-const PAD     = [48, 0, 0, 0, 43, 0, 0, 0, 45, 0, 0, 0, 41, 0, 0, 0]; // C G Am F
-const LEAD    = [0, 0, 72, 76, 0, 79, 76, 0, 0, 0, 81, 79, 0, 76, 74, 72];
-const TWINKLE = [84, 88, 91, 96]; // bright C-major sparkles
-const STEP_MS = 300;
+// jukebox: cycle OFF -> CALM -> COZY TOWN -> OFF with the MUSIC button
+const TRACKS = [
+  { // calm/hopeful: warm major pads (C–G–Am–F), gentle rising lead
+    name: 'CALM', stepMs: 300, drone: true,
+    pad:  [48, 0, 0, 0, 43, 0, 0, 0, 45, 0, 0, 0, 41, 0, 0, 0],
+    lead: [0, 0, 72, 76, 0, 79, 76, 0, 0, 0, 81, 79, 0, 76, 74, 72],
+    twinkle: [84, 88, 91, 96],
+  },
+  { // cozy town: bouncier mid-tempo C–Am–F–G with a friendly skipping melody
+    name: 'COZY TOWN', stepMs: 220, drone: false,
+    pad:  [48, 0, 0, 0, 45, 0, 0, 0, 41, 0, 0, 0, 43, 0, 0, 0],
+    lead: [76, 0, 72, 0, 74, 0, 69, 0, 72, 0, 77, 0, 74, 0, 79, 0],
+    twinkle: [84, 88, 91],
+  },
+];
 const music = { timer: null, step: 0 };
+function curTrack() { return TRACKS[state.musicTrack] || TRACKS[0]; }
 
 function mNote(freq, dur, type, vol) {
   try {
@@ -1457,18 +1470,19 @@ function mNote(freq, dur, type, vol) {
   } catch (e) { /* audio unavailable */ }
 }
 function musicTick() {
+  const tk = curTrack();
   const i = music.step % 16;
-  if (i === 0) mNote(N2F(36), 2.6, 'sine', 0.03); // soft low C for warmth/grounding
-  const pad = PAD[i];
-  if (pad) {                                     // warm major pad: root + fifth + octave
+  if (tk.drone && i === 0) mNote(N2F(36), 2.6, 'sine', 0.03);
+  const pad = tk.pad[i];
+  if (pad) {
     mNote(N2F(pad), 1.9, 'sine', 0.05);
     mNote(N2F(pad + 7), 1.9, 'sine', 0.03);
     mNote(N2F(pad + 12), 1.9, 'sine', 0.018);
   }
-  const m = LEAD[i];
-  if (m) mNote(N2F(m), 0.55, 'triangle', 0.038); // gentle rising lead
-  if (Math.random() < 0.2) {                     // soft bright twinkle
-    mNote(N2F(TWINKLE[Math.floor(Math.random() * TWINKLE.length)]), 0.35, 'sine', 0.02);
+  const m = tk.lead[i];
+  if (m) mNote(N2F(m), 0.5, 'triangle', 0.04);
+  if (Math.random() < 0.2) {
+    mNote(N2F(tk.twinkle[Math.floor(Math.random() * tk.twinkle.length)]), 0.32, 'sine', 0.02);
   }
   music.step += 1;
 }
@@ -1476,19 +1490,24 @@ function startMusic() {
   if (music.timer) return;
   try { getAudio(); } catch (e) { return; }
   musicTick();
-  music.timer = setInterval(musicTick, STEP_MS);
+  music.timer = setInterval(musicTick, curTrack().stepMs);
 }
 function stopMusic() {
   if (music.timer) { clearInterval(music.timer); music.timer = null; }
 }
-function setMusicLabel() { els.music.textContent = '♫ MUSIC: ' + (state.musicOn ? 'ON' : 'OFF'); }
-function toggleMusic() {
-  state.musicOn = !state.musicOn;
+function setMusicLabel() { els.music.textContent = state.musicOn ? ('♫ ' + curTrack().name) : '♫ MUSIC: OFF'; }
+function cycleMusic() {
+  if (!state.musicOn) { state.musicOn = true; state.musicTrack = 0; }
+  else {
+    state.musicTrack += 1;
+    if (state.musicTrack >= TRACKS.length) { state.musicOn = false; state.musicTrack = 0; }
+  }
   save();
   setMusicLabel();
-  if (state.musicOn) startMusic(); else stopMusic();
+  stopMusic();
+  if (state.musicOn) { music.step = 0; startMusic(); }
 }
-els.music.addEventListener('click', toggleMusic);
+els.music.addEventListener('click', cycleMusic);
 setMusicLabel();
 // browsers block audio until a gesture — if music was on last session, start on first interaction
 if (state.musicOn) {

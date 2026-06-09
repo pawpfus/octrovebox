@@ -74,8 +74,8 @@ Enter the Konami code (↑↑↓↓←→←→ B A) on a keyboard, or tap the t
 ### 👾 Roaming buddies
 Pac-Man and the four ghosts (drawn as crisp SVG sprites) drift and bounce freely around the screen for extra retro charm — and **scatter in surprise whenever you log a transaction**, then settle back down. They never block clicks, and they respect your "reduced motion" setting.
 
-### 🎶 Chiptune background music
-A gentle looping 8-bit melody generated live with the Web Audio API (no audio files), with its own on/off toggle.
+### 🎶 Chiptune jukebox
+Looping 8-bit tracks generated live with the Web Audio API (no audio files). The MUSIC button cycles OFF → Calm → Cozy Town.
 
 ### ✨ Parallax starfield + day/night
 Slow-drifting pixel stars twinkle behind the panels, and the sky shifts with your real local time — warm dawn, bright day, dusk, and a deep starry night with a moon (respects reduced-motion).
