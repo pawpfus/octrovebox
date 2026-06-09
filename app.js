@@ -1282,12 +1282,11 @@ if ('serviceWorker' in navigator) {
    CHIPTUNE BACKGROUND MUSIC (generated live, looping)
 ============================================================ */
 const N2F = (n) => 440 * Math.pow(2, (n - 69) / 12); // MIDI note -> frequency
-// eerie/mysterious: low detuned drone, tritone pad chords (A <-> Eb),
-// sparse Phrygian lead (flat-2nd), faint dissonant high shimmer
-const PAD     = [45, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0]; // A2 then Eb3 (tritone apart)
-const LEAD    = [0, 0, 77, 0, 76, 0, 0, 72, 0, 0, 70, 0, 69, 0, 0, 0]; // F E C ... Bb A (Phrygian)
-const TWINKLE = [81, 83, 86, 89];
-const STEP_MS = 360;
+// calm/hopeful: warm major sine pads (C–G–Am–F), gentle rising lead, soft twinkles
+const PAD     = [48, 0, 0, 0, 43, 0, 0, 0, 45, 0, 0, 0, 41, 0, 0, 0]; // C G Am F
+const LEAD    = [0, 0, 72, 76, 0, 79, 76, 0, 0, 0, 81, 79, 0, 76, 74, 72];
+const TWINKLE = [84, 88, 91, 96]; // bright C-major sparkles
+const STEP_MS = 300;
 const music = { timer: null, step: 0 };
 
 function mNote(freq, dur, type, vol) {
@@ -1306,22 +1305,17 @@ function mNote(freq, dur, type, vol) {
 }
 function musicTick() {
   const i = music.step % 16;
-  if (i === 0 || i === 8) {                      // low detuned drone (slow beating = unease)
-    mNote(N2F(33), 3.0, 'sine', 0.05);
-    mNote(N2F(33) * 1.005, 3.0, 'sine', 0.03);
-  }
+  if (i === 0) mNote(N2F(36), 2.6, 'sine', 0.03); // soft low C for warmth/grounding
   const pad = PAD[i];
-  if (pad) {                                     // dissonant pad: root + tritone + minor 3rd
-    mNote(N2F(pad), 2.4, 'sine', 0.045);
-    mNote(N2F(pad + 6), 2.4, 'sine', 0.028);     // tritone — "diabolus in musica"
-    mNote(N2F(pad + 3), 2.4, 'triangle', 0.02);
+  if (pad) {                                     // warm major pad: root + fifth + octave
+    mNote(N2F(pad), 1.9, 'sine', 0.05);
+    mNote(N2F(pad + 7), 1.9, 'sine', 0.03);
+    mNote(N2F(pad + 12), 1.9, 'sine', 0.018);
   }
   const m = LEAD[i];
-  if (m) mNote(N2F(m), 0.7, 'triangle', 0.034);  // sparse Phrygian lead
-  if (Math.random() < 0.16) {                    // faint minor-2nd shimmer up high
-    const t = TWINKLE[Math.floor(Math.random() * TWINKLE.length)];
-    mNote(N2F(t), 0.4, 'sine', 0.017);
-    mNote(N2F(t + 1), 0.4, 'sine', 0.011);
+  if (m) mNote(N2F(m), 0.55, 'triangle', 0.038); // gentle rising lead
+  if (Math.random() < 0.2) {                     // soft bright twinkle
+    mNote(N2F(TWINKLE[Math.floor(Math.random() * TWINKLE.length)]), 0.35, 'sine', 0.02);
   }
   music.step += 1;
 }
