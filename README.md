@@ -18,9 +18,6 @@ A fully client-side personal finance tracker with a retro Nintendo 8-bit theme. 
 ### 🗺️ Side Quests
 A panel of auto-tracked challenges (log 5 entries, spend in 3 categories, reach a $5,000 balance, hit a 3-month budget streak, complete a savings quest, and more). Each shows live progress and fires a celebration when you complete it.
 
-### 🗓️ Spending Heatmap
-A pixel calendar of the current month where each day glows brighter the more you spent — spot your heavy spending days at a glance.
-
 ### 🎲 Random encounters
 Logging an entry has a small chance to trigger a pixel event — a wandering merchant, a found coin, a goblin pickpocket — for a bit of dungeon-crawl surprise.
 

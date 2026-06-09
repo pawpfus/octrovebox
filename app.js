@@ -85,8 +85,6 @@ const els = {
   catBudgetSelect: $('catBudgetSelect'), catBudgetInput: $('catBudgetInput'), catBudgetSave: $('catBudgetSave'),
   // world map chart + streak
   chart: $('chart'), monthStreak: $('monthStreak'),
-  // spending heatmap
-  heatMonth: $('heatMonth'), heatGrid: $('heatGrid'),
   // xp
   xpFill: $('xpFill'), xpNext: $('xpNext'),
   // oracle
@@ -444,34 +442,6 @@ function renderStreak() {
   els.monthStreak.textContent = '🔥 ' + s + ' MO';
 }
 
-/* ---------------- SPENDING HEATMAP (current month) ---------------- */
-function renderHeatmap() {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  els.heatMonth.textContent = MONTHS[m] + ' ' + y;
-  const daysIn = new Date(y, m + 1, 0).getDate();
-  const firstDow = new Date(y, m, 1).getDay();
-  const daily = {};
-  state.transactions.forEach((t) => {
-    if (t.type !== 'expense') return;
-    const d = new Date(t.id);
-    if (d.getFullYear() === y && d.getMonth() === m) daily[d.getDate()] = (daily[d.getDate()] || 0) + t.amount;
-  });
-  const max = Math.max(1, ...Object.values(daily));
-  const today = now.getDate();
-  let html = '';
-  for (let i = 0; i < firstDow; i++) html += '<span class="heat-cell blank"></span>';
-  for (let d = 1; d <= daysIn; d++) {
-    const v = daily[d] || 0;
-    const has = v > 0;
-    const alpha = has ? (0.2 + 0.8 * (v / max)).toFixed(2) : 0;
-    const style = has ? `background-color:rgba(255,210,63,${alpha})` : '';
-    const cls = 'heat-cell' + (d === today ? ' today' : '') + (has ? ' has' : '');
-    html += `<span class="${cls}" style="${style}" title="${MONTHS[m]} ${d}: ${fmt(v)}">${d}</span>`;
-  }
-  els.heatGrid.innerHTML = html;
-}
-
 /* ---------------- WORLD MAP CHART (last 6 months) ---------------- */
 function kfmt(n) {
   if (n >= 1000) return '$' + (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'k';
@@ -782,7 +752,6 @@ function renderAll(prevLevel) {
   renderGoal();
   renderMiniBosses();
   renderStreak();
-  renderHeatmap();
   renderChart();
   renderQuests();
   renderOracle();

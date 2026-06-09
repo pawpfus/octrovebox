@@ -326,26 +326,6 @@ h1 {
 .mboss-select { flex: 1; min-width: 90px; }
 .mboss-editor input { flex: 1; min-width: 60px; }
 
-/* =========================== SPENDING HEATMAP =========================== */
-.heatmap-panel { margin-bottom: 18px; }
-.heat-month { font-size: 8px; color: var(--gold); }
-.heat-weekdays, .heat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.heat-weekdays { margin-bottom: 6px; }
-.heat-weekdays span { font-size: 7px; color: var(--ink-dim); text-align: center; }
-.heat-cell {
-  aspect-ratio: 1 / 1; background: var(--bg-2); border: 2px solid var(--shadow);
-  display: grid; place-items: center; font-size: 8px; color: var(--ink-dim);
-}
-.heat-cell.blank { background: transparent; border: none; }
-.heat-cell.has { color: #1a1205; }
-.heat-cell.today { outline: 3px solid var(--gold); outline-offset: -3px; }
-.heat-legend { display: flex; align-items: center; gap: 5px; justify-content: flex-end; margin-top: 10px; font-size: 7px; color: var(--ink-dim); }
-.hl { width: 13px; height: 13px; border: 2px solid var(--shadow); display: inline-block; }
-.hl1 { background: rgba(255,210,63,.28); }
-.hl2 { background: rgba(255,210,63,.52); }
-.hl3 { background: rgba(255,210,63,.76); }
-.hl4 { background: rgba(255,210,63,1); }
-
 /* =========================== WORLD MAP CHART =========================== */
 .chart-legend { display: flex; gap: 12px; font-size: 7px; }
 .lg-in  { color: var(--green); }
