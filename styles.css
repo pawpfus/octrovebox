@@ -28,14 +28,19 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { background: var(--bg); }
-
-body {
-  font-family: 'Press Start 2P', monospace;
+/* background lives on <html> so the fixed starfield canvas (z-index:-1)
+   can show through the transparent <body> */
+html {
   background:
     radial-gradient(circle at 50% 0%, var(--panel) 0%, var(--bg) 60%),
     var(--bg);
-  transition: background-color .3s, color .3s;
+  transition: background-color .3s;
+}
+
+body {
+  font-family: 'Press Start 2P', monospace;
+  background: transparent;
+  transition: color .3s;
   color: var(--ink);
   min-height: 100vh;
   padding: 24px 16px 48px;
@@ -154,7 +159,8 @@ h1 {
 
 /* the signature chunky pixel-bevel box */
 .stat-card, .panel {
-  background: var(--panel);
+  background: var(--panel); /* fallback */
+  background: color-mix(in srgb, var(--panel) 90%, transparent); /* lets stars peek through */
   border: var(--pixel) solid var(--shadow);
   box-shadow:
     inset calc(var(--pixel) * -1) calc(var(--pixel) * -1) 0 rgba(0,0,0,.4),
