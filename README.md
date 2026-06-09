@@ -48,7 +48,10 @@ Export all your data to a `.json` file you can save anywhere, and import it back
 One click generates a clean, printable financial report — summary, budget status, savings quest, category breakdown, and a full transaction table — then opens your browser's print dialog so you can **Save as PDF**. Works offline and on mobile; no libraries.
 
 ### 🔮 The Oracle (insights & education)
-A retro advisor that reads **your own tracked data** and gives personalised tips — savings rate, biggest spending category, emergency-fund coverage, budget and goal nudges — plus rotating general education on stocks & gold (diversification, dollar-cost averaging, gold as a hedge). Works offline. *Educational only — not financial advice.*
+A retro advisor that reads **your own tracked data** and gives personalised tips — savings rate, biggest spending category, emergency-fund coverage, budget and goal nudges — plus rotating general education on stocks & gold (diversification, dollar-cost averaging, gold as a hedge). Tips type out character-by-character with RPG-textbox blips. Works offline. *Educational only — not financial advice.*
+
+### 📳 Haptic feedback
+A tiny buzz on supported devices (Android) for key actions and milestones — earning, spending, level-ups, and quest/skin unlocks.
 
 ### 🎁 Daily chest
 Open a treasure chest once per day for a coin-shower animation and a random tip, building a daily-login streak.

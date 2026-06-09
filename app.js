@@ -121,15 +121,17 @@ function beep(freqs, dur = 0.09, type = 'square', gain = 0.05) {
     });
   } catch (e) { /* audio not available */ }
 }
+// haptic buzz on supporting devices (Android); a no-op on iOS/desktop
+const vibe = (p) => { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { /* unsupported */ } };
 const sfx = {
-  coin:    () => beep([988, 1319], 0.08, 'square', 0.06),       // earn — classic coin
-  spend:   () => beep([330, 247], 0.1, 'triangle', 0.06),       // spend
-  click:   () => beep([660], 0.04, 'square', 0.03),
-  delete:  () => beep([200, 140], 0.08, 'sawtooth', 0.05),
-  levelup: () => beep([523, 659, 784, 1047], 0.1, 'square', 0.06),
-  error:   () => beep([160, 120], 0.12, 'sawtooth', 0.06),
-  roar:    () => beep([180, 130, 90], 0.14, 'sawtooth', 0.07),         // boss enraged
-  victory: () => beep([659, 784, 988, 1319, 1047, 1319], 0.11, 'square', 0.06), // quest done
+  coin:    () => { beep([988, 1319], 0.08, 'square', 0.06); vibe(15); },       // earn — classic coin
+  spend:   () => { beep([330, 247], 0.1, 'triangle', 0.06); vibe(12); },       // spend
+  click:   () => beep([660], 0.04, 'square', 0.03),                            // (no haptic — too frequent)
+  delete:  () => { beep([200, 140], 0.08, 'sawtooth', 0.05); vibe(10); },
+  levelup: () => { beep([523, 659, 784, 1047], 0.1, 'square', 0.06); vibe([15, 40, 15, 40, 30]); },
+  error:   () => { beep([160, 120], 0.12, 'sawtooth', 0.06); vibe([20, 40, 20]); },
+  roar:    () => { beep([180, 130, 90], 0.14, 'sawtooth', 0.07); vibe([40, 30, 50]); },       // boss enraged
+  victory: () => { beep([659, 784, 988, 1319, 1047, 1319], 0.11, 'square', 0.06); vibe([15, 40, 15, 40, 30]); }, // milestone
 };
 
 /* ============================================================
@@ -598,11 +600,29 @@ function renderQuests() {
 }
 
 let oracleIdx = 0;
-function renderOracle() {
+let typeTimer = null;
+function typeBlip() { if (state.soundOn) { try { beep([1180], 0.012, 'square', 0.013); } catch (e) {} } }
+function typewrite(el, text) {
+  if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+  el.textContent = '';
+  let i = 0;
+  typeTimer = setInterval(() => {
+    el.textContent = text.slice(0, i + 1);
+    if (text[i] && text[i] !== ' ' && i % 2 === 0) typeBlip(); // soft RPG-textbox blip
+    i += 1;
+    if (i >= text.length) { clearInterval(typeTimer); typeTimer = null; }
+  }, 26);
+}
+function currentTip() {
   const list = oracleTips();
   if (oracleIdx >= list.length) oracleIdx = 0;
-  els.oracleText.textContent = list[oracleIdx] || '';
+  return list[oracleIdx] || '';
 }
+function renderOracle() {            // instant update from renderAll — don't interrupt active typing
+  if (typeTimer) return;
+  els.oracleText.textContent = currentTip();
+}
+function typeOracle() { typewrite(els.oracleText, currentTip()); } // animated (NEXT / first load)
 
 /* ---------------- DAILY CHEST ---------------- */
 const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD (local)
@@ -1062,7 +1082,7 @@ els.btnIncome.addEventListener('click', () => setType('income'));
 els.reset.addEventListener('click', resetAll);
 els.exportBtn.addEventListener('click', exportPDF);
 els.backupBtn.addEventListener('click', exportBackup);
-els.oracleNext.addEventListener('click', () => { oracleIdx += 1; sfx.click(); renderOracle(); });
+els.oracleNext.addEventListener('click', () => { oracleIdx += 1; sfx.click(); typeOracle(); });
 els.chestBtn.addEventListener('click', openChest);
 
 // Konami code (keyboard) → rainbow cheat
@@ -1144,6 +1164,7 @@ function init() {
     showToast('WELCOME! ADD YOUR FIRST ENTRY ⮞');
   }
   appReady = true; // from now on, completing a side quest celebrates
+  typeOracle();    // type out the first Oracle tip for that RPG-textbox feel
 }
 init();
 
