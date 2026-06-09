@@ -1468,6 +1468,18 @@ const TRACKS = [
     lead: [72, 76, 79, 84, 79, 84, 88, 0, 77, 81, 84, 89, 84, 0, 84, 0], leadType: 'square', leadDur: 0.22, leadVol: 0.05,
     twinkle: [91, 96],
   },
+  { // space: slow airy open-fifth pads (Am–F–C–G) with a sparse drifting lead
+    name: 'SPACE', stepMs: 300, drone: false,
+    pad:  [45, 0, 0, 0, 41, 0, 0, 0, 48, 0, 0, 0, 43, 0, 0, 0], padChord: [0, 7], padDur: 1.6,
+    lead: [0, 0, 76, 79, 0, 81, 79, 76, 0, 0, 72, 74, 0, 76, 74, 72], leadType: 'triangle', leadDur: 0.55, leadVol: 0.036,
+    twinkle: [81, 84, 88, 91],
+  },
+  { // eerie: detuned low drone, dissonant tritone+min3rd pads, Phrygian lead, min-2nd shimmer
+    name: 'EERIE', stepMs: 360, drone: true, droneNote: 33, droneDur: 3.0, droneDetune: true,
+    pad:  [45, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0], padChord: [0, 6, 3], padDur: 2.4,
+    lead: [0, 0, 77, 0, 76, 0, 0, 72, 0, 0, 70, 0, 69, 0, 0, 0], leadType: 'triangle', leadDur: 0.7, leadVol: 0.034,
+    twinkle: [81, 83, 86, 89], twinkleCluster: true,
+  },
 ];
 const music = { timer: null, step: 0 };
 function curTrack() { return TRACKS[state.musicTrack] || TRACKS[0]; }
@@ -1489,18 +1501,22 @@ function mNote(freq, dur, type, vol) {
 function musicTick() {
   const tk = curTrack();
   const i = music.step % 16;
-  if (tk.drone && i === 0) mNote(N2F(36), 2.6, 'sine', 0.03);
+  if (tk.drone && i === 0) {                       // low sustained drone (optionally detuned)
+    const dn = tk.droneNote || 36, dd = tk.droneDur || 2.6;
+    mNote(N2F(dn), dd, 'sine', 0.03);
+    if (tk.droneDetune) mNote(N2F(dn) * 1.005, dd, 'sine', 0.02);
+  }
   if (tk.bass) {                                   // driving staccato bass
     const b = tk.bass[i];
     if (b) mNote(N2F(b), tk.bassDur || 0.12, tk.bassType || 'square', tk.bassVol || 0.045);
   }
-  if (tk.pad) {                                    // sustained chord (root + fifth + octave)
+  if (tk.pad) {                                    // sustained chord (intervals from padChord)
     const p = tk.pad[i];
     if (p) {
       const pd = tk.padDur || 1.9;
-      mNote(N2F(p), pd, 'sine', 0.05);
-      mNote(N2F(p + 7), pd, 'sine', 0.03);
-      mNote(N2F(p + 12), pd, 'sine', 0.018);
+      const chord = tk.padChord || [0, 7, 12];
+      const vols = [0.05, 0.03, 0.018];
+      chord.forEach((off, idx) => mNote(N2F(p + off), pd, tk.padType || 'sine', vols[idx] != null ? vols[idx] : 0.018));
     }
   }
   if (tk.lead) {
@@ -1508,7 +1524,9 @@ function musicTick() {
     if (m) mNote(N2F(m), tk.leadDur || 0.5, tk.leadType || 'triangle', tk.leadVol || 0.04);
   }
   if (tk.twinkle && Math.random() < 0.2) {
-    mNote(N2F(tk.twinkle[Math.floor(Math.random() * tk.twinkle.length)]), 0.32, 'sine', 0.02);
+    const tw = tk.twinkle[Math.floor(Math.random() * tk.twinkle.length)];
+    mNote(N2F(tw), 0.32, 'sine', 0.02);
+    if (tk.twinkleCluster) mNote(N2F(tw + 1), 0.32, 'sine', 0.012); // dissonant minor-2nd shimmer
   }
   music.step += 1;
 }
