@@ -47,6 +47,8 @@ let state = {
   lastChest: null,      // YYYY-MM-DD of last daily-chest open
   chestStreak: 0,       // consecutive days opening the chest
   rainbow: false,       // konami-code rainbow mode
+  charClass: null,      // chosen RPG class id
+  relicsSeen: [],       // relics already announced as earned
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -85,8 +87,9 @@ const els = {
   catBudgetSelect: $('catBudgetSelect'), catBudgetInput: $('catBudgetInput'), catBudgetSave: $('catBudgetSave'),
   // world map chart + streak
   chart: $('chart'), monthStreak: $('monthStreak'),
-  // xp
+  // xp + hp
   xpFill: $('xpFill'), xpNext: $('xpNext'),
+  hpVitFill: $('hpVitFill'), hpVitText: $('hpVitText'), playerTag: $('playerTag'),
   // oracle
   oracleText: $('oracleText'), oracleNext: $('oracleNext'),
   // side quests
@@ -97,6 +100,9 @@ const els = {
   // monthly recap
   recapBtn: $('recapBtn'), recapOverlay: $('recapOverlay'), recapClose: $('recapClose'),
   recapMonth: $('recapMonth'), recapGrade: $('recapGrade'), recapRows: $('recapRows'),
+  // class + relics
+  classBtn: $('classBtn'), classOverlay: $('classOverlay'), classClose: $('classClose'), classGrid: $('classGrid'),
+  relicGrid: $('relicGrid'),
 };
 
 /* ============================================================
@@ -286,7 +292,7 @@ function renderCats() {
 /* ---------------- BUDGET BOSS ---------------- */
 function renderBudget() {
   const monthLabel = MONTHS[new Date().getMonth()];
-  els.bossTitle.textContent = 'BUDGET BOSS · ' + monthLabel;
+  els.bossTitle.textContent = (state.charClass === 'knight' ? '🛡️ ' : '') + 'BUDGET BOSS · ' + monthLabel;
 
   if (!state.budget) {
     els.bossPanel.classList.remove('enraged');
@@ -562,7 +568,8 @@ function oracleTips() {
     }
   }
 
-  return tips.concat(EDU_TIPS);
+  // Investor Mage perk: surface investing/gold wisdom first
+  return state.charClass === 'mage' ? EDU_TIPS.concat(tips) : tips.concat(EDU_TIPS);
 }
 
 /* ---------------- SIDE QUESTS (challenges) ---------------- */
@@ -602,6 +609,26 @@ function renderQuests() {
       if (appReady) { sfx.victory(); showToast('🗺️ QUEST COMPLETE: ' + c.name + '!'); }
     }
   });
+}
+
+/* ---------------- PLAYER HP (emergency-fund vitality) ---------------- */
+function renderHP() {
+  const { balance } = totals();
+  let expense = 0;
+  state.transactions.forEach((t) => { if (t.type === 'expense') expense += t.amount; });
+  const avg = expense / distinctMonths(); // average monthly spend
+  let pct, cls, text;
+  if (avg <= 0) {
+    pct = 100; cls = 'hp-v-ok'; text = 'HEALTHY';
+  } else {
+    const months = Math.max(0, balance) / avg; // months of expenses covered
+    pct = clamp((months / 6) * 100, 0, 100);
+    cls = months >= 3 ? 'hp-v-ok' : (months >= 1 ? 'hp-v-warn' : 'hp-v-danger');
+    text = (months >= 6 ? '6+' : months.toFixed(1)) + ' MO HP';
+  }
+  els.hpVitFill.style.width = pct + '%';
+  els.hpVitFill.className = 'hp-vit-fill ' + cls;
+  els.hpVitText.textContent = text;
 }
 
 let oracleIdx = 0;
@@ -656,7 +683,7 @@ function openChest() {
   state.lastChest = todayStr();
   save();
   sfx.victory();
-  coinRain(28);
+  coinRain(state.charClass === 'rogue' ? 44 : 28); // Hustle Rogue perk: extra loot
   showToast('🎁 ' + CHEST_REWARDS[Math.floor(Math.random() * CHEST_REWARDS.length)]);
   renderChest();
 }
@@ -729,8 +756,79 @@ function activateCheat() {
   else { sfx.click(); showToast('RAINBOW MODE OFF'); }
 }
 
+/* ---------------- CHARACTER CLASS ---------------- */
+const CLASSES = [
+  { id: 'knight', icon: '🛡️', name: 'SAVER KNIGHT',  perk: 'Shielded budget — your Budget Boss bears a guardian crest.' },
+  { id: 'mage',   icon: '🔮', name: 'INVESTOR MAGE', perk: 'Wiser Oracle — investing & gold wisdom surfaces first.' },
+  { id: 'rogue',  icon: '🗡️', name: 'HUSTLE ROGUE',  perk: 'Lucky loot — daily chests rain extra coins.' },
+];
+function classOf() { return CLASSES.find((c) => c.id === state.charClass) || null; }
+function renderClassTag() {
+  const c = classOf();
+  els.playerTag.textContent = c ? (c.icon + ' ' + c.name) : 'PLAYER 1';
+}
+function renderClassPicker() {
+  els.classGrid.innerHTML = '';
+  CLASSES.forEach((c) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'class-card' + (state.charClass === c.id ? ' active' : '');
+    btn.innerHTML = `<span class="c-ico">${c.icon}</span><span><span class="c-name">${c.name}</span><span class="c-perk">${c.perk}</span></span>`;
+    btn.addEventListener('click', () => {
+      state.charClass = c.id; save(); sfx.victory(); coinRain(20);
+      renderClassTag(); renderAll();
+      els.classOverlay.hidden = true;
+      showToast('⚔ CLASS: ' + c.name);
+    });
+    els.classGrid.appendChild(btn);
+  });
+}
+function openClassPicker() { renderClassPicker(); els.classOverlay.hidden = false; }
+
+/* ---------------- RELIC VAULT ---------------- */
+const RELICS = [
+  { id: 'gem',    icon: '💎', name: 'GEM OF THRIFT',      has: () => Math.max(0, totals().balance) >= 1000 },
+  { id: 'sword',  icon: '⚔️', name: 'BLADE OF INCOME',    has: () => totals().income >= 10000 },
+  { id: 'scroll', icon: '📜', name: 'SCROLL OF DISCIPLINE', has: () => streakMonths() >= 3 },
+  { id: 'shield', icon: '🛡️', name: 'SHIELD OF BUDGET',   has: () => !!state.budget && monthSpend() > 0 && (state.budget - monthSpend()) >= 0 },
+  { id: 'crown',  icon: '👑', name: 'CROWN OF WEALTH',     has: () => levelFor(totals().income) >= 10 },
+  { id: 'trophy', icon: '🏆', name: 'QUEST TROPHY',        has: () => state.questsDone.length >= CHALLENGES.length },
+];
+function renderRelics() {
+  els.relicGrid.innerHTML = '';
+  RELICS.forEach((r) => {
+    const earned = !!r.has();
+    if (earned && !state.relicsSeen.includes(r.id)) {
+      state.relicsSeen.push(r.id); save();
+      if (appReady) { sfx.victory(); coinRain(30); showToast('🎒 RELIC EARNED: ' + r.name + '!'); }
+    }
+    const cell = document.createElement('div');
+    cell.className = 'relic ' + (earned ? 'earned' : 'locked');
+    cell.innerHTML = `<span class="r-emoji">${earned ? r.icon : '🔒'}</span><span class="r-title">${earned ? r.name : '???'}</span>`;
+    els.relicGrid.appendChild(cell);
+  });
+}
+
+/* ---------------- RANDOM ENCOUNTERS ---------------- */
+const ENCOUNTERS = [
+  { msg: '🧙 A wandering merchant nods approvingly.', coins: 0 },
+  { msg: '🪙 You found a lucky coin on the ground!', coins: 14 },
+  { msg: '👺 A goblin tried to pickpocket you — you dodged!', coins: 0 },
+  { msg: '✨ A shooting star streaks past. Make a wish!', coins: 10 },
+  { msg: '📦 You spot a mysterious crate in the dungeon.', coins: 8 },
+  { msg: '🐉 The Spend Dragon eyes your wallet…', coins: 0 },
+];
+function maybeEncounter() {
+  if (Math.random() > 0.15) return; // ~15% chance per entry
+  const e = ENCOUNTERS[Math.floor(Math.random() * ENCOUNTERS.length)];
+  setTimeout(() => { showToast(e.msg); if (e.coins) coinRain(e.coins); }, 750);
+}
+
 function renderAll(prevLevel) {
   renderStats(prevLevel);
+  renderHP();
+  renderClassTag();
+  renderRelics();
   renderList();
   renderCats();
   renderBudget();
@@ -818,6 +916,7 @@ function addTx(e) {
   renderAll(prevLevel);
   if (currentType === 'expense') hitBoss(amount); // boss takes a hit
   scatterBuddies(); // the pixel buddies bolt away in surprise
+  maybeEncounter();  // a chance at a random RPG event
 
   els.form.reset();
   els.desc.focus();
@@ -1038,6 +1137,8 @@ function importBackup(file) {
     state.lastChest = data.lastChest || null;
     state.chestStreak = Number(data.chestStreak) || 0;
     state.rainbow = !!data.rainbow;
+    state.charClass = data.charClass || null;
+    state.relicsSeen = Array.isArray(data.relicsSeen) ? data.relicsSeen : [];
     applyTheme(state.theme);
     document.body.classList.toggle('rainbow', state.rainbow);
     state.soundOn = data.soundOn !== false;
@@ -1163,6 +1264,10 @@ els.backupBtn.addEventListener('click', exportBackup);
 els.recapBtn.addEventListener('click', openRecap);
 els.recapClose.addEventListener('click', closeRecap);
 els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOverlay) closeRecap(); });
+els.classBtn.addEventListener('click', () => { sfx.click(); openClassPicker(); });
+els.classClose.addEventListener('click', () => { els.classOverlay.hidden = true; });
+els.classOverlay.addEventListener('click', (e) => { if (e.target === els.classOverlay) els.classOverlay.hidden = true; });
+els.playerTag.addEventListener('click', openClassPicker);
 els.oracleNext.addEventListener('click', () => { oracleIdx += 1; sfx.click(); typeOracle(); });
 els.chestBtn.addEventListener('click', openChest);
 
@@ -1234,6 +1339,7 @@ els.mute.addEventListener('click', () => {
    BOOT
 ============================================================ */
 function init() {
+  const firstRun = !localStorage.getItem(STORE_KEY);
   load();
   els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
   applyTheme(state.theme);
@@ -1248,6 +1354,7 @@ function init() {
   }
   appReady = true; // from now on, completing a side quest celebrates
   typeOracle();    // type out the first Oracle tip for that RPG-textbox feel
+  if (firstRun && !state.charClass) openClassPicker(); // character creation on first run
 }
 init();
 

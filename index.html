@@ -42,13 +42,18 @@
         <p class="subtitle">- PERSONAL FINANCE ADVENTURE -</p>
       </div>
       <div class="player-row">
-        <span class="player-tag">PLAYER 1</span>
+        <span class="player-tag" id="playerTag">PLAYER 1</span>
         <span class="lives" id="streakDisplay">LV.1</span>
         <span class="streak" id="monthStreak">🔥 0 MO</span>
       </div>
       <div class="xp-row">
         <span class="xp-track"><span class="xp-fill" id="xpFill"></span></span>
         <span class="xp-next" id="xpNext">0 / 1000 XP</span>
+      </div>
+      <div class="xp-row hp-row">
+        <span class="hp-heart">❤️</span>
+        <span class="xp-track"><span class="hp-vit-fill" id="hpVitFill"></span></span>
+        <span class="xp-next" id="hpVitText">FULL HP</span>
       </div>
     </header>
 
@@ -222,6 +227,12 @@
       <div class="quest-grid" id="questList"></div>
     </section>
 
+    <!-- ===== RELIC VAULT ===== -->
+    <section class="panel relic-panel">
+      <h2 class="panel-title">🎒 RELIC VAULT</h2>
+      <div class="relic-grid" id="relicGrid"></div>
+    </section>
+
     <!-- ===== THE ORACLE — tips from your data ===== -->
     <section class="panel oracle-panel">
       <div class="log-head">
@@ -252,6 +263,7 @@
         <button type="button" class="mute-btn" id="muteBtn" title="Toggle sound">♪ SOUND: ON</button>
         <button type="button" class="mute-btn" id="musicBtn" title="Toggle music">♫ MUSIC: OFF</button>
       </div>
+      <button type="button" class="mute-btn" id="classBtn" style="margin-top:10px;width:100%;">⚔ CHANGE CLASS</button>
     </section>
 
     <footer class="foot">
@@ -269,6 +281,16 @@
 
   <!-- print-only report (filled in by exportPDF) -->
   <div class="print-report" id="printReport" aria-hidden="true"></div>
+
+  <!-- class picker overlay -->
+  <div class="recap-overlay" id="classOverlay" hidden>
+    <div class="recap-card">
+      <button type="button" class="recap-close" id="classClose">✕</button>
+      <div class="recap-head">⚔ CHOOSE YOUR CLASS</div>
+      <div class="class-grid" id="classGrid"></div>
+      <div class="recap-foot">PICK YOUR PLAYSTYLE</div>
+    </div>
+  </div>
 
   <!-- monthly recap overlay -->
   <div class="recap-overlay" id="recapOverlay" hidden>
