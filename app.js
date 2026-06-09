@@ -560,6 +560,7 @@ function oracleTips() {
     if (balance <= 0) tips.push('You have no cash cushion yet. Aim for a 3–6 month emergency fund before investing.');
     else if (months < 3) tips.push('Your savings cover ~' + months.toFixed(1) + ' months of spending. Build it to 3–6 months for safety.');
     else tips.push('💪 Your savings cover ~' + Math.floor(months) + ' months of spending — a healthy emergency fund. Surplus could go into gold or stocks.');
+    else tips.push('All good until our daily caffeine spending & government boondoggle foreshadows doom.');
   }
 
   // budget adherence
