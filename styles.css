@@ -355,11 +355,12 @@ h1 {
 /* =========================== LAYOUT GRID =========================== */
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1.25fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
   gap: 18px;
   margin-bottom: 18px;
   align-items: start;
 }
+.grid > * { min-width: 0; } /* let grid items shrink instead of overflowing */
 
 .panel { padding: 18px; }
 .panel-title {
@@ -414,6 +415,7 @@ input, select {
   border: 3px solid var(--shadow);
   padding: 12px 10px;
   width: 100%;
+  min-width: 0;
   outline: none;
   box-shadow: inset 2px 2px 0 rgba(0,0,0,.45);
 }
@@ -830,7 +832,7 @@ body[data-theme="midas"] {
 /* =========================== RESPONSIVE =========================== */
 @media (max-width: 720px) {
   .stats { grid-template-columns: 1fr; }
-  .grid { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
   .quest-row { grid-template-columns: 1fr; }
   .logo-octo { display: none; }
   .cat-row { grid-template-columns: 86px 1fr 60px; }
