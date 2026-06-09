@@ -202,11 +202,24 @@ function totals() {
   return { income, expense, balance: income - expense };
 }
 
+const prevStat = { income: 0, expense: 0, balance: 0 };
+function animateValue(el, from, to, dur = 650) {
+  if (from === to) { el.textContent = fmt(to); return; }
+  const start = performance.now();
+  function frame(t) {
+    const k = Math.min(1, (t - start) / dur);
+    const eased = 1 - Math.pow(1 - k, 3);
+    el.textContent = fmt(from + (to - from) * eased);
+    if (k < 1) requestAnimationFrame(frame); else el.textContent = fmt(to);
+  }
+  requestAnimationFrame(frame);
+}
+
 function renderStats(prevLevel) {
   const { income, expense, balance } = totals();
-  els.income.textContent = fmt(income);
-  els.expense.textContent = fmt(expense);
-  els.balance.textContent = fmt(balance);
+  animateValue(els.income, prevStat.income, income);  prevStat.income = income;
+  animateValue(els.expense, prevStat.expense, expense); prevStat.expense = expense;
+  animateValue(els.balance, prevStat.balance, balance); prevStat.balance = balance;
   els.balanceCard.classList.toggle('negative', balance < 0);
 
   els.balanceFoot.textContent = balance >= 0 ? 'KEEP GOING!' : 'GAME OVER?';
@@ -721,6 +734,25 @@ function coinRain(n = 24) {
     setTimeout(() => c.remove(), 3800);
   }
 }
+// coins fly from the form area up into the balance card (on income)
+function flyCoinsTo(el, n = 6) {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const tx = r.left + r.width / 2, ty = r.top + r.height / 2;
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('div');
+    c.className = 'fly-coin';
+    c.textContent = '🪙';
+    const sx = window.innerWidth / 2 + (Math.random() * 90 - 45);
+    const sy = window.innerHeight - 70 + (Math.random() * 30 - 15);
+    c.style.left = sx + 'px';
+    c.style.top = sy + 'px';
+    document.body.appendChild(c);
+    const delay = i * 55;
+    setTimeout(() => { c.style.transform = `translate(${tx - sx}px,${ty - sy}px) scale(0.4)`; c.style.opacity = '0'; }, 20 + delay);
+    setTimeout(() => c.remove(), 760 + delay);
+  }
+}
 function activateCheat() {
   state.rainbow = !state.rainbow;
   save();
@@ -831,6 +863,7 @@ function addTx(e) {
 
   currentType === 'income' ? sfx.coin() : sfx.spend();
   renderAll(prevLevel);
+  if (currentType === 'income') flyCoinsTo(els.balanceCard); // coins fly into the balance
   if (currentType === 'expense') hitBoss(amount); // boss takes a hit
   scatterBuddies(); // the pixel buddies bolt away in surprise
   maybeEncounter();  // a chance at a random RPG event
@@ -1489,11 +1522,52 @@ if (state.musicOn) {
       });
     }
   }
+  // day/night phase from the user's real local time
+  function phaseInfo() {
+    const d = new Date();
+    const hf = d.getHours() + d.getMinutes() / 60;
+    let p;
+    if (hf >= 5 && hf < 7.5) p = 'dawn';
+    else if (hf >= 7.5 && hf < 17) p = 'day';
+    else if (hf >= 17 && hf < 19.5) p = 'dusk';
+    else p = 'night';
+    const cfg = {
+      dawn:  { sky: '255,158,107', skyA: 0.34, starMul: 0.5,  body: 'sun',  bodyCol: '#ffd27a' },
+      day:   { sky: '91,139,224',  skyA: 0.30, starMul: 0.16, body: 'sun',  bodyCol: '#fff1a8' },
+      dusk:  { sky: '255,111,145', skyA: 0.34, starMul: 0.55, body: 'sun',  bodyCol: '#ff9e6b' },
+      night: { sky: '26,26,85',    skyA: 0.22, starMul: 1,    body: 'moon', bodyCol: '#e8e8ff' },
+    }[p];
+    return Object.assign({ hf }, cfg);
+  }
+  function drawBody(type, x, y, col) {
+    ctx.save();
+    ctx.globalAlpha = 0.22; ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(x, y, 22, 0, 7); ctx.fill();      // soft glow
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.fill();      // body
+    if (type === 'moon') {
+      ctx.fillStyle = 'rgba(120,120,160,0.55)';
+      ctx.beginPath(); ctx.arc(x - 4, y - 3, 2.5, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 4, y + 2, 2, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 1, y + 5, 1.5, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+  }
   function paint(animate) {
     ctx.clearRect(0, 0, w, h);
+    const ph = phaseInfo();
+    // sky tint (top glow) for the time of day
+    const g = ctx.createLinearGradient(0, 0, 0, h * 0.5);
+    g.addColorStop(0, `rgba(${ph.sky},${ph.skyA})`);
+    g.addColorStop(1, `rgba(${ph.sky},0)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h * 0.5);
+    // sun / moon positioned by time of day
+    const frac = ph.hf / 24;
+    drawBody(ph.body, frac * w, 66 + 26 * Math.cos(frac * 2 * Math.PI), ph.bodyCol);
+    // stars (dimmer by day)
     for (const st of stars) {
       if (animate) { st.y += st.sp; if (st.y > h) { st.y = -2; st.x = Math.random() * w; } st.tw += 0.05; }
-      ctx.globalAlpha = animate ? 0.45 + 0.55 * Math.abs(Math.sin(st.tw)) : 0.8;
+      ctx.globalAlpha = (animate ? 0.45 + 0.55 * Math.abs(Math.sin(st.tw)) : 0.8) * ph.starMul;
       ctx.fillStyle = st.c;
       ctx.fillRect(st.x | 0, st.y | 0, st.s, st.s);
     }

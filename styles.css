@@ -778,6 +778,13 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 }
 @keyframes coinFall { to { transform: translateY(112vh) rotate(540deg); } }
 
+/* coins flying into the balance (on income) */
+.fly-coin {
+  position: fixed; z-index: 700; pointer-events: none;
+  font-size: 22px; opacity: 1;
+  transition: transform .6s cubic-bezier(.4, 0, .2, 1), opacity .6s ease-in;
+}
+
 /* =========================== RAINBOW (konami) =========================== */
 body.rainbow { animation: rainbow 6s linear infinite; }
 @keyframes rainbow { to { filter: hue-rotate(360deg); } }

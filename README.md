@@ -77,8 +77,11 @@ Pac-Man and the four ghosts (drawn as crisp SVG sprites) drift and bounce freely
 ### 🎶 Chiptune background music
 A gentle looping 8-bit melody generated live with the Web Audio API (no audio files), with its own on/off toggle.
 
-### ✨ Parallax starfield
-Slow-drifting pixel stars twinkle behind the panels for depth and atmosphere (respects reduced-motion).
+### ✨ Parallax starfield + day/night
+Slow-drifting pixel stars twinkle behind the panels, and the sky shifts with your real local time — warm dawn, bright day, dusk, and a deep starry night with a moon (respects reduced-motion).
+
+### 🪙 Juicy numbers
+The Balance/Income/Spent figures animate counting up and down, and coins fly into the balance when you log income.
 
 ### 🎵 Chiptune sound effects
 Coin pickups, spend blips, error buzzes, boss roars, and victory fanfares — all generated live with the Web Audio API (no audio files). Toggle with the SOUND button.
