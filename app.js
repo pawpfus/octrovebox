@@ -62,7 +62,7 @@ const els = {
   balance: $('balanceValue'), income: $('incomeValue'), expense: $('expenseValue'),
   balanceFoot: $('balanceFoot'), balanceCard: document.querySelector('.balance'),
   streak: $('streakDisplay'),
-  form: $('txForm'), desc: $('descInput'), amount: $('amountInput'), category: $('categoryInput'),
+  form: $('txForm'), desc: $('descInput'), amount: $('amountInput'), category: $('categoryInput'), date: $('dateInput'),
   btnExpense: $('btnExpense'), btnIncome: $('btnIncome'), submit: $('submitBtn'),
   list: $('txList'), emptyState: $('emptyState'),
   catBars: $('catBars'), catEmpty: $('catEmpty'),
@@ -169,6 +169,11 @@ function levelFor(income) {
   return Math.max(1, Math.floor(income / 1000) + 1); // +1 level per $1000 earned
 }
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+// effective date of an entry — uses the editable `date`, falling back to id (old entries)
+const txDate = (t) => t.date || t.id;
+// ms timestamp for a YYYY-MM-DD string at local noon (avoids timezone day-shift)
+const ymdToTs = (s) => (s ? new Date(s + 'T12:00:00').getTime() : Date.now());
+const tsToYmd = (ts) => { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
 const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
@@ -176,7 +181,7 @@ const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV
 function monthTotals(y, m, category) {
   let income = 0, expense = 0;
   state.transactions.forEach((t) => {
-    const d = new Date(t.id);
+    const d = new Date(txDate(t));
     if (d.getFullYear() !== y || d.getMonth() !== m) return;
     if (category && t.category !== category) return;
     if (t.type === 'income') income += t.amount; else expense += t.amount;
@@ -248,7 +253,7 @@ function renderStats(prevLevel) {
 function renderList() {
   const items = state.transactions
     .filter((t) => currentFilter === 'all' || t.type === currentFilter)
-    .slice().reverse();
+    .slice().sort((a, b) => txDate(b) - txDate(a)); // newest date first (handles backdated entries)
 
   els.list.innerHTML = '';
   els.emptyState.style.display = items.length ? 'none' : 'block';
@@ -257,7 +262,9 @@ function renderList() {
     const c = catInfo(t.type, t.category);
     const li = document.createElement('li');
     li.className = 'tx-item';
-    const date = new Date(t.id).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const dObj = new Date(txDate(t));
+    const sameYear = dObj.getFullYear() === new Date().getFullYear();
+    const date = dObj.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' });
     li.innerHTML = `
       <span class="tx-icon" style="background:${CAT_COLORS[t.category] || '#2e2e63'}22;border-color:${CAT_COLORS[t.category] || '#050510'}">${c.icon}</span>
       <span class="tx-body">
@@ -442,7 +449,7 @@ function streakMonths() {
   const curIdx = now.getFullYear() * 12 + now.getMonth();
   let earliest = Infinity;
   state.transactions.forEach((t) => {
-    const d = new Date(t.id);
+    const d = new Date(txDate(t));
     earliest = Math.min(earliest, d.getFullYear() * 12 + d.getMonth());
   });
   let streak = 0;
@@ -514,7 +521,7 @@ const EDU_TIPS = [
 
 function distinctMonths() {
   const set = new Set();
-  state.transactions.forEach((t) => { const d = new Date(t.id); set.add(d.getFullYear() * 12 + d.getMonth()); });
+  state.transactions.forEach((t) => { const d = new Date(txDate(t)); set.add(d.getFullYear() * 12 + d.getMonth()); });
   return Math.max(1, set.size);
 }
 
@@ -618,7 +625,7 @@ function oracleTips() {
   if (dayOfMonth >= 7) {
     const spendDays = new Set();
     state.transactions.forEach((t) => {
-      const d = new Date(t.id);
+      const d = new Date(txDate(t));
       if (t.type === 'expense' && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) spendDays.add(d.getDate());
     });
     const noSpend = dayOfMonth - spendDays.size;
@@ -639,14 +646,14 @@ function oracleTips() {
   // weekend spending share
   if (expenses.length >= 8) {
     let we = 0;
-    expenses.forEach((t) => { const dw = new Date(t.id).getDay(); if (dw === 0 || dw === 6) we += t.amount; });
+    expenses.forEach((t) => { const dw = new Date(txDate(t)).getDay(); if (dw === 0 || dw === 6) we += t.amount; });
     const weShare = expense > 0 ? Math.round((we / expense) * 100) : 0;
     if (weShare >= 40) tips.push('🎉 ' + weShare + '% of your spending happens on weekends (2 days out of 7). Plan weekend fun with a cap.');
   }
 
   // best savings month on record
   const monthKeys = new Set();
-  state.transactions.forEach((t) => { const d = new Date(t.id); monthKeys.add(d.getFullYear() * 12 + d.getMonth()); });
+  state.transactions.forEach((t) => { const d = new Date(txDate(t)); monthKeys.add(d.getFullYear() * 12 + d.getMonth()); });
   if (monthKeys.size >= 2) {
     let best = null;
     monthKeys.forEach((k) => {
@@ -906,6 +913,7 @@ function setType(type) {
 }
 
 function submitLabel() { return currentType === 'income' ? '⮞ COLLECT GOLD' : '⮞ ADD ENTRY'; }
+function setDateToday() { els.date.value = tsToYmd(Date.now()); }
 
 function startEdit(id) {
   const tx = state.transactions.find((t) => t.id === Number(id));
@@ -915,6 +923,7 @@ function startEdit(id) {
   els.desc.value = tx.desc;
   els.amount.value = tx.amount;
   els.category.value = tx.category;
+  els.date.value = tsToYmd(txDate(tx));
   els.submit.textContent = '✓ SAVE EDIT';
   els.form.scrollIntoView({ behavior: 'smooth', block: 'center' });
   els.desc.focus();
@@ -929,11 +938,11 @@ function addTx(e) {
   // edit mode: update the existing entry and exit
   if (editingId != null) {
     const tx = state.transactions.find((t) => t.id === editingId);
-    if (tx) { tx.type = currentType; tx.desc = desc; tx.amount = amount; tx.category = els.category.value; }
+    if (tx) { tx.type = currentType; tx.desc = desc; tx.amount = amount; tx.category = els.category.value; tx.date = ymdToTs(els.date.value); }
     editingId = null;
     save(); sfx.click();
     renderAll();
-    els.form.reset();
+    els.form.reset(); setDateToday();
     els.submit.textContent = submitLabel();
     showToast('✓ ENTRY UPDATED');
     return;
@@ -943,6 +952,7 @@ function addTx(e) {
 
   state.transactions.push({
     id: Date.now(),
+    date: ymdToTs(els.date.value),
     type: currentType,
     desc,
     amount,
@@ -958,6 +968,7 @@ function addTx(e) {
   maybeEncounter();  // a chance at a random RPG event
 
   els.form.reset();
+  setDateToday();
   els.desc.focus();
 }
 
@@ -1137,8 +1148,8 @@ function buildReport() {
   html += `<div class="pr-section"><div class="pr-h2">TRANSACTIONS (${state.transactions.length})</div>`;
   if (state.transactions.length) {
     html += `<table class="pr-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="num">Amount</th></tr></thead><tbody>`;
-    state.transactions.slice().sort((a, b) => b.id - a.id).forEach((t) => {
-      const d = new Date(t.id).toLocaleDateString('en-US', { year: '2-digit', month: 'short', day: 'numeric' });
+    state.transactions.slice().sort((a, b) => txDate(b) - txDate(a)).forEach((t) => {
+      const d = new Date(txDate(t)).toLocaleDateString('en-US', { year: '2-digit', month: 'short', day: 'numeric' });
       const c = catInfo(t.type, t.category);
       const amt = (t.type === 'income' ? '+' : '-') + fmt(t.amount).replace('-', '');
       html += `<tr><td>${d}</td><td>${escapeHtml(t.desc)}</td><td>${c.name}</td><td class="num ${t.type === 'income' ? 'pr-pos' : 'pr-neg'}">${amt}</td></tr>`;
@@ -1231,7 +1242,7 @@ function openRecap() {
   // top spending category this month
   const spend = {};
   state.transactions.forEach((t) => {
-    const d = new Date(t.id);
+    const d = new Date(txDate(t));
     if (t.type === 'expense' && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) {
       spend[t.category] = (spend[t.category] || 0) + t.amount;
     }
@@ -1400,6 +1411,7 @@ function init() {
   document.body.classList.toggle('rainbow', !!state.rainbow);
   fillCategories();
   fillCatBudgetSelect();
+  setDateToday();
   renderAll();
 
   // seed a friendly demo entry the very first time

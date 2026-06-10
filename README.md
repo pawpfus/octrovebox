@@ -41,8 +41,8 @@ Set a named savings goal and watch a golden treasure bar fill toward it:
 ### 📜 Monthly Recap
 A "LEVEL COMPLETE" results card for the current month — earned, spent, saved, savings-rate grade (S/A/B/C/D), budget result, and top category — styled to screenshot and share.
 
-### ✏️ Edit entries
-Tap ✎ on any entry to edit its name, amount, category, or type — not just delete.
+### ✏️ Edit entries & 🗓️ backdate
+Tap ✎ on any entry to edit its name, amount, category, type, or **date**. Every entry has a date field (defaults to today) so you can **backdate** old transactions — the Quest Log, monthly streak, World Map history, and all trends use the entry's real date.
 
 ### ★ Starting balance
 Set your real opening balance (tap **✎ START** on the Balance card) so Balance reflects actual money on hand, not just the sum since you began logging. Balance = starting balance + income − expenses.
