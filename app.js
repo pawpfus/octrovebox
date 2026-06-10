@@ -561,6 +561,12 @@ const EDU_TIPS = [
   '💡 Inflation is a silent boss battle — idle cash loses HP every year. Make long-term money work.',
   '💡 An emergency fund isn\'t an investment — it\'s armor. Keep it boring, liquid, and reachable.',
   '💡 Track first, judge later: a month of honest logging beats a year of guessing.',
+  '💡 Needs vs wants: sleep 24 hours on any "want" bigger than your daily budget — most cravings quietly fade.',
+  '💡 A rupiah saved beats a rupiah earned — saving skips the tax and effort that earning costs you.',
+  '💡 Audit subscriptions monthly. The quietest boss is the one that auto-renews while you sleep.',
+  '💡 Keep at least one month of expenses in instant-access cash before chasing higher returns.',
+  '💡 Pay yourself first: treat savings like a fixed bill, not whatever happens to be left over.',
+  '💡 Lifestyle creep is the stealth boss — when income rises, bank the raise before your spending learns about it.',
 ];
 
 function distinctMonths() {
@@ -715,19 +721,55 @@ function oracleTips() {
     tips.push('💼 All your income flows from one source. A side quest income stream is the best armor against surprises.');
   }
 
+  // daily spending allowance for the rest of the month
+  if (state.budget) {
+    const remaining = state.budget - monthSpend();
+    const daysLeft = daysInMonth - dayOfMonth + 1;
+    if (remaining > 0 && daysLeft > 0) {
+      tips.push('🪙 ' + fmt(remaining) + ' budget left over ' + daysLeft + ' day' + (daysLeft > 1 ? 's' : '') + ' = ~' + fmt(remaining / daysLeft) + '/day to stay on track.');
+    }
+  }
+
+  // this month's net so far
+  const mtNow = monthTotals(now.getFullYear(), now.getMonth());
+  if (mtNow.income > 0 || mtNow.expense > 0) {
+    const net = mtNow.income - mtNow.expense;
+    tips.push((net >= 0 ? '🟢' : '🔴') + ' This month so far: earned ' + fmt(mtNow.income) + ', spent ' + fmt(mtNow.expense) + ' → ' + (net >= 0 ? 'saved ' : 'down ') + fmt(Math.abs(net)) + '.');
+  }
+
+  // single-category over-concentration
+  if (top && expense > 0) {
+    const topShare = Math.round((top[1] / expense) * 100);
+    if (topShare >= 45) tips.push('⚠ ' + catInfo('expense', top[0]).name + ' is ' + topShare + '% of all spending — one category dominating is risky. Diversify your spending, not just your investments.');
+  }
+
+  // average expense size — point of awareness
+  if (expenses.length >= 6) {
+    const avgExp = expense / expenses.length;
+    tips.push('📊 Your average expense is ' + fmt(avgExp) + ' across ' + expenses.length + ' purchases. Knowing your "normal" makes the outliers obvious.');
+  }
+
   return tips.concat(EDU_TIPS);
 }
 
 /* ---------------- SIDE QUESTS (challenges) ---------------- */
 const CHALLENGES = [
-  { id: 'first',   icon: '🐣', name: 'FIRST STEPS',    desc: 'Log your first entry',        check: () => ({ cur: Math.min(state.transactions.length, 1), goal: 1 }) },
-  { id: 'five',    icon: '📜', name: 'GETTING STARTED', desc: 'Log 5 entries',               check: () => ({ cur: Math.min(state.transactions.length, 5), goal: 5 }) },
-  { id: 'budget',  icon: '🛡️', name: 'BUDGET KEEPER',   desc: 'Set a monthly budget',        check: () => ({ cur: state.budget ? 1 : 0, goal: 1 }) },
-  { id: 'diverse', icon: '🎨', name: 'DIVERSIFIER',     desc: 'Spend in 3 categories',       check: () => ({ cur: Math.min(new Set(state.transactions.filter((t) => t.type === 'expense').map((t) => t.category)).size, 3), goal: 3 }) },
-  { id: 'earn1m',  icon: '💰', name: 'BIG EARNER',      desc: 'Earn $10,000 total',          check: () => ({ cur: Math.min(totals().income, 10000), goal: 10000 }) },
-  { id: 'save5',   icon: '🥚', name: 'NEST EGG',        desc: 'Reach a $5,000 balance',      check: () => ({ cur: Math.min(Math.max(0, totals().balance), 5000), goal: 5000 }) },
-  { id: 'streak3', icon: '🔥', name: 'ON A ROLL',       desc: '3-month budget streak',       check: () => ({ cur: Math.min(streakMonths(), 3), goal: 3 }) },
-  { id: 'quest',   icon: '⭐', name: 'DREAM ACHIEVED',  desc: 'Complete a savings quest',    check: () => ({ cur: (state.goal && totals().balance >= state.goal.target) ? 1 : 0, goal: 1 }) },
+  { id: 'first',    icon: '🐣', name: 'FIRST STEPS',     desc: 'Log your first entry',     check: () => ({ cur: Math.min(state.transactions.length, 1), goal: 1 }) },
+  { id: 'five',     icon: '📜', name: 'GETTING STARTED', desc: 'Log 5 entries',            check: () => ({ cur: Math.min(state.transactions.length, 5), goal: 5 }) },
+  { id: 'log25',    icon: '📚', name: 'BOOKKEEPER',      desc: 'Log 25 entries',           check: () => ({ cur: Math.min(state.transactions.length, 25), goal: 25 }) },
+  { id: 'budget',   icon: '🛡️', name: 'BUDGET KEEPER',   desc: 'Set a monthly budget',     check: () => ({ cur: state.budget ? 1 : 0, goal: 1 }) },
+  { id: 'minib',    icon: '👾', name: 'BOSS HUNTER',     desc: 'Set a category limit',     check: () => ({ cur: Object.keys(state.catBudgets || {}).length ? 1 : 0, goal: 1 }) },
+  { id: 'goalset',  icon: '🗺️', name: 'DREAMER',         desc: 'Set a savings quest',      check: () => ({ cur: state.goal ? 1 : 0, goal: 1 }) },
+  { id: 'diverse',  icon: '🎨', name: 'DIVERSIFIER',     desc: 'Spend in 3 categories',    check: () => ({ cur: Math.min(new Set(state.transactions.filter((t) => t.type === 'expense').map((t) => t.category)).size, 3), goal: 3 }) },
+  { id: 'diverse5', icon: '🌈', name: 'WELL-ROUNDED',    desc: 'Spend in 5 categories',    check: () => ({ cur: Math.min(new Set(state.transactions.filter((t) => t.type === 'expense').map((t) => t.category)).size, 5), goal: 5 }) },
+  { id: 'months3',  icon: '🗓️', name: 'CONSISTENT',      desc: 'Track across 3 months',    check: () => ({ cur: Math.min(distinctMonths(), 3), goal: 3 }) },
+  { id: 'saver20',  icon: '📈', name: 'DISCIPLINED',     desc: 'Reach a 20% savings rate', check: () => { const { income, expense } = totals(); const r = income > 0 ? (income - expense) / income : 0; return { cur: clamp(Math.round(r * 100), 0, 20), goal: 20 }; } },
+  { id: 'earn1m',   icon: '💰', name: 'BIG EARNER',      desc: 'Earn Rp10jt total',        check: () => ({ cur: Math.min(totals().income, 10000000), goal: 10000000 }) },
+  { id: 'save5',    icon: '🥚', name: 'NEST EGG',        desc: 'Reach a Rp5jt balance',    check: () => ({ cur: Math.min(Math.max(0, totals().balance), 5000000), goal: 5000000 }) },
+  { id: 'streak3',  icon: '🔥', name: 'ON A ROLL',       desc: '3-month budget streak',    check: () => ({ cur: Math.min(streakMonths(), 3), goal: 3 }) },
+  { id: 'chest7',   icon: '🎁', name: 'DAILY HABIT',     desc: '7-day chest streak',       check: () => ({ cur: Math.min(state.chestStreak || 0, 7), goal: 7 }) },
+  { id: 'wealth50', icon: '👑', name: 'WEALTHY',         desc: 'Reach a Rp50jt balance',   check: () => ({ cur: Math.min(Math.max(0, totals().balance), 50000000), goal: 50000000 }) },
+  { id: 'quest',    icon: '⭐', name: 'DREAM ACHIEVED',  desc: 'Complete a savings quest', check: () => ({ cur: (state.goal && totals().balance >= state.goal.target) ? 1 : 0, goal: 1 }) },
 ];
 
 function renderQuests() {
