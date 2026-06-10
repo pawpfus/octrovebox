@@ -69,7 +69,7 @@ A retro advisor that reads **your own tracked data** and gives personalised tips
 A tiny buzz on supported devices (Android) for key actions and milestones — earning, spending, level-ups, and quest/skin unlocks.
 
 ### 🎁 Daily chest
-Open a treasure chest once per day for a coin-shower animation and a random tip, building a daily-login streak.
+A daily bounty on the Quest Board — open it once per day for a coin-shower animation and a random tip, building a daily-login streak.
 
 ### 🎨 Unlockable skins
 Retro theme palettes that re-skin the whole app — Classic, Game Boy, SNES, and Arcade unlock as you level up, and a secret **Midas** gold skin unlocks only after you complete every Side Quest.

@@ -676,7 +676,6 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .quest-scroll { transform-origin: top; animation: unroll .4s cubic-bezier(.18, .89, .32, 1.18); margin-top: 10px; }
 .quest-scroll[hidden] { display: none; }
 @keyframes unroll { from { transform: scaleY(.1); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
-.qb-foot { font-size: 7px; color: #8a6d3a; text-align: center; letter-spacing: 1px; margin-top: 12px; }
 
 .quest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
@@ -876,8 +875,14 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 
 .pr-foot { margin-top: 20px; border-top: 3px double #111; padding-top: 10px; text-align: center; font-size: 15px; color: #555; }
 
-/* =========================== DAILY CHEST =========================== */
-.chest-stage { display: flex; align-items: center; gap: 14px; }
+/* =========================== DAILY CHEST (inside the quest board) =========================== */
+.qb-chest {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 12px; margin-bottom: 10px;
+  background: linear-gradient(180deg, #2b2316 0%, #221a10 100%);
+  border: 3px solid var(--shadow);
+  border-left: 6px solid var(--gold);
+}
 .chest-btn {
   font-family: inherit; font-size: 40px; line-height: 1;
   width: 60px; height: 60px; flex-shrink: 0;
