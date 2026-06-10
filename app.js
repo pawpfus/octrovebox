@@ -96,7 +96,7 @@ const els = {
   // xp
   xpFill: $('xpFill'), xpNext: $('xpNext'),
   // oracle
-  oracleText: $('oracleText'), oracleNext: $('oracleNext'),
+  oracleText: $('oracleText'), oracleStage: $('oracleStage'), oracleMore: $('oracleMore'), oracleCount: $('oracleCount'),
   // side quests
   questList: $('questList'),
   questToggle: $('questToggle'), questScroll: $('questScroll'), questProgress: $('questProgress'),
@@ -815,16 +815,19 @@ function toggleQuestBoard() {
 
 let oracleIdx = 0;
 let typeTimer = null;
+let typingFull = '';                 // full text of the tip currently being typed (for tap-to-skip)
 function typeBlip() { if (state.soundOn) { try { beep([1180], 0.012, 'square', 0.013); } catch (e) {} } }
 function typewrite(el, text) {
   if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+  typingFull = text;
+  els.oracleMore.hidden = true;      // hide the continue arrow while typing
   el.textContent = '';
   let i = 0;
   typeTimer = setInterval(() => {
     el.textContent = text.slice(0, i + 1);
     if (text[i] && text[i] !== ' ' && i % 2 === 0) typeBlip(); // soft RPG-textbox blip
     i += 1;
-    if (i >= text.length) { clearInterval(typeTimer); typeTimer = null; }
+    if (i >= text.length) { clearInterval(typeTimer); typeTimer = null; els.oracleMore.hidden = false; }
   }, 26);
 }
 function currentTip() {
@@ -832,11 +835,30 @@ function currentTip() {
   if (oracleIdx >= list.length) oracleIdx = 0;
   return list[oracleIdx] || '';
 }
+function updateOracleCount() {
+  els.oracleCount.textContent = 'INSIGHT ' + (oracleIdx + 1) + ' / ' + oracleTips().length;
+}
 function renderOracle() {            // instant update from renderAll — don't interrupt active typing
+  updateOracleCount();
   if (typeTimer) return;
   els.oracleText.textContent = currentTip();
+  els.oracleMore.hidden = false;
 }
-function typeOracle() { typewrite(els.oracleText, currentTip()); } // animated (NEXT / first load)
+function typeOracle() { updateOracleCount(); typewrite(els.oracleText, currentTip()); } // animated (tap / first load)
+
+/* tap the dialogue: skip the typing if mid-sentence, otherwise next insight */
+function oracleTap() {
+  if (typeTimer) {                   // skip — reveal the full line instantly
+    clearInterval(typeTimer); typeTimer = null;
+    els.oracleText.textContent = typingFull;
+    els.oracleMore.hidden = false;
+    sfx.click();
+  } else {
+    oracleIdx += 1;
+    sfx.click();
+    typeOracle();
+  }
+}
 
 /* ---------------- DAILY CHEST ---------------- */
 const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD (local)
@@ -1465,7 +1487,7 @@ els.backupBtn.addEventListener('click', exportBackup);
 els.recapBtn.addEventListener('click', openRecap);
 els.recapClose.addEventListener('click', closeRecap);
 els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOverlay) closeRecap(); });
-els.oracleNext.addEventListener('click', () => { oracleIdx += 1; sfx.click(); typeOracle(); });
+els.oracleStage.addEventListener('click', oracleTap);
 els.questToggle.addEventListener('click', toggleQuestBoard);
 els.chestBtn.addEventListener('click', openChest);
 

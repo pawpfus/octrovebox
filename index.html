@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=63" />
+<link rel="stylesheet" href="styles.css?v=64" />
 </head>
 <body>
   <!-- update banner (shown when a new version is deployed) -->
@@ -261,10 +261,21 @@
     <section class="panel oracle-panel">
       <div class="log-head">
         <h2 class="panel-title">🔮 THE ORACLE</h2>
-        <button type="button" class="mini-btn" id="oracleNext">NEXT ▶</button>
+        <span class="oracle-count" id="oracleCount"></span>
       </div>
-      <p class="oracle-text" id="oracleText">Consulting the money spirits…</p>
-      <p class="oracle-note">★ EDUCATIONAL ONLY — NOT FINANCIAL ADVICE</p>
+      <div class="oracle-stage" id="oracleStage" title="Tap to continue">
+        <div class="oracle-orb">
+          <span class="orb-ball">🔮</span>
+          <span class="orb-spark s1">✦</span>
+          <span class="orb-spark s2">✧</span>
+          <span class="orb-spark s3">✦</span>
+        </div>
+        <div class="oracle-bubble">
+          <p class="oracle-text" id="oracleText">Consulting the money spirits…</p>
+          <span class="oracle-more" id="oracleMore" hidden>▼</span>
+        </div>
+      </div>
+      <p class="oracle-note">★ EDUCATIONAL ONLY — NOT FINANCIAL ADVICE · TAP TO CONTINUE</p>
     </section>
 
     <!-- ===== THEME / SKINS + AUDIO ===== -->
@@ -322,6 +333,6 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=63"></script>
+  <script src="app.js?v=64"></script>
 </body>
 </html>

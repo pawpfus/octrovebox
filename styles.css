@@ -712,9 +712,40 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .q-status { font-size: 7px; color: var(--ink-dim); white-space: nowrap; align-self: end; padding-bottom: 2px; }
 .quest-item.done .q-status { color: var(--green); }
 
-/* =========================== ORACLE =========================== */
-.oracle-panel { margin-bottom: 18px; }
+/* =========================== ORACLE (RPG dialogue) =========================== */
+.oracle-panel {
+  margin-bottom: 18px;
+  background:
+    linear-gradient(180deg, rgba(176, 107, 255, .10) 0%, rgba(176, 107, 255, 0) 60%),
+    var(--panel);
+}
+.oracle-count { font-size: 8px; color: var(--purple); letter-spacing: 1px; }
 
+.oracle-stage { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+
+/* the seer's crystal orb */
+.oracle-orb { position: relative; flex: 0 0 auto; width: 52px; height: 60px; }
+.orb-ball {
+  position: absolute; left: 4px; top: 10px; font-size: 36px; line-height: 1;
+  filter: drop-shadow(0 0 7px rgba(176, 107, 255, .8)) drop-shadow(2px 2px 0 var(--shadow));
+  animation: orbPulse 2.6s ease-in-out infinite;
+}
+@keyframes orbPulse {
+  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 0 5px rgba(176, 107, 255, .55)) drop-shadow(2px 2px 0 var(--shadow)); }
+  50% { transform: translateY(-4px) scale(1.06); filter: drop-shadow(0 0 12px rgba(176, 107, 255, .95)) drop-shadow(2px 2px 0 var(--shadow)); }
+}
+.orb-spark { position: absolute; font-size: 9px; color: var(--purple); animation: sparkTw 1.8s ease-in-out infinite; }
+.orb-spark.s1 { left: 0; top: 2px; }
+.orb-spark.s2 { right: 0; top: 18px; animation-delay: .6s; color: var(--pink); }
+.orb-spark.s3 { left: 6px; bottom: 0; animation-delay: 1.2s; color: var(--blue); }
+@keyframes sparkTw { 0%, 100% { opacity: .15; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
+
+/* RPG speech bubble with pointer toward the orb */
+.oracle-bubble { position: relative; flex: 1; min-width: 0; }
+.oracle-bubble::before {
+  content: ''; position: absolute; left: -9px; top: 22px;
+  border: 6px solid transparent; border-right-color: var(--shadow); border-left: none;
+}
 .oracle-text {
   font-family: 'VT323', monospace;
   font-size: 19px; line-height: 1.4; color: var(--ink);
@@ -722,8 +753,16 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
   background: var(--bg-2);
   border: 3px solid var(--shadow);
   box-shadow: inset 2px 2px 0 rgba(0,0,0,.4);
-  padding: 14px 16px;
+  padding: 14px 26px 14px 16px;
 }
+/* blinking continue arrow, classic RPG textbox */
+.oracle-more {
+  position: absolute; right: 10px; bottom: 8px;
+  font-size: 9px; color: var(--gold);
+  animation: blink 0.9s steps(2) infinite;
+  pointer-events: none;
+}
+.oracle-more[hidden] { display: none; }
 .oracle-note { font-size: 7px; color: var(--ink-dim); margin-top: 12px; letter-spacing: 1px; }
 
 /* =========================== UPDATE BANNER =========================== */
