@@ -648,23 +648,69 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .danger-btn:hover { background: var(--red); }
 .copyright { font-size: 7px; color: #4a4a7a; letter-spacing: 1px; }
 
-/* =========================== SIDE QUESTS =========================== */
-.quests-panel { margin-bottom: 18px; }
-.quest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.quest-item {
-  display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center;
-  padding: 10px; background: var(--bg-2); border: 3px solid var(--shadow);
+/* =========================== SIDE QUESTS — RPG QUEST BOARD =========================== */
+.quests-panel { margin-bottom: 18px; padding: 12px; }
+
+/* guild banner (click to unroll) */
+.qboard-banner {
+  font-family: inherit; cursor: pointer; width: 100%;
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  padding: 12px 14px; color: var(--ink);
+  background: linear-gradient(180deg, #4a2f12 0%, #3a2410 55%, #2a1a0a 100%);
+  border: 3px solid var(--shadow);
+  box-shadow: inset 0 2px 0 rgba(255, 210, 63, .25), inset 0 -3px 0 rgba(0, 0, 0, .5);
 }
-.quest-item.done { border-color: var(--green-dk); background: #14321d; }
-.q-ico { font-size: 17px; text-align: center; }
+.qboard-banner:hover { filter: brightness(1.12); }
+.qb-seal {
+  font-size: 24px; flex: 0 0 auto;
+  filter: drop-shadow(2px 2px 0 var(--shadow));
+  animation: hover 2.4s ease-in-out infinite;
+}
+.qb-text { flex: 1; min-width: 0; }
+.qb-title { display: block; font-size: 10px; color: var(--gold); letter-spacing: 2px; text-shadow: 2px 2px 0 var(--shadow); }
+.qb-sub { display: block; font-size: 7px; color: #c9a96a; margin-top: 6px; letter-spacing: 1px; }
+.qb-arrow { font-size: 10px; color: var(--gold); transition: transform .3s; }
+.qboard-banner.open .qb-arrow { transform: rotate(180deg); }
+
+/* unrolling scroll */
+.quest-scroll { transform-origin: top; animation: unroll .4s cubic-bezier(.18, .89, .32, 1.18); margin-top: 10px; }
+.quest-scroll[hidden] { display: none; }
+@keyframes unroll { from { transform: scaleY(.1); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+.qb-foot { font-size: 7px; color: #8a6d3a; text-align: center; letter-spacing: 1px; margin-top: 12px; }
+
+.quest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* quest scrolls: parchment plaque with a ribbon edge */
+.quest-item {
+  position: relative;
+  display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center;
+  padding: 10px 10px 10px 14px;
+  background: linear-gradient(180deg, #2b2316 0%, #221a10 100%);
+  border: 3px solid var(--shadow);
+  border-left: 6px solid var(--gold-dk);
+}
+.quest-item.done {
+  border-left-color: var(--green);
+  background: linear-gradient(180deg, #14321d 0%, #0e2415 100%);
+}
+/* wax-stamp DONE */
+.quest-item.done::after {
+  content: '✦ DONE ✦';
+  position: absolute; right: 6px; top: 4px;
+  font-size: 6px; color: var(--green);
+  border: 2px solid var(--green-dk); padding: 2px 4px;
+  transform: rotate(8deg); opacity: .9; letter-spacing: 1px;
+  background: rgba(0, 0, 0, .35);
+}
+.q-ico { font-size: 17px; text-align: center; filter: drop-shadow(2px 2px 0 var(--shadow)); }
 .q-body { min-width: 0; }
-.q-name { font-size: 8px; color: var(--ink); display: block; }
+.q-name { font-size: 8px; color: var(--gold); display: block; letter-spacing: 1px; }
 .quest-item.done .q-name { color: var(--green); }
 .q-desc { font-size: 7px; color: var(--ink-dim); display: block; margin: 5px 0 7px; }
 .q-track { display: block; height: 8px; background: var(--bg); border: 2px solid var(--shadow); overflow: hidden; }
 .q-fill { display: block; height: 100%; width: 0; background: var(--gold); transition: width .5s ease; }
 .quest-item.done .q-fill { background: var(--green); }
-.q-status { font-size: 7px; color: var(--ink-dim); white-space: nowrap; }
+.q-status { font-size: 7px; color: var(--ink-dim); white-space: nowrap; align-self: end; padding-bottom: 2px; }
 .quest-item.done .q-status { color: var(--green); }
 
 /* =========================== ORACLE =========================== */

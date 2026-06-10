@@ -99,6 +99,7 @@ const els = {
   oracleText: $('oracleText'), oracleNext: $('oracleNext'),
   // side quests
   questList: $('questList'),
+  questToggle: $('questToggle'), questScroll: $('questScroll'), questProgress: $('questProgress'),
   // chest + themes
   chestBtn: $('chestBtn'), chestStreak: $('chestStreak'), chestSay: $('chestSay'),
   themeGrid: $('themeGrid'),
@@ -797,6 +798,19 @@ function renderQuests() {
       if (appReady) { sfx.victory(); showToast('🗺️ QUEST COMPLETE: ' + c.name + '!'); }
     }
   });
+
+  // guild banner progress
+  const doneCount = CHALLENGES.filter((c) => { const { cur, goal } = c.check(); return cur >= goal; }).length;
+  els.questProgress.textContent = doneCount + ' / ' + CHALLENGES.length + ' DEEDS COMPLETED';
+}
+
+/* quest board open/close with a little guild-horn flourish */
+function toggleQuestBoard() {
+  const opening = els.questScroll.hidden;
+  els.questScroll.hidden = !opening;
+  els.questToggle.classList.toggle('open', opening);
+  if (opening) beep([523, 659, 784], 0.07, 'triangle', 0.04); // unroll fanfare
+  else sfx.click();
 }
 
 let oracleIdx = 0;
@@ -1452,6 +1466,7 @@ els.recapBtn.addEventListener('click', openRecap);
 els.recapClose.addEventListener('click', closeRecap);
 els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOverlay) closeRecap(); });
 els.oracleNext.addEventListener('click', () => { oracleIdx += 1; sfx.click(); typeOracle(); });
+els.questToggle.addEventListener('click', toggleQuestBoard);
 els.chestBtn.addEventListener('click', openChest);
 
 // Konami code (keyboard) → rainbow cheat
