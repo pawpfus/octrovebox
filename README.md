@@ -48,7 +48,7 @@ Filter entries by category and by month, and see a live count + net total of wha
 Tap ✎ on any entry to edit its name, amount, category, type, or **date**. Every entry has a date field (defaults to today) so you can **backdate** old transactions — the Quest Log, monthly streak, World Map history, and all trends use the entry's real date.
 
 ### ★ Starting balance
-Set your real opening balance (tap **SET ✎** on the Balance card) so Balance reflects actual money on hand, not just the sum since you began logging. Balance = starting balance + income − expenses.
+Set your real opening balance (tap **START ✎** on the Balance card) so Balance reflects actual money on hand, not just the sum since you began logging. Balance = starting balance + income − expenses.
 
 ### 🔥 Streak Tracking
 A `🔥 X MO` counter in the HUD counts consecutive completed months you stayed under your Budget Boss limit.
