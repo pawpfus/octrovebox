@@ -26,7 +26,7 @@
   --pixel:     4px;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 /* background lives on <html> so the fixed starfield canvas (z-index:-1)
    can show through the transparent <body> */

@@ -1,25 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>COIN QUEST — 8-Bit Finance Tracker</title>
 
-<!-- PWA: installable app -->
-<link rel="manifest" href="manifest.webmanifest" />
-<meta name="theme-color" content="#0b0b1f" />
-<meta name="description" content="Track your money like a retro NES adventure. Earn gold, fight the Budget Boss, and complete savings quests." />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Coin Quest" />
-<link rel="apple-touch-icon" href="apple-touch-icon.png" />
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=56" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>COIN QUEST — 8-Bit Finance Tracker</title>
+
+  <!-- PWA: installable app -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0b0b1f" />
+  <meta name="description"
+    content="Track your money like a retro NES adventure. Earn gold, fight the Budget Boss, and complete savings quests." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Coin Quest" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=56" />
 </head>
+
 <body>
   <!-- update banner (shown when a new version is deployed) -->
   <div class="update-bar" id="updateBar" hidden>
@@ -55,7 +58,8 @@
     <!-- ===== STAT HUD ===== -->
     <section class="stats" aria-label="Money stats">
       <div class="stat-card balance">
-        <span class="stat-label">★ BALANCE <button type="button" class="start-btn" id="editStartBtn" title="Set starting balance">✎ START</button></span>
+        <span class="stat-label">★ BALANCE <button type="button" class="start-btn" id="editStartBtn"
+            title="Set starting balance">✎ START</button></span>
         <span class="stat-value" id="balanceValue">$0</span>
         <span class="stat-foot" id="balanceFoot">PRESS START</span>
         <div class="editor hidden" id="startEditor">
@@ -293,4 +297,5 @@
 
   <script src="app.js?v=56"></script>
 </body>
+
 </html>
