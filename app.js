@@ -96,7 +96,7 @@ const els = {
   // xp
   xpFill: $('xpFill'), xpNext: $('xpNext'),
   // oracle
-  oracleText: $('oracleText'), oracleStage: $('oracleStage'), oracleMore: $('oracleMore'), oracleCount: $('oracleCount'),
+  oracleText: $('oracleText'), oracleStage: $('oracleStage'), oracleMore: $('oracleMore'),
   // side quests
   questList: $('questList'),
   questToggle: $('questToggle'), questScroll: $('questScroll'), questProgress: $('questProgress'),
@@ -835,16 +835,12 @@ function currentTip() {
   if (oracleIdx >= list.length) oracleIdx = 0;
   return list[oracleIdx] || '';
 }
-function updateOracleCount() {
-  els.oracleCount.textContent = 'INSIGHT ' + (oracleIdx + 1) + ' / ' + oracleTips().length;
-}
 function renderOracle() {            // instant update from renderAll — don't interrupt active typing
-  updateOracleCount();
   if (typeTimer) return;
   els.oracleText.textContent = currentTip();
   els.oracleMore.hidden = false;
 }
-function typeOracle() { updateOracleCount(); typewrite(els.oracleText, currentTip()); } // animated (tap / first load)
+function typeOracle() { typewrite(els.oracleText, currentTip()); } // animated (tap / first load)
 
 /* tap the dialogue: skip the typing if mid-sentence, otherwise next insight */
 function oracleTap() {
