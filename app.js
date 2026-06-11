@@ -52,7 +52,9 @@ let state = {
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
-let currentFilter = 'all';
+let currentFilter = 'all';      // type filter: all / income / expense
+let catFilterVal = 'all';       // quest-log category filter
+let monthFilterVal = 'all';     // quest-log month filter (y*12+m, or 'all')
 let editingId = null; // id of the transaction being edited (null = adding new)
 let scatterBuddies = () => {}; // assigned by the roaming-buddies system below
 
@@ -63,8 +65,11 @@ const els = {
   balanceFoot: $('balanceFoot'), balanceCard: document.querySelector('.balance'),
   streak: $('streakDisplay'),
   form: $('txForm'), desc: $('descInput'), amount: $('amountInput'), category: $('categoryInput'),
+  dateField: $('dateField'), dateLabel: $('dateLabel'),
+  calOverlay: $('calOverlay'), calPrev: $('calPrev'), calNext: $('calNext'), calTitle: $('calTitle'), calGrid: $('calGrid'), calToday: $('calToday'),
   btnExpense: $('btnExpense'), btnIncome: $('btnIncome'), submit: $('submitBtn'),
   list: $('txList'), emptyState: $('emptyState'),
+  catFilter: $('catFilter'), monthFilter: $('monthFilter'), logSummary: $('logSummary'),
   catBars: $('catBars'), catEmpty: $('catEmpty'),
   filters: $('logFilters'), mute: $('muteBtn'), music: $('musicBtn'),
   editStartBtn: $('editStartBtn'), startEditor: $('startEditor'), startInput: $('startInput'), startSave: $('startSave'),
@@ -91,9 +96,10 @@ const els = {
   // xp
   xpFill: $('xpFill'), xpNext: $('xpNext'),
   // oracle
-  oracleText: $('oracleText'), oracleNext: $('oracleNext'),
+  oracleText: $('oracleText'), oracleStage: $('oracleStage'), oracleMore: $('oracleMore'),
   // side quests
   questList: $('questList'),
+  questToggle: $('questToggle'), questScroll: $('questScroll'), questProgress: $('questProgress'),
   // chest + themes
   chestBtn: $('chestBtn'), chestStreak: $('chestStreak'), chestSay: $('chestSay'),
   themeGrid: $('themeGrid'),
@@ -159,8 +165,8 @@ function save() {
 ============================================================ */
 const fmt = (n) => {
   const neg = n < 0;
-  const v = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  return (neg ? '-$' : '$') + v;
+  const v = Math.abs(n).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return (neg ? '-Rp' : 'Rp') + v;
 };
 function catInfo(type, id) {
   return CATEGORIES[type].find((c) => c.id === id) || { name: id, icon: '❓' };
@@ -169,6 +175,11 @@ function levelFor(income) {
   return Math.max(1, Math.floor(income / 1000) + 1); // +1 level per $1000 earned
 }
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+// effective date of an entry — uses the editable `date`, falling back to id (old entries)
+const txDate = (t) => t.date || t.id;
+// ms timestamp for a YYYY-MM-DD string at local noon (avoids timezone day-shift)
+const ymdToTs = (s) => (s ? new Date(s + 'T12:00:00').getTime() : Date.now());
+const tsToYmd = (ts) => { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
 const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
@@ -176,7 +187,7 @@ const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV
 function monthTotals(y, m, category) {
   let income = 0, expense = 0;
   state.transactions.forEach((t) => {
-    const d = new Date(t.id);
+    const d = new Date(txDate(t));
     if (d.getFullYear() !== y || d.getMonth() !== m) return;
     if (category && t.category !== category) return;
     if (t.type === 'income') income += t.amount; else expense += t.amount;
@@ -206,13 +217,22 @@ function totals() {
 }
 
 const prevStat = { income: 0, expense: 0, balance: 0 };
+// shrink the stat font as the Rupiah figure grows (lots of zeros = long string)
+function fitStat(el, a, b) {
+  const len = Math.max(fmt(a).length, fmt(b).length);
+  el.classList.remove('len-m', 'len-l', 'len-xl', 'len-xxl');
+  if (len >= 17) el.classList.add('len-xxl');
+  else if (len >= 14) el.classList.add('len-xl');
+  else if (len >= 12) el.classList.add('len-l');
+  else if (len >= 10) el.classList.add('len-m');
+}
 function animateValue(el, from, to, dur = 650) {
   if (from === to) { el.textContent = fmt(to); return; }
   const start = performance.now();
   function frame(t) {
     const k = Math.min(1, (t - start) / dur);
     const eased = 1 - Math.pow(1 - k, 3);
-    el.textContent = fmt(from + (to - from) * eased);
+    el.textContent = fmt(Math.round(from + (to - from) * eased));
     if (k < 1) requestAnimationFrame(frame); else el.textContent = fmt(to);
   }
   requestAnimationFrame(frame);
@@ -220,6 +240,9 @@ function animateValue(el, from, to, dur = 650) {
 
 function renderStats(prevLevel) {
   const { income, expense, balance } = totals();
+  fitStat(els.income, prevStat.income, income);
+  fitStat(els.expense, prevStat.expense, expense);
+  fitStat(els.balance, prevStat.balance, balance);
   animateValue(els.income, prevStat.income, income);  prevStat.income = income;
   animateValue(els.expense, prevStat.expense, expense); prevStat.expense = expense;
   animateValue(els.balance, prevStat.balance, balance); prevStat.balance = balance;
@@ -245,19 +268,39 @@ function renderStats(prevLevel) {
   }
 }
 
+function txMonthKey(t) { const d = new Date(txDate(t)); return d.getFullYear() * 12 + d.getMonth(); }
+function matchesFilters(t) {
+  if (currentFilter !== 'all' && t.type !== currentFilter) return false;
+  if (catFilterVal !== 'all' && t.category !== catFilterVal) return false;
+  if (monthFilterVal !== 'all' && txMonthKey(t) !== Number(monthFilterVal)) return false;
+  return true;
+}
+
 function renderList() {
+  fillMonthFilter();
   const items = state.transactions
-    .filter((t) => currentFilter === 'all' || t.type === currentFilter)
-    .slice().reverse();
+    .filter(matchesFilters)
+    .slice().sort((a, b) => txDate(b) - txDate(a)); // newest date first (handles backdated entries)
 
   els.list.innerHTML = '';
   els.emptyState.style.display = items.length ? 'none' : 'block';
+
+  // filtered summary: count + net (income − expense of shown)
+  let inc = 0, exp = 0;
+  items.forEach((t) => { if (t.type === 'income') inc += t.amount; else exp += t.amount; });
+  const net = inc - exp;
+  const anyFilter = currentFilter !== 'all' || catFilterVal !== 'all' || monthFilterVal !== 'all';
+  els.logSummary.innerHTML = state.transactions.length
+    ? `${items.length} ${anyFilter ? 'MATCH' : 'ENTR' + (items.length === 1 ? 'Y' : 'IES')} · <span class="sum-net ${net >= 0 ? 'pos' : 'neg'}">${net >= 0 ? '+' : ''}${fmt(net)}</span>`
+    : '';
 
   items.forEach((t) => {
     const c = catInfo(t.type, t.category);
     const li = document.createElement('li');
     li.className = 'tx-item';
-    const date = new Date(t.id).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const dObj = new Date(txDate(t));
+    const sameYear = dObj.getFullYear() === new Date().getFullYear();
+    const date = dObj.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' });
     li.innerHTML = `
       <span class="tx-icon" style="background:${CAT_COLORS[t.category] || '#2e2e63'}22;border-color:${CAT_COLORS[t.category] || '#050510'}">${c.icon}</span>
       <span class="tx-body">
@@ -270,6 +313,26 @@ function renderList() {
     `;
     els.list.appendChild(li);
   });
+}
+
+function fillCatFilter() {
+  const seen = new Set();
+  const opts = ['<option value="all">ALL CATEGORIES</option>'];
+  [...CATEGORIES.expense, ...CATEGORIES.income].forEach((c) => {
+    if (seen.has(c.id)) return; seen.add(c.id);
+    opts.push(`<option value="${c.id}">${c.icon} ${c.name}</option>`);
+  });
+  els.catFilter.innerHTML = opts.join('');
+}
+function fillMonthFilter() {
+  const keys = new Set();
+  state.transactions.forEach((t) => keys.add(txMonthKey(t)));
+  const sorted = [...keys].sort((a, b) => b - a);
+  const opts = ['<option value="all">ALL MONTHS</option>'];
+  sorted.forEach((k) => { opts.push(`<option value="${k}">${MONTHS[k % 12]} ${Math.floor(k / 12)}</option>`); });
+  els.monthFilter.innerHTML = opts.join('');
+  if (monthFilterVal !== 'all' && !keys.has(Number(monthFilterVal))) monthFilterVal = 'all';
+  els.monthFilter.value = monthFilterVal;
 }
 
 function renderCats() {
@@ -442,7 +505,7 @@ function streakMonths() {
   const curIdx = now.getFullYear() * 12 + now.getMonth();
   let earliest = Infinity;
   state.transactions.forEach((t) => {
-    const d = new Date(t.id);
+    const d = new Date(txDate(t));
     earliest = Math.min(earliest, d.getFullYear() * 12 + d.getMonth());
   });
   let streak = 0;
@@ -460,8 +523,9 @@ function renderStreak() {
 
 /* ---------------- WORLD MAP CHART (last 6 months) ---------------- */
 function kfmt(n) {
-  if (n >= 1000) return '$' + (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'k';
-  return '$' + Math.round(n);
+  if (n >= 1000000) return 'Rp' + (n / 1000000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'jt';
+  if (n >= 1000) return 'Rp' + (n / 1000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'rb';
+  return 'Rp' + Math.round(n).toLocaleString('id-ID');
 }
 function renderChart() {
   const now = new Date();
@@ -510,11 +574,17 @@ const EDU_TIPS = [
   '💡 Inflation is a silent boss battle — idle cash loses HP every year. Make long-term money work.',
   '💡 An emergency fund isn\'t an investment — it\'s armor. Keep it boring, liquid, and reachable.',
   '💡 Track first, judge later: a month of honest logging beats a year of guessing.',
+  '💡 Needs vs wants: sleep 24 hours on any "want" bigger than your daily budget — most cravings quietly fade.',
+  '💡 A rupiah saved beats a rupiah earned — saving skips the tax and effort that earning costs you.',
+  '💡 Audit subscriptions monthly. The quietest boss is the one that auto-renews while you sleep.',
+  '💡 Keep at least one month of expenses in instant-access cash before chasing higher returns.',
+  '💡 Pay yourself first: treat savings like a fixed bill, not whatever happens to be left over.',
+  '💡 Lifestyle creep is the stealth boss — when income rises, bank the raise before your spending learns about it.',
 ];
 
 function distinctMonths() {
   const set = new Set();
-  state.transactions.forEach((t) => { const d = new Date(t.id); set.add(d.getFullYear() * 12 + d.getMonth()); });
+  state.transactions.forEach((t) => { const d = new Date(txDate(t)); set.add(d.getFullYear() * 12 + d.getMonth()); });
   return Math.max(1, set.size);
 }
 
@@ -618,7 +688,7 @@ function oracleTips() {
   if (dayOfMonth >= 7) {
     const spendDays = new Set();
     state.transactions.forEach((t) => {
-      const d = new Date(t.id);
+      const d = new Date(txDate(t));
       if (t.type === 'expense' && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) spendDays.add(d.getDate());
     });
     const noSpend = dayOfMonth - spendDays.size;
@@ -639,14 +709,14 @@ function oracleTips() {
   // weekend spending share
   if (expenses.length >= 8) {
     let we = 0;
-    expenses.forEach((t) => { const dw = new Date(t.id).getDay(); if (dw === 0 || dw === 6) we += t.amount; });
+    expenses.forEach((t) => { const dw = new Date(txDate(t)).getDay(); if (dw === 0 || dw === 6) we += t.amount; });
     const weShare = expense > 0 ? Math.round((we / expense) * 100) : 0;
     if (weShare >= 40) tips.push('🎉 ' + weShare + '% of your spending happens on weekends (2 days out of 7). Plan weekend fun with a cap.');
   }
 
   // best savings month on record
   const monthKeys = new Set();
-  state.transactions.forEach((t) => { const d = new Date(t.id); monthKeys.add(d.getFullYear() * 12 + d.getMonth()); });
+  state.transactions.forEach((t) => { const d = new Date(txDate(t)); monthKeys.add(d.getFullYear() * 12 + d.getMonth()); });
   if (monthKeys.size >= 2) {
     let best = null;
     monthKeys.forEach((k) => {
@@ -664,19 +734,55 @@ function oracleTips() {
     tips.push('💼 All your income flows from one source. A side quest income stream is the best armor against surprises.');
   }
 
+  // daily spending allowance for the rest of the month
+  if (state.budget) {
+    const remaining = state.budget - monthSpend();
+    const daysLeft = daysInMonth - dayOfMonth + 1;
+    if (remaining > 0 && daysLeft > 0) {
+      tips.push('🪙 ' + fmt(remaining) + ' budget left over ' + daysLeft + ' day' + (daysLeft > 1 ? 's' : '') + ' = ~' + fmt(remaining / daysLeft) + '/day to stay on track.');
+    }
+  }
+
+  // this month's net so far
+  const mtNow = monthTotals(now.getFullYear(), now.getMonth());
+  if (mtNow.income > 0 || mtNow.expense > 0) {
+    const net = mtNow.income - mtNow.expense;
+    tips.push((net >= 0 ? '🟢' : '🔴') + ' This month so far: earned ' + fmt(mtNow.income) + ', spent ' + fmt(mtNow.expense) + ' → ' + (net >= 0 ? 'saved ' : 'down ') + fmt(Math.abs(net)) + '.');
+  }
+
+  // single-category over-concentration
+  if (top && expense > 0) {
+    const topShare = Math.round((top[1] / expense) * 100);
+    if (topShare >= 45) tips.push('⚠ ' + catInfo('expense', top[0]).name + ' is ' + topShare + '% of all spending — one category dominating is risky. Diversify your spending, not just your investments.');
+  }
+
+  // average expense size — point of awareness
+  if (expenses.length >= 6) {
+    const avgExp = expense / expenses.length;
+    tips.push('📊 Your average expense is ' + fmt(avgExp) + ' across ' + expenses.length + ' purchases. Knowing your "normal" makes the outliers obvious.');
+  }
+
   return tips.concat(EDU_TIPS);
 }
 
 /* ---------------- SIDE QUESTS (challenges) ---------------- */
 const CHALLENGES = [
-  { id: 'first',   icon: '🐣', name: 'FIRST STEPS',    desc: 'Log your first entry',        check: () => ({ cur: Math.min(state.transactions.length, 1), goal: 1 }) },
-  { id: 'five',    icon: '📜', name: 'GETTING STARTED', desc: 'Log 5 entries',               check: () => ({ cur: Math.min(state.transactions.length, 5), goal: 5 }) },
-  { id: 'budget',  icon: '🛡️', name: 'BUDGET KEEPER',   desc: 'Set a monthly budget',        check: () => ({ cur: state.budget ? 1 : 0, goal: 1 }) },
-  { id: 'diverse', icon: '🎨', name: 'DIVERSIFIER',     desc: 'Spend in 3 categories',       check: () => ({ cur: Math.min(new Set(state.transactions.filter((t) => t.type === 'expense').map((t) => t.category)).size, 3), goal: 3 }) },
-  { id: 'earn1m',  icon: '💰', name: 'BIG EARNER',      desc: 'Earn $10,000 total',          check: () => ({ cur: Math.min(totals().income, 10000), goal: 10000 }) },
-  { id: 'save5',   icon: '🥚', name: 'NEST EGG',        desc: 'Reach a $5,000 balance',      check: () => ({ cur: Math.min(Math.max(0, totals().balance), 5000), goal: 5000 }) },
-  { id: 'streak3', icon: '🔥', name: 'ON A ROLL',       desc: '3-month budget streak',       check: () => ({ cur: Math.min(streakMonths(), 3), goal: 3 }) },
-  { id: 'quest',   icon: '⭐', name: 'DREAM ACHIEVED',  desc: 'Complete a savings quest',    check: () => ({ cur: (state.goal && totals().balance >= state.goal.target) ? 1 : 0, goal: 1 }) },
+  { id: 'first',    icon: '🐣', name: 'FIRST STEPS',     desc: 'Log your first entry',     check: () => ({ cur: Math.min(state.transactions.length, 1), goal: 1 }) },
+  { id: 'five',     icon: '📜', name: 'GETTING STARTED', desc: 'Log 5 entries',            check: () => ({ cur: Math.min(state.transactions.length, 5), goal: 5 }) },
+  { id: 'log25',    icon: '📚', name: 'BOOKKEEPER',      desc: 'Log 25 entries',           check: () => ({ cur: Math.min(state.transactions.length, 25), goal: 25 }) },
+  { id: 'budget',   icon: '🛡️', name: 'BUDGET KEEPER',   desc: 'Set a monthly budget',     check: () => ({ cur: state.budget ? 1 : 0, goal: 1 }) },
+  { id: 'minib',    icon: '👾', name: 'BOSS HUNTER',     desc: 'Set a category limit',     check: () => ({ cur: Object.keys(state.catBudgets || {}).length ? 1 : 0, goal: 1 }) },
+  { id: 'goalset',  icon: '🗺️', name: 'DREAMER',         desc: 'Set a savings quest',      check: () => ({ cur: state.goal ? 1 : 0, goal: 1 }) },
+  { id: 'diverse',  icon: '🎨', name: 'DIVERSIFIER',     desc: 'Spend in 3 categories',    check: () => ({ cur: Math.min(new Set(state.transactions.filter((t) => t.type === 'expense').map((t) => t.category)).size, 3), goal: 3 }) },
+  { id: 'diverse5', icon: '🌈', name: 'WELL-ROUNDED',    desc: 'Spend in 5 categories',    check: () => ({ cur: Math.min(new Set(state.transactions.filter((t) => t.type === 'expense').map((t) => t.category)).size, 5), goal: 5 }) },
+  { id: 'months3',  icon: '🗓️', name: 'CONSISTENT',      desc: 'Track across 3 months',    check: () => ({ cur: Math.min(distinctMonths(), 3), goal: 3 }) },
+  { id: 'saver20',  icon: '📈', name: 'DISCIPLINED',     desc: 'Reach a 20% savings rate', check: () => { const { income, expense } = totals(); const r = income > 0 ? (income - expense) / income : 0; return { cur: clamp(Math.round(r * 100), 0, 20), goal: 20 }; } },
+  { id: 'earn1m',   icon: '💰', name: 'BIG EARNER',      desc: 'Earn Rp10jt total',        check: () => ({ cur: Math.min(totals().income, 10000000), goal: 10000000 }) },
+  { id: 'save5',    icon: '🥚', name: 'NEST EGG',        desc: 'Reach a Rp5jt balance',    check: () => ({ cur: Math.min(Math.max(0, totals().balance), 5000000), goal: 5000000 }) },
+  { id: 'streak3',  icon: '🔥', name: 'ON A ROLL',       desc: '3-month budget streak',    check: () => ({ cur: Math.min(streakMonths(), 3), goal: 3 }) },
+  { id: 'chest7',   icon: '🎁', name: 'DAILY HABIT',     desc: '7-day chest streak',       check: () => ({ cur: Math.min(state.chestStreak || 0, 7), goal: 7 }) },
+  { id: 'wealth50', icon: '👑', name: 'WEALTHY',         desc: 'Reach a Rp50jt balance',   check: () => ({ cur: Math.min(Math.max(0, totals().balance), 50000000), goal: 50000000 }) },
+  { id: 'quest',    icon: '⭐', name: 'DREAM ACHIEVED',  desc: 'Complete a savings quest', check: () => ({ cur: (state.goal && totals().balance >= state.goal.target) ? 1 : 0, goal: 1 }) },
 ];
 
 function renderQuests() {
@@ -704,20 +810,36 @@ function renderQuests() {
       if (appReady) { sfx.victory(); showToast('🗺️ QUEST COMPLETE: ' + c.name + '!'); }
     }
   });
+
+  // guild banner progress
+  const doneCount = CHALLENGES.filter((c) => { const { cur, goal } = c.check(); return cur >= goal; }).length;
+  els.questProgress.textContent = doneCount + ' / ' + CHALLENGES.length + ' DEEDS COMPLETED';
+}
+
+/* quest board open/close with a little guild-horn flourish */
+function toggleQuestBoard() {
+  const opening = els.questScroll.hidden;
+  els.questScroll.hidden = !opening;
+  els.questToggle.classList.toggle('open', opening);
+  if (opening) beep([523, 659, 784], 0.07, 'triangle', 0.04); // unroll fanfare
+  else sfx.click();
 }
 
 let oracleIdx = 0;
 let typeTimer = null;
+let typingFull = '';                 // full text of the tip currently being typed (for tap-to-skip)
 function typeBlip() { if (state.soundOn) { try { beep([1180], 0.012, 'square', 0.013); } catch (e) {} } }
 function typewrite(el, text) {
   if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+  typingFull = text;
+  els.oracleMore.hidden = true;      // hide the continue arrow while typing
   el.textContent = '';
   let i = 0;
   typeTimer = setInterval(() => {
     el.textContent = text.slice(0, i + 1);
     if (text[i] && text[i] !== ' ' && i % 2 === 0) typeBlip(); // soft RPG-textbox blip
     i += 1;
-    if (i >= text.length) { clearInterval(typeTimer); typeTimer = null; }
+    if (i >= text.length) { clearInterval(typeTimer); typeTimer = null; els.oracleMore.hidden = false; }
   }, 26);
 }
 function currentTip() {
@@ -728,8 +850,23 @@ function currentTip() {
 function renderOracle() {            // instant update from renderAll — don't interrupt active typing
   if (typeTimer) return;
   els.oracleText.textContent = currentTip();
+  els.oracleMore.hidden = false;
 }
-function typeOracle() { typewrite(els.oracleText, currentTip()); } // animated (NEXT / first load)
+function typeOracle() { typewrite(els.oracleText, currentTip()); } // animated (tap / first load)
+
+/* tap the dialogue: skip the typing if mid-sentence, otherwise next insight */
+function oracleTap() {
+  if (typeTimer) {                   // skip — reveal the full line instantly
+    clearInterval(typeTimer); typeTimer = null;
+    els.oracleText.textContent = typingFull;
+    els.oracleMore.hidden = false;
+    sfx.click();
+  } else {
+    oracleIdx += 1;
+    sfx.click();
+    typeOracle();
+  }
+}
 
 /* ---------------- DAILY CHEST ---------------- */
 const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD (local)
@@ -907,6 +1044,42 @@ function setType(type) {
 
 function submitLabel() { return currentType === 'income' ? '⮞ COLLECT GOLD' : '⮞ ADD ENTRY'; }
 
+/* ---- custom date picker ---- */
+let pickerDate = Date.now();          // the date chosen for the form
+let calView = { y: 0, m: 0 };         // month currently shown in the popup
+function fmtDateLabel(ts) {
+  return new Date(ts).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase();
+}
+function setPickerDate(ts) { pickerDate = ts; els.dateLabel.textContent = fmtDateLabel(ts); }
+function setDateToday() { setPickerDate(Date.now()); }
+function renderCal() {
+  els.calTitle.textContent = MONTHS[calView.m] + ' ' + calView.y;
+  const daysIn = new Date(calView.y, calView.m + 1, 0).getDate();
+  const firstDow = new Date(calView.y, calView.m, 1).getDay();
+  const sel = new Date(pickerDate), now = new Date();
+  let html = '';
+  for (let i = 0; i < firstDow; i++) html += '<span class="cal-cell blank"></span>';
+  for (let d = 1; d <= daysIn; d++) {
+    const isSel = sel.getFullYear() === calView.y && sel.getMonth() === calView.m && sel.getDate() === d;
+    const isToday = now.getFullYear() === calView.y && now.getMonth() === calView.m && now.getDate() === d;
+    html += `<button type="button" class="cal-cell${isSel ? ' sel' : ''}${isToday ? ' today' : ''}" data-d="${d}">${d}</button>`;
+  }
+  els.calGrid.innerHTML = html;
+}
+function openCal() {
+  const d = new Date(pickerDate);
+  calView = { y: d.getFullYear(), m: d.getMonth() };
+  renderCal();
+  els.calOverlay.hidden = false;
+  sfx.click();
+}
+function shiftCal(delta) {
+  calView.m += delta;
+  if (calView.m < 0) { calView.m = 11; calView.y -= 1; }
+  else if (calView.m > 11) { calView.m = 0; calView.y += 1; }
+  renderCal();
+}
+
 function startEdit(id) {
   const tx = state.transactions.find((t) => t.id === Number(id));
   if (!tx) return;
@@ -915,6 +1088,7 @@ function startEdit(id) {
   els.desc.value = tx.desc;
   els.amount.value = tx.amount;
   els.category.value = tx.category;
+  setPickerDate(txDate(tx));
   els.submit.textContent = '✓ SAVE EDIT';
   els.form.scrollIntoView({ behavior: 'smooth', block: 'center' });
   els.desc.focus();
@@ -929,11 +1103,11 @@ function addTx(e) {
   // edit mode: update the existing entry and exit
   if (editingId != null) {
     const tx = state.transactions.find((t) => t.id === editingId);
-    if (tx) { tx.type = currentType; tx.desc = desc; tx.amount = amount; tx.category = els.category.value; }
+    if (tx) { tx.type = currentType; tx.desc = desc; tx.amount = amount; tx.category = els.category.value; tx.date = pickerDate; }
     editingId = null;
     save(); sfx.click();
     renderAll();
-    els.form.reset();
+    els.form.reset(); setDateToday();
     els.submit.textContent = submitLabel();
     showToast('✓ ENTRY UPDATED');
     return;
@@ -943,6 +1117,7 @@ function addTx(e) {
 
   state.transactions.push({
     id: Date.now(),
+    date: pickerDate,
     type: currentType,
     desc,
     amount,
@@ -958,6 +1133,7 @@ function addTx(e) {
   maybeEncounter();  // a chance at a random RPG event
 
   els.form.reset();
+  setDateToday();
   els.desc.focus();
 }
 
@@ -1137,8 +1313,8 @@ function buildReport() {
   html += `<div class="pr-section"><div class="pr-h2">TRANSACTIONS (${state.transactions.length})</div>`;
   if (state.transactions.length) {
     html += `<table class="pr-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="num">Amount</th></tr></thead><tbody>`;
-    state.transactions.slice().sort((a, b) => b.id - a.id).forEach((t) => {
-      const d = new Date(t.id).toLocaleDateString('en-US', { year: '2-digit', month: 'short', day: 'numeric' });
+    state.transactions.slice().sort((a, b) => txDate(b) - txDate(a)).forEach((t) => {
+      const d = new Date(txDate(t)).toLocaleDateString('en-US', { year: '2-digit', month: 'short', day: 'numeric' });
       const c = catInfo(t.type, t.category);
       const amt = (t.type === 'income' ? '+' : '-') + fmt(t.amount).replace('-', '');
       html += `<tr><td>${d}</td><td>${escapeHtml(t.desc)}</td><td>${c.name}</td><td class="num ${t.type === 'income' ? 'pr-pos' : 'pr-neg'}">${amt}</td></tr>`;
@@ -1231,7 +1407,7 @@ function openRecap() {
   // top spending category this month
   const spend = {};
   state.transactions.forEach((t) => {
-    const d = new Date(t.id);
+    const d = new Date(txDate(t));
     if (t.type === 'expense' && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) {
       spend[t.category] = (spend[t.category] || 0) + t.amount;
     }
@@ -1319,7 +1495,8 @@ els.backupBtn.addEventListener('click', exportBackup);
 els.recapBtn.addEventListener('click', openRecap);
 els.recapClose.addEventListener('click', closeRecap);
 els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOverlay) closeRecap(); });
-els.oracleNext.addEventListener('click', () => { oracleIdx += 1; sfx.click(); typeOracle(); });
+els.oracleStage.addEventListener('click', oracleTap);
+els.questToggle.addEventListener('click', toggleQuestBoard);
 els.chestBtn.addEventListener('click', openChest);
 
 // Konami code (keyboard) → rainbow cheat
@@ -1349,6 +1526,20 @@ els.restoreInput.addEventListener('change', (e) => {
 els.editStartBtn.addEventListener('click', toggleStartEditor);
 els.startSave.addEventListener('click', saveStart);
 els.startInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveStart(); });
+
+// custom date picker
+els.dateField.addEventListener('click', openCal);
+els.calPrev.addEventListener('click', () => shiftCal(-1));
+els.calNext.addEventListener('click', () => shiftCal(1));
+els.calToday.addEventListener('click', () => { setPickerDate(Date.now()); sfx.click(); els.calOverlay.hidden = true; });
+els.calGrid.addEventListener('click', (e) => {
+  const cell = e.target.closest('.cal-cell[data-d]');
+  if (!cell) return;
+  setPickerDate(new Date(calView.y, calView.m, Number(cell.dataset.d), 12).getTime());
+  sfx.click();
+  els.calOverlay.hidden = true;
+});
+els.calOverlay.addEventListener('click', (e) => { if (e.target === els.calOverlay) els.calOverlay.hidden = true; });
 
 els.editBudgetBtn.addEventListener('click', toggleBudgetEditor);
 els.saveBudgetBtn.addEventListener('click', saveBudget);
@@ -1382,6 +1573,8 @@ els.filters.addEventListener('click', (e) => {
   sfx.click();
   renderList();
 });
+els.catFilter.addEventListener('change', () => { catFilterVal = els.catFilter.value; sfx.click(); renderList(); });
+els.monthFilter.addEventListener('change', () => { monthFilterVal = els.monthFilter.value; sfx.click(); renderList(); });
 
 els.mute.addEventListener('click', () => {
   state.soundOn = !state.soundOn;
@@ -1400,6 +1593,8 @@ function init() {
   document.body.classList.toggle('rainbow', !!state.rainbow);
   fillCategories();
   fillCatBudgetSelect();
+  fillCatFilter();
+  setDateToday();
   renderAll();
 
   // seed a friendly demo entry the very first time

@@ -41,8 +41,11 @@ Set a named savings goal and watch a golden treasure bar fill toward it:
 ### 📜 Monthly Recap
 A "LEVEL COMPLETE" results card for the current month — earned, spent, saved, savings-rate grade (S/A/B/C/D), budget result, and top category — styled to screenshot and share.
 
-### ✏️ Edit entries
-Tap ✎ on any entry to edit its name, amount, category, or type — not just delete.
+### 🔎 Filter the log
+Filter entries by category and by month, and see a live count + net total of whatever's shown — so you can answer "how much did I spend on Food in April?" at a glance.
+
+### ✏️ Edit entries & 🗓️ backdate
+Tap ✎ on any entry to edit its name, amount, category, type, or **date**. Every entry has a date field (defaults to today) so you can **backdate** old transactions — the Quest Log, monthly streak, World Map history, and all trends use the entry's real date.
 
 ### ★ Starting balance
 Set your real opening balance (tap **✎ START** on the Balance card) so Balance reflects actual money on hand, not just the sum since you began logging. Balance = starting balance + income − expenses.
@@ -66,7 +69,7 @@ A retro advisor that reads **your own tracked data** and gives personalised tips
 A tiny buzz on supported devices (Android) for key actions and milestones — earning, spending, level-ups, and quest/skin unlocks.
 
 ### 🎁 Daily chest
-Open a treasure chest once per day for a coin-shower animation and a random tip, building a daily-login streak.
+A daily bounty on the Quest Board — open it once per day for a coin-shower animation and a random tip, building a daily-login streak.
 
 ### 🎨 Unlockable skins
 Retro theme palettes that re-skin the whole app — Classic, Game Boy, SNES, and Arcade unlock as you level up, and a secret **Midas** gold skin unlocks only after you complete every Side Quest.

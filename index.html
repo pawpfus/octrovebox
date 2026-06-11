@@ -63,18 +63,18 @@
         <span class="stat-value" id="balanceValue">$0</span>
         <span class="stat-foot" id="balanceFoot">PRESS START</span>
         <div class="editor hidden" id="startEditor">
-          <span class="dollar2">$</span>
+          <span class="dollar2">Rp</span>
           <input type="number" id="startInput" step="1" placeholder="STARTING BALANCE" />
           <button type="button" class="mini-save" id="startSave">OK</button>
         </div>
       </div>
       <div class="stat-card income">
         <span class="stat-label">▲ INCOME</span>
-        <span class="stat-value" id="incomeValue">$0</span>
+        <span class="stat-value" id="incomeValue">Rp0</span>
       </div>
       <div class="stat-card expense">
         <span class="stat-label">▼ SPENT</span>
-        <span class="stat-value" id="expenseValue">$0</span>
+        <span class="stat-value" id="expenseValue">Rp0</span>
       </div>
     </section>
 
@@ -100,7 +100,7 @@
         </div>
 
         <div class="editor hidden" id="budgetEditor">
-          <span class="dollar2">$</span>
+          <span class="dollar2">Rp</span>
           <input type="number" id="budgetInput" min="1" step="1" placeholder="MONTHLY LIMIT" />
           <button type="button" class="mini-save" id="saveBudgetBtn">OK</button>
           <button type="button" class="mini-clear" id="clearBudgetBtn">CLEAR</button>
@@ -127,7 +127,7 @@
 
         <div class="editor hidden" id="goalEditor">
           <input type="text" id="goalNameInput" maxlength="18" placeholder="QUEST NAME" />
-          <span class="dollar2">$</span>
+          <span class="dollar2">Rp</span>
           <input type="number" id="goalTargetInput" min="1" step="1" placeholder="TARGET" />
           <button type="button" class="mini-save" id="saveGoalBtn">OK</button>
           <button type="button" class="mini-clear" id="clearGoalBtn">CLEAR</button>
@@ -145,7 +145,7 @@
       </div>
       <div class="editor mboss-editor" id="catBudgetEditor">
         <div class="select-wrap mboss-select"><select id="catBudgetSelect"></select></div>
-        <span class="dollar2">$</span>
+        <span class="dollar2">Rp</span>
         <input type="number" id="catBudgetInput" min="1" step="1" placeholder="LIMIT" />
         <button type="button" class="mini-save" id="catBudgetSave">SET</button>
       </div>
@@ -170,7 +170,7 @@
           <label class="field">
             <span class="field-label">GOLD AMOUNT</span>
             <div class="amount-wrap">
-              <span class="dollar">$</span>
+              <span class="dollar">Rp</span>
               <input type="number" id="amountInput" min="0.01" step="0.01" placeholder="0.00" required />
             </div>
           </label>
@@ -180,6 +180,12 @@
             <div class="select-wrap">
               <select id="categoryInput"></select>
             </div>
+          </label>
+
+          <label class="field">
+            <span class="field-label">DATE</span>
+            <button type="button" class="date-field" id="dateField"><span id="dateLabel">—</span><span
+                class="df-ico">📅</span></button>
           </label>
 
           <button type="submit" class="submit-btn" id="submitBtn">⮞ ADD ENTRY</button>
@@ -196,6 +202,13 @@
             <button class="filter-btn" data-filter="expense">SPEND</button>
           </div>
         </div>
+        <div class="log-search">
+          <div class="log-search-row">
+            <div class="select-wrap"><select id="catFilter"></select></div>
+            <div class="select-wrap"><select id="monthFilter"></select></div>
+          </div>
+        </div>
+        <div class="log-summary" id="logSummary"></div>
         <ul class="tx-list" id="txList"></ul>
         <div class="empty-state" id="emptyState">
           <span class="empty-art">[ · _ · ]</span>
@@ -225,33 +238,47 @@
       <div class="chart" id="chart"></div>
     </section>
 
-    <!-- ===== SIDE QUESTS — challenges ===== -->
+    <!-- ===== SIDE QUESTS — RPG quest board ===== -->
     <section class="panel quests-panel">
-      <h2 class="panel-title">🗺️ SIDE QUESTS</h2>
-      <div class="quest-grid" id="questList"></div>
+      <button type="button" class="qboard-banner" id="questToggle">
+        <span class="qb-seal">📯</span>
+        <span class="qb-text">
+          <span class="qb-title">⚜ QUEST BOARD ⚜</span>
+          <span class="qb-sub" id="questProgress">THE GUILD AWAITS</span>
+        </span>
+        <span class="qb-arrow" id="questArrow">▼</span>
+      </button>
+      <div class="quest-scroll" id="questScroll" hidden>
+        <div class="qb-chest">
+          <button type="button" class="chest-btn" id="chestBtn">🎁</button>
+          <div class="bar-info">
+            <div class="chest-streak" id="chestStreak">NO STREAK</div>
+            <div class="chest-say" id="chestSay">Tap to open today's chest!</div>
+          </div>
+        </div>
+        <div class="quest-grid" id="questList"></div>
+      </div>
     </section>
 
 
     <!-- ===== THE ORACLE — tips from your data ===== -->
     <section class="panel oracle-panel">
       <div class="log-head">
-        <h2 class="panel-title">🔮 THE ORACLE</h2>
-        <button type="button" class="mini-btn" id="oracleNext">NEXT ▶</button>
+        <h2 class="panel-title">THE ORACLE</h2>
       </div>
-      <p class="oracle-text" id="oracleText">Consulting the money spirits…</p>
-      <p class="oracle-note">★ EDUCATIONAL ONLY — NOT FINANCIAL ADVICE</p>
-    </section>
-
-    <!-- ===== DAILY CHEST ===== -->
-    <section class="panel chest-panel">
-      <h2 class="panel-title">🎁 DAILY CHEST</h2>
-      <div class="chest-stage">
-        <button type="button" class="chest-btn" id="chestBtn">🎁</button>
-        <div class="bar-info">
-          <div class="chest-streak" id="chestStreak">NO STREAK</div>
-          <div class="chest-say" id="chestSay">Tap to open today's chest!</div>
+      <div class="oracle-stage" id="oracleStage" title="Tap to continue">
+        <div class="oracle-orb">
+          <span class="orb-ball">🔮</span>
+          <span class="orb-spark s1">✦</span>
+          <span class="orb-spark s2">✧</span>
+          <span class="orb-spark s3">✦</span>
+        </div>
+        <div class="oracle-bubble">
+          <p class="oracle-text" id="oracleText">Consulting the money spirits…</p>
+          <span class="oracle-more" id="oracleMore" hidden>▼</span>
         </div>
       </div>
+      <p class="oracle-note">★ EDUCATIONAL ONLY — NOT FINANCIAL ADVICE · TAP TO CONTINUE</p>
     </section>
 
     <!-- ===== THEME / SKINS + AUDIO ===== -->
@@ -280,6 +307,21 @@
   <!-- print-only report (filled in by exportPDF) -->
   <div class="print-report" id="printReport" aria-hidden="true"></div>
 
+  <!-- custom date picker overlay -->
+  <div class="cal-overlay" id="calOverlay" hidden>
+    <div class="cal-card">
+      <div class="cal-head">
+        <button type="button" class="cal-nav" id="calPrev">◀</button>
+        <span class="cal-title" id="calTitle">MONTH</span>
+        <button type="button" class="cal-nav" id="calNext">▶</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <button type="button" class="cal-today" id="calToday">↺ TODAY</button>
+    </div>
+  </div>
+
   <!-- monthly recap overlay -->
   <div class="recap-overlay" id="recapOverlay" hidden>
     <div class="recap-card">
@@ -295,7 +337,7 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=56"></script>
+  <script src="app.js?v=66"></script>
 </body>
 
 </html>
