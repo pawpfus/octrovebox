@@ -31,8 +31,18 @@ const CAT_COLORS = {
   shop: '#ffd23f', health: '#ff5d5d', bills: '#ff9f1c', other: '#9a9ad0',
 };
 
+const HERO_CLASSES = {
+  knight:  { icon: '🛡️', title: 'BUDGET GUARDIAN' },
+  wizard:  { icon: '🧙', title: 'GOLD ALCHEMIST' },
+  ranger:  { icon: '🏹', title: 'DEBT HUNTER' },
+  cleric:  { icon: '✨', title: 'WEALTH HEALER' },
+  ninja:   { icon: '🥷', title: 'EXPENSE ASSASSIN' },
+};
+
 /* ---------------- state ---------------- */
 let state = {
+  playerName: 'PLAYER 1',
+  playerClass: 'knight',
   transactions: [],
   openingBalance: 0,    // real starting balance before any logged entries
   soundOn: true,
@@ -74,6 +84,10 @@ const els = {
   filters: $('logFilters'), mute: $('muteBtn'), music: $('musicBtn'),
   editStartBtn: $('editStartBtn'), startEditor: $('startEditor'), startInput: $('startInput'), startSave: $('startSave'),
   reset: $('resetBtn'), toast: $('toast'),
+  playerTag: $('playerTag'),
+  heroOverlay: $('heroOverlay'), heroCloseBtn: $('heroCloseBtn'),
+  heroNameInput: $('heroNameInput'), heroClassGrid: $('heroClassGrid'), heroSaveBtn: $('heroSaveBtn'),
+  bossHero: $('bossHero'), goalHero: $('goalHero'),
   exportBtn: $('exportBtn'), printReport: $('printReport'),
   updateBar: $('updateBar'), updateBtn: $('updateBtn'),
   backupBtn: $('backupBtn'), restoreBtn: $('restoreBtn'), restoreInput: $('restoreInput'),
@@ -236,6 +250,16 @@ function animateValue(el, from, to, dur = 650) {
     if (k < 1) requestAnimationFrame(frame); else el.textContent = fmt(to);
   }
   requestAnimationFrame(frame);
+}
+
+function renderHero() {
+  const c = HERO_CLASSES[state.playerClass] || HERO_CLASSES.knight;
+  els.playerTag.textContent = state.playerName;
+  els.bossHero.textContent = c.icon;
+  els.goalHero.textContent = c.icon;
+
+  // update Budget Boss and Savings Quest section labels if applicable
+  // (already handled by renderBudget but can be explicitly set here)
 }
 
 function renderStats(prevLevel) {
@@ -593,7 +617,10 @@ function oracleTips() {
   const tips = [];
 
   if (state.transactions.length === 0) {
-    tips.push('🔮 Add your income and expenses, and I\'ll reveal personalised money insights here.');
+    tips.push(`🔮 Greetings, ${state.playerName}. Add your income and expenses, and I'll reveal personalised money insights here.`);
+  } else if (Math.random() > 0.7) {
+    const c = HERO_CLASSES[state.playerClass] || HERO_CLASSES.knight;
+    tips.push(`🔮 The spirits watch your journey, ${state.playerName} the ${c.title}...`);
   }
 
   if (income > 0) {
@@ -900,6 +927,41 @@ function openChest() {
   renderChest();
 }
 
+/* ---------------- HERO PROFILE ---------------- */
+function renderHeroClasses() {
+  els.heroClassGrid.innerHTML = '';
+  Object.entries(HERO_CLASSES).forEach(([id, c]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'theme-btn' + (state.playerClass === id ? ' active' : '');
+    btn.innerHTML = `<span class="q-ico" style="font-size:22px; margin-right:8px;">${c.icon}</span><span class="theme-name" style="display:inline">${c.title}</span>`;
+    btn.onclick = () => {
+      state.playerClass = id;
+      sfx.click();
+      renderHeroClasses();
+    };
+    els.heroClassGrid.appendChild(btn);
+  });
+}
+
+function openHeroProfile() {
+  els.heroNameInput.value = state.playerName;
+  renderHeroClasses();
+  els.heroOverlay.hidden = false;
+  sfx.click();
+}
+
+function saveHeroProfile() {
+  const name = els.heroNameInput.value.trim();
+  if (!name) { sfx.error(); shake(els.heroNameInput); return; }
+  state.playerName = name.toUpperCase();
+  save();
+  sfx.coin();
+  els.heroOverlay.hidden = true;
+  renderHero();
+  showToast('🛡️ PROFILE UPDATED, ' + state.playerName + '!');
+}
+
 /* ---------------- UNLOCKABLE THEMES ---------------- */
 // Each theme unlocks either by level (lv) or by a milestone (req + reqLabel).
 const THEMES = [
@@ -1127,7 +1189,15 @@ function addTx(e) {
 
   currentType === 'income' ? sfx.coin() : sfx.spend();
   renderAll(prevLevel);
-  if (currentType === 'income') flyCoinsTo(els.balanceCard); // coins fly into the balance
+  if (currentType === 'income') {
+    flyCoinsTo(els.balanceCard); // coins fly into the balance
+    // trigger hero victory animation
+    [els.bossHero, els.goalHero].forEach(h => {
+      h.classList.remove('hero-victory');
+      void h.offsetWidth;
+      h.classList.add('hero-victory');
+    });
+  }
   if (currentType === 'expense') hitBoss(amount); // boss takes a hit
   scatterBuddies(); // the pixel buddies bolt away in surprise
   maybeEncounter();  // a chance at a random RPG event
@@ -1469,6 +1539,11 @@ function shake(el) {
 }
 // flash the Budget Boss + float a damage number when an expense lands
 function hitBoss(amount) {
+  // trigger hero attack animation
+  els.bossHero.classList.remove('hero-attack');
+  void els.bossHero.offsetWidth;
+  els.bossHero.classList.add('hero-attack');
+
   if (!state.budget) return;
   els.bossPanel.classList.remove('hit');
   void els.bossPanel.offsetWidth;
@@ -1498,6 +1573,9 @@ els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOv
 els.oracleStage.addEventListener('click', oracleTap);
 els.questToggle.addEventListener('click', toggleQuestBoard);
 els.chestBtn.addEventListener('click', openChest);
+els.playerTag.addEventListener('click', openHeroProfile);
+els.heroCloseBtn.addEventListener('click', () => { els.heroOverlay.hidden = true; sfx.click(); });
+els.heroSaveBtn.addEventListener('click', saveHeroProfile);
 
 // Konami code (keyboard) → rainbow cheat
 const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
@@ -1595,6 +1673,7 @@ function init() {
   fillCatBudgetSelect();
   fillCatFilter();
   setDateToday();
+  renderHero();
   renderAll();
 
   // seed a friendly demo entry the very first time

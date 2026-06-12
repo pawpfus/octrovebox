@@ -45,7 +45,7 @@
         <p class="subtitle">- PERSONAL FINANCE ADVENTURE -</p>
       </div>
       <div class="player-row">
-        <span class="player-tag" id="playerTag">PLAYER 1</span>
+        <span class="player-tag" id="playerTag" title="Customize Hero" style="cursor:pointer">PLAYER 1</span>
         <span class="lives" id="streakDisplay">LV.1</span>
         <span class="streak" id="monthStreak">🔥 0 MO</span>
       </div>
@@ -91,6 +91,7 @@
         </div>
 
         <div class="boss-stage">
+          <span class="hero-sprite" id="bossHero"></span>
           <span class="boss-sprite" id="bossSprite">👾</span>
           <div class="bar-info">
             <div class="bar-name" id="bossName">NO BUDGET SET</div>
@@ -117,6 +118,7 @@
         </div>
 
         <div class="boss-stage">
+          <span class="hero-sprite" id="goalHero"></span>
           <span class="goal-chest" id="goalChest">🗝️</span>
           <div class="bar-info">
             <div class="bar-name" id="goalName">NO ACTIVE QUEST</div>
@@ -321,6 +323,25 @@
         <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
       <div class="cal-grid" id="calGrid"></div>
       <button type="button" class="cal-today" id="calToday">↺ TODAY</button>
+    </div>
+  </div>
+
+  <!-- hero profile overlay -->
+  <div class="recap-overlay" id="heroOverlay" hidden>
+    <div class="recap-card">
+      <button type="button" class="recap-close" id="heroCloseBtn">✕</button>
+      <div class="recap-head">★ HERO PROFILE ★</div>
+      <div class="editor" style="display:block; border:none; margin-top:20px;">
+        <label class="field">
+          <span class="field-label">HERO NAME</span>
+          <input type="text" id="heroNameInput" maxlength="12" placeholder="YOUR NAME" />
+        </label>
+        <label class="field">
+          <span class="field-label">CHOOSE CLASS</span>
+          <div class="theme-grid" id="heroClassGrid"></div>
+        </label>
+        <button type="button" class="submit-btn" id="heroSaveBtn" style="margin-top:20px;">✓ SAVE CHANGES</button>
+      </div>
     </div>
   </div>
 
