@@ -407,7 +407,6 @@ h1 {
   gap: 14px;
 }
 
-.hero-sprite,
 .boss-sprite,
 .goal-chest {
   font-size: 38px;
@@ -419,38 +418,8 @@ h1 {
   filter: drop-shadow(3px 3px 0 var(--shadow));
 }
 
-.hero-sprite {
-  animation: hero-idle 2.4s ease-in-out infinite;
-}
-
 .boss-sprite {
   animation: hover 2s ease-in-out infinite;
-}
-
-@keyframes hero-idle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-@keyframes hero-attack {
-  0% { transform: translateX(0); }
-  30% { transform: translateX(25px) scale(1.1); }
-  100% { transform: translateX(0); }
-}
-
-@keyframes hero-victory {
-  0%, 100% { transform: translateY(0); }
-  25% { transform: translateY(-15px) rotate(10deg); }
-  50% { transform: translateY(0); }
-  75% { transform: translateY(-10px) rotate(-10deg); }
-}
-
-.hero-attack {
-  animation: hero-attack 0.4s ease-out !important;
-}
-
-.hero-victory {
-  animation: hero-victory 0.6s ease-in-out !important;
 }
 
 @keyframes hover {
@@ -1875,6 +1844,55 @@ select {
   50% {
     transform: translateY(-5px);
   }
+}
+
+/* ============================================================
+   RECURRING & SHOP
+============================================================ */
+.rec-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.rec-ico { font-size: 20px; }
+.rec-body { flex: 1; display: flex; flex-direction: column; }
+.rec-name { font-family: 'Press Start 2P', cursive; font-size: 10px; }
+.rec-meta { font-size: 13px; color: #9a9ad0; margin-top: 4px; }
+.rec-amt { font-family: 'Press Start 2P', cursive; font-size: 10px; }
+.rec-del { background: none; border: none; color: #ff5d5d; cursor: pointer; padding: 4px 8px; font-size: 16px; }
+
+.recurring-editor { display: flex; flex-direction: column; gap: 10px; }
+.rec-row { display: flex; gap: 10px; align-items: center; }
+.rec-row input, .rec-row .select-wrap { flex: 1; }
+
+.shop-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px; margin-top: 15px;
+}
+.shop-card {
+  background: rgba(5,5,16,0.4); border: 2px solid #2e2e63;
+  padding: 15px; border-radius: 4px; position: relative;
+  display: flex; flex-direction: column; gap: 8px;
+  transition: transform 0.2s;
+}
+.shop-card:hover { transform: translateY(-2px); border-color: #ffd23f; }
+.shop-card.owned { border-color: #4be35a; opacity: 0.8; }
+.shop-card .ico { font-size: 24px; margin-bottom: 5px; }
+.shop-card .name { font-family: 'Press Start 2P', cursive; font-size: 10px; color: #ffd23f; }
+.shop-card .desc { font-size: 13px; color: #9a9ad0; line-height: 1.4; }
+.shop-card .cost { font-family: 'Press Start 2P', cursive; font-size: 10px; margin-top: auto; padding-top: 10px; }
+.buy-btn {
+  background: #ffd23f; color: #0b0b1f; border: none;
+  font-family: 'Press Start 2P', cursive; font-size: 9px;
+  padding: 8px; border-radius: 2px; cursor: pointer; margin-top: 5px;
+}
+.buy-btn:disabled { background: #444; color: #888; cursor: default; }
+
+.inventory-hud { display: flex; gap: 6px; margin: 0 10px; }
+.buff-icon {
+  font-size: 16px; width: 24px; height: 24px;
+  background: rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
 }
 
 /* =========================== MONTHLY RECAP =========================== */

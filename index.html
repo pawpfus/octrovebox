@@ -45,7 +45,8 @@
         <p class="subtitle">- PERSONAL FINANCE ADVENTURE -</p>
       </div>
       <div class="player-row">
-        <span class="player-tag" id="playerTag" title="Customize Hero" style="cursor:pointer">PLAYER 1</span>
+        <span class="player-tag" id="playerTag">PLAYER 1</span>
+        <div class="inventory-hud" id="inventoryHud"></div>
         <span class="lives" id="streakDisplay">LV.1</span>
         <span class="streak" id="monthStreak">🔥 0 MO</span>
       </div>
@@ -91,7 +92,6 @@
         </div>
 
         <div class="boss-stage">
-          <span class="hero-sprite" id="bossHero"></span>
           <span class="boss-sprite" id="bossSprite">👾</span>
           <div class="bar-info">
             <div class="bar-name" id="bossName">NO BUDGET SET</div>
@@ -118,7 +118,6 @@
         </div>
 
         <div class="boss-stage">
-          <span class="hero-sprite" id="goalHero"></span>
           <span class="goal-chest" id="goalChest">🗝️</span>
           <div class="bar-info">
             <div class="bar-name" id="goalName">NO ACTIVE QUEST</div>
@@ -242,6 +241,46 @@
       <div class="chart" id="chart"></div>
     </section>
 
+    <!-- ===== AUTO-SPELLS (Recurring Transactions) ===== -->
+    <section class="panel recurring-panel">
+      <h2 class="panel-title">✧ AUTO-SPELLS ✧</h2>
+      <p class="panel-subtitle">RECURRING INCOME & EXPENSES</p>
+
+      <div class="recurring-list" id="recurringList"></div>
+      <div class="empty-state small" id="recurringEmpty">
+        <p>NO ACTIVE SPELLS.<br />AUTOMATE YOUR INCOME OR BILLS BELOW.</p>
+      </div>
+
+      <div class="editor recurring-editor">
+        <div class="rec-row">
+          <input type="text" id="recDesc" placeholder="SPELL NAME (e.g. RENT)" maxlength="20" />
+          <div class="select-wrap"><select id="recType">
+            <option value="expense">▼ SPEND</option>
+            <option value="income">▲ EARN</option>
+          </select></div>
+        </div>
+        <div class="rec-row">
+          <div class="amount-wrap">
+            <span class="dollar">Rp</span>
+            <input type="number" id="recAmount" placeholder="AMOUNT" min="1" />
+          </div>
+          <div class="select-wrap"><select id="recDay">
+            <option value="1">DAY 1</option><option value="5">DAY 5</option><option value="10">DAY 10</option>
+            <option value="15">DAY 15</option><option value="20">DAY 20</option><option value="25">DAY 25</option>
+            <option value="28">DAY 28</option>
+          </select></div>
+          <button type="button" class="mini-save" id="saveRecBtn">CAST</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MERCHANT'S SHOP ===== -->
+    <section class="panel shop-panel">
+      <h2 class="panel-title">🏪 MERCHANT'S SHOP</h2>
+      <p class="panel-subtitle">SPEND SURPLUS GOLD ON BUFFS</p>
+      <div class="shop-grid" id="shopGrid"></div>
+    </section>
+
     <!-- ===== SIDE QUESTS — RPG quest board ===== -->
     <section class="panel quests-panel">
       <button type="button" class="qboard-banner" id="questToggle">
@@ -323,25 +362,6 @@
         <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
       <div class="cal-grid" id="calGrid"></div>
       <button type="button" class="cal-today" id="calToday">↺ TODAY</button>
-    </div>
-  </div>
-
-  <!-- hero profile overlay -->
-  <div class="recap-overlay" id="heroOverlay" hidden>
-    <div class="recap-card">
-      <button type="button" class="recap-close" id="heroCloseBtn">✕</button>
-      <div class="recap-head">★ HERO PROFILE ★</div>
-      <div class="editor" style="display:block; border:none; margin-top:20px;">
-        <label class="field">
-          <span class="field-label">HERO NAME</span>
-          <input type="text" id="heroNameInput" maxlength="12" placeholder="YOUR NAME" />
-        </label>
-        <label class="field">
-          <span class="field-label">CHOOSE CLASS</span>
-          <div class="theme-grid" id="heroClassGrid"></div>
-        </label>
-        <button type="button" class="submit-btn" id="heroSaveBtn" style="margin-top:20px;">✓ SAVE CHANGES</button>
-      </div>
     </div>
   </div>
 

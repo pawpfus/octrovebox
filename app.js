@@ -31,18 +31,8 @@ const CAT_COLORS = {
   shop: '#ffd23f', health: '#ff5d5d', bills: '#ff9f1c', other: '#9a9ad0',
 };
 
-const HERO_CLASSES = {
-  knight:  { icon: '🛡️', title: 'BUDGET GUARDIAN' },
-  wizard:  { icon: '🧙', title: 'GOLD ALCHEMIST' },
-  ranger:  { icon: '🏹', title: 'DEBT HUNTER' },
-  cleric:  { icon: '✨', title: 'WEALTH HEALER' },
-  ninja:   { icon: '🥷', title: 'EXPENSE ASSASSIN' },
-};
-
 /* ---------------- state ---------------- */
 let state = {
-  playerName: 'PLAYER 1',
-  playerClass: 'knight',
   transactions: [],
   openingBalance: 0,    // real starting balance before any logged entries
   soundOn: true,
@@ -59,7 +49,16 @@ let state = {
   lastChest: null,      // YYYY-MM-DD of last daily-chest open
   chestStreak: 0,       // consecutive days opening the chest
   rainbow: false,       // konami-code rainbow mode
+  inventory: [],        // owned SHOP_ITEMS ids
+  recurring: [],        // { id, desc, amount, type, category, day, lastProcessed }
 };
+
+const SHOP_ITEMS = [
+  { id: 'shield', name: 'SHIELD OF THRIFT', icon: '🛡️', cost: 1000000, desc: 'Adds a 5% "safe zone" to your budget before the boss enrages.' },
+  { id: 'amulet', name: 'AMULET OF ABUNDANCE', icon: '🧿', cost: 2500000, desc: 'Increases XP gained from income by 20%.' },
+  { id: 'lens',   name: 'ORACLE\'S LENS', icon: '🔎', cost: 5000000, desc: 'Unlocks advanced financial analytics from the Oracle.' },
+];
+
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
 let currentFilter = 'all';      // type filter: all / income / expense
@@ -84,10 +83,6 @@ const els = {
   filters: $('logFilters'), mute: $('muteBtn'), music: $('musicBtn'),
   editStartBtn: $('editStartBtn'), startEditor: $('startEditor'), startInput: $('startInput'), startSave: $('startSave'),
   reset: $('resetBtn'), toast: $('toast'),
-  playerTag: $('playerTag'),
-  heroOverlay: $('heroOverlay'), heroCloseBtn: $('heroCloseBtn'),
-  heroNameInput: $('heroNameInput'), heroClassGrid: $('heroClassGrid'), heroSaveBtn: $('heroSaveBtn'),
-  bossHero: $('bossHero'), goalHero: $('goalHero'),
   exportBtn: $('exportBtn'), printReport: $('printReport'),
   updateBar: $('updateBar'), updateBtn: $('updateBtn'),
   backupBtn: $('backupBtn'), restoreBtn: $('restoreBtn'), restoreInput: $('restoreInput'),
@@ -105,6 +100,11 @@ const els = {
   // category mini-bosses
   mbossList: $('mbossList'), mbossEmpty: $('mbossEmpty'),
   catBudgetSelect: $('catBudgetSelect'), catBudgetInput: $('catBudgetInput'), catBudgetSave: $('catBudgetSave'),
+  // recurring
+  recList: $('recurringList'), recEmpty: $('recurringEmpty'),
+  recDesc: $('recDesc'), recType: $('recType'), recAmount: $('recAmount'), recDay: $('recDay'), saveRecBtn: $('saveRecBtn'),
+  // shop
+  shopGrid: $('shopGrid'), inventoryHud: $('inventoryHud'),
   // world map chart + streak
   chart: $('chart'), monthStreak: $('monthStreak'),
   // xp
@@ -185,8 +185,13 @@ const fmt = (n) => {
 function catInfo(type, id) {
   return CATEGORIES[type].find((c) => c.id === id) || { name: id, icon: '❓' };
 }
+function hasItem(id) {
+  return state.inventory && state.inventory.includes(id);
+}
 function levelFor(income) {
-  return Math.max(1, Math.floor(income / 1000) + 1); // +1 level per $1000 earned
+  const mult = hasItem('amulet') ? 1.2 : 1.0;
+  const effective = Math.max(0, income) * mult;
+  return Math.max(1, Math.floor(effective / 1000) + 1);
 }
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 // effective date of an entry — uses the editable `date`, falling back to id (old entries)
@@ -252,16 +257,6 @@ function animateValue(el, from, to, dur = 650) {
   requestAnimationFrame(frame);
 }
 
-function renderHero() {
-  const c = HERO_CLASSES[state.playerClass] || HERO_CLASSES.knight;
-  els.playerTag.textContent = state.playerName;
-  els.bossHero.textContent = c.icon;
-  els.goalHero.textContent = c.icon;
-
-  // update Budget Boss and Savings Quest section labels if applicable
-  // (already handled by renderBudget but can be explicitly set here)
-}
-
 function renderStats(prevLevel) {
   const { income, expense, balance } = totals();
   fitStat(els.income, prevStat.income, income);
@@ -278,7 +273,9 @@ function renderStats(prevLevel) {
   els.streak.textContent = 'LV.' + level;
 
   // XP bar: progress through the current level (1000 income = 1 level)
-  const xpInto = Math.max(0, income) % 1000;
+  const mult = hasItem('amulet') ? 1.2 : 1.0;
+  const effectiveXP = Math.max(0, income) * mult;
+  const xpInto = effectiveXP % 1000;
   els.xpFill.style.width = (xpInto / 1000 * 100) + '%';
   els.xpNext.textContent = Math.floor(xpInto) + ' / 1000 XP';
 
@@ -403,16 +400,23 @@ function renderBudget() {
   }
 
   const spent = monthSpend();
+  const hasShield = hasItem('shield');
+  const buffer = hasShield ? 1.05 : 1.0;
+  const isEnraged = spent > (state.budget * buffer);
+
   const remaining = state.budget - spent;
   const pct = clamp((remaining / state.budget) * 100, 0, 100);
 
   els.hpFill.style.width = (remaining <= 0 ? 100 : pct) + '%';
 
   let cls, sprite, name, text, over = false;
-  if (remaining <= 0) {
+  if (isEnraged) {
     cls = 'hp-dead'; over = true;
     sprite = '💀'; name = 'BOSS ENRAGED!';
-    text = 'OVER BUDGET BY ' + fmt(Math.abs(remaining));
+    text = 'OVER BUDGET BY ' + fmt(spent - state.budget);
+  } else if (spent > state.budget) {
+    cls = 'hp-warn'; sprite = '🛡️'; name = 'SHIELD ACTIVE';
+    text = 'SAFE ZONE: ' + fmt(state.budget * buffer - spent) + ' LEFT';
   } else if (pct <= 20) {
     cls = 'hp-danger'; sprite = '😡'; name = 'THE SPEND DRAGON';
     text = fmt(remaining) + ' HP LEFT — DANGER!';
@@ -484,6 +488,130 @@ function hpState(pct, over) {
   if (pct <= 20) return { cls: 'hp-danger', hex: '#ff5d5d' };
   if (pct <= 50) return { cls: 'hp-warn',   hex: '#ffd23f' };
   return                { cls: 'hp-ok',     hex: '#4be35a' };
+}
+
+function renderRecurring() {
+  els.recEmpty.style.display = state.recurring.length ? 'none' : 'block';
+  els.recList.innerHTML = '';
+  state.recurring.forEach((r) => {
+    const div = document.createElement('div');
+    div.className = 'rec-item';
+    div.innerHTML = `
+      <span class="rec-ico">${r.type === 'income' ? '✨' : '⏳'}</span>
+      <span class="rec-body">
+        <span class="rec-name">${escapeHtml(r.desc)}</span>
+        <span class="rec-meta">${r.type.toUpperCase()} · DAY ${r.day}</span>
+      </span>
+      <span class="rec-amt ${r.type}">${r.type === 'income' ? '+' : '-'}${fmt(r.amount).replace('-', '')}</span>
+      <button class="rec-del" data-id="${r.id}">✕</button>
+    `;
+    els.recList.appendChild(div);
+  });
+}
+
+function saveRecurring() {
+  const desc = els.recDesc.value.trim();
+  const amount = parseFloat(els.recAmount.value);
+  const type = els.recType.value;
+  const day = Number(els.recDay.value);
+  if (!desc || !(amount > 0)) { sfx.error(); return; }
+  state.recurring.push({ id: Date.now(), desc, amount, type, day });
+  save(); sfx.coin();
+  els.recDesc.value = ''; els.recAmount.value = '';
+  showToast('✧ SPELL CAST: ' + desc);
+  renderRecurring();
+}
+
+function removeRecurring(id) {
+  state.recurring = state.recurring.filter((r) => r.id !== Number(id));
+  save(); sfx.delete();
+  renderRecurring();
+}
+
+function processRecurring() {
+  const now = new Date();
+  const monthKey = now.getFullYear() + '-' + (now.getMonth() + 1);
+  const today = now.getDate();
+  let added = 0;
+
+  state.recurring.forEach((r) => {
+    // If not yet processed this month AND today is >= scheduled day
+    if (r.lastProcessed !== monthKey && today >= r.day) {
+      state.transactions.push({
+        id: Date.now() + Math.random(),
+        date: new Date(now.getFullYear(), now.getMonth(), r.day, 12).getTime(),
+        type: r.type,
+        desc: '[AUTO] ' + r.desc,
+        amount: r.amount,
+        category: 'other',
+      });
+      r.lastProcessed = monthKey;
+      added++;
+    }
+  });
+
+  if (added > 0) {
+    save();
+    showToast('✧ ' + added + ' AUTO-SPELLS TRIGGERED!');
+  }
+}
+
+function renderShop() {
+  const { balance } = totals();
+  els.shopGrid.innerHTML = '';
+  SHOP_ITEMS.forEach((it) => {
+    const owned = state.inventory.includes(it.id);
+    const card = document.createElement('div');
+    card.className = 'shop-card' + (owned ? ' owned' : '');
+    card.innerHTML = `
+      <div class="ico">${it.icon}</div>
+      <div class="name">${it.name}</div>
+      <div class="desc">${it.desc}</div>
+      <div class="cost">${fmt(it.cost)}</div>
+      <button class="buy-btn" ${owned || balance < it.cost ? 'disabled' : ''}>
+        ${owned ? 'OWNED ✓' : (balance < it.cost ? 'NOT ENOUGH GOLD' : 'PURCHASE')}
+      </button>
+    `;
+    if (!owned && balance >= it.cost) {
+      card.querySelector('.buy-btn').onclick = () => buyItem(it.id);
+    }
+    els.shopGrid.appendChild(card);
+  });
+
+  els.inventoryHud.innerHTML = '';
+  state.inventory.forEach((id) => {
+    const it = SHOP_ITEMS.find((i) => i.id === id);
+    if (!it) return;
+    const span = document.createElement('span');
+    span.className = 'buff-icon';
+    span.textContent = it.icon;
+    span.title = it.name;
+    els.inventoryHud.appendChild(span);
+  });
+}
+
+function buyItem(id) {
+  const it = SHOP_ITEMS.find((i) => i.id === id);
+  const { balance } = totals();
+  if (!it || state.inventory.includes(id) || balance < it.cost) { sfx.error(); return; }
+
+  state.inventory.push(id);
+  // Purchase subtracts from "openingBalance" or we can just log it as a special transaction
+  // To keep it clean, let's log it as a 'shop' transaction so it hits the balance
+  state.transactions.push({
+    id: Date.now(),
+    date: Date.now(),
+    type: 'expense',
+    desc: 'SHOP: ' + it.name,
+    amount: it.cost,
+    category: 'other',
+  });
+
+  save();
+  sfx.victory();
+  coinRain(32);
+  showToast('🛒 BOUGHT: ' + it.name);
+  renderAll();
 }
 
 function renderMiniBosses() {
@@ -616,11 +744,23 @@ function oracleTips() {
   const { income, expense, balance } = totals();
   const tips = [];
 
+  if (hasItem('lens')) {
+    const savings = income - expense;
+    if (savings > 0) {
+      const daysTo100M = Math.ceil((100000000 - balance) / (savings / distinctMonths() || 1) * 30);
+      if (daysTo100M > 0 && daysTo100M < 10000) {
+        tips.push('✨ LENS REVEALS: At this rate, you will reach Rp100.000.000 in ~' + daysTo100M + ' days.');
+      }
+    }
+    const burnRate = expense / (new Date().getDate());
+    tips.push('✨ LENS REVEALS: Current burn rate is ' + fmt(burnRate) + ' per day.');
+    if (balance > 0 && burnRate > 0) {
+      tips.push('✨ LENS REVEALS: At current spending, your balance lasts ' + Math.floor(balance / burnRate) + ' more days.');
+    }
+  }
+
   if (state.transactions.length === 0) {
-    tips.push(`🔮 Greetings, ${state.playerName}. Add your income and expenses, and I'll reveal personalised money insights here.`);
-  } else if (Math.random() > 0.7) {
-    const c = HERO_CLASSES[state.playerClass] || HERO_CLASSES.knight;
-    tips.push(`🔮 The spirits watch your journey, ${state.playerName} the ${c.title}...`);
+    tips.push('🔮 Add your income and expenses, and I\'ll reveal personalised money insights here.');
   }
 
   if (income > 0) {
@@ -927,41 +1067,6 @@ function openChest() {
   renderChest();
 }
 
-/* ---------------- HERO PROFILE ---------------- */
-function renderHeroClasses() {
-  els.heroClassGrid.innerHTML = '';
-  Object.entries(HERO_CLASSES).forEach(([id, c]) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'theme-btn' + (state.playerClass === id ? ' active' : '');
-    btn.innerHTML = `<span class="q-ico" style="font-size:22px; margin-right:8px;">${c.icon}</span><span class="theme-name" style="display:inline">${c.title}</span>`;
-    btn.onclick = () => {
-      state.playerClass = id;
-      sfx.click();
-      renderHeroClasses();
-    };
-    els.heroClassGrid.appendChild(btn);
-  });
-}
-
-function openHeroProfile() {
-  els.heroNameInput.value = state.playerName;
-  renderHeroClasses();
-  els.heroOverlay.hidden = false;
-  sfx.click();
-}
-
-function saveHeroProfile() {
-  const name = els.heroNameInput.value.trim();
-  if (!name) { sfx.error(); shake(els.heroNameInput); return; }
-  state.playerName = name.toUpperCase();
-  save();
-  sfx.coin();
-  els.heroOverlay.hidden = true;
-  renderHero();
-  showToast('🛡️ PROFILE UPDATED, ' + state.playerName + '!');
-}
-
 /* ---------------- UNLOCKABLE THEMES ---------------- */
 // Each theme unlocks either by level (lv) or by a milestone (req + reqLabel).
 const THEMES = [
@@ -1071,6 +1176,8 @@ function renderAll(prevLevel) {
   renderBudget();
   renderGoal();
   renderMiniBosses();
+  renderRecurring();
+  renderShop();
   renderStreak();
   renderChart();
   renderQuests();
@@ -1189,15 +1296,7 @@ function addTx(e) {
 
   currentType === 'income' ? sfx.coin() : sfx.spend();
   renderAll(prevLevel);
-  if (currentType === 'income') {
-    flyCoinsTo(els.balanceCard); // coins fly into the balance
-    // trigger hero victory animation
-    [els.bossHero, els.goalHero].forEach(h => {
-      h.classList.remove('hero-victory');
-      void h.offsetWidth;
-      h.classList.add('hero-victory');
-    });
-  }
+  if (currentType === 'income') flyCoinsTo(els.balanceCard); // coins fly into the balance
   if (currentType === 'expense') hitBoss(amount); // boss takes a hit
   scatterBuddies(); // the pixel buddies bolt away in surprise
   maybeEncounter();  // a chance at a random RPG event
@@ -1539,11 +1638,6 @@ function shake(el) {
 }
 // flash the Budget Boss + float a damage number when an expense lands
 function hitBoss(amount) {
-  // trigger hero attack animation
-  els.bossHero.classList.remove('hero-attack');
-  void els.bossHero.offsetWidth;
-  els.bossHero.classList.add('hero-attack');
-
   if (!state.budget) return;
   els.bossPanel.classList.remove('hit');
   void els.bossPanel.offsetWidth;
@@ -1573,9 +1667,6 @@ els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOv
 els.oracleStage.addEventListener('click', oracleTap);
 els.questToggle.addEventListener('click', toggleQuestBoard);
 els.chestBtn.addEventListener('click', openChest);
-els.playerTag.addEventListener('click', openHeroProfile);
-els.heroCloseBtn.addEventListener('click', () => { els.heroOverlay.hidden = true; sfx.click(); });
-els.heroSaveBtn.addEventListener('click', saveHeroProfile);
 
 // Konami code (keyboard) → rainbow cheat
 const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
@@ -1636,6 +1727,13 @@ els.mbossList.addEventListener('click', (e) => {
   if (btn) removeCatBudget(btn.dataset.cat);
 });
 
+els.saveRecBtn.addEventListener('click', saveRecurring);
+els.recAmount.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveRecurring(); });
+els.recList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.rec-del');
+  if (btn) removeRecurring(btn.dataset.id);
+});
+
 els.list.addEventListener('click', (e) => {
   const ed = e.target.closest('.tx-edit');
   if (ed) { startEdit(ed.dataset.id); return; }
@@ -1666,6 +1764,7 @@ els.mute.addEventListener('click', () => {
 ============================================================ */
 function init() {
   load();
+  processRecurring();
   els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
   applyTheme(state.theme);
   document.body.classList.toggle('rainbow', !!state.rainbow);
@@ -1673,7 +1772,6 @@ function init() {
   fillCatBudgetSelect();
   fillCatFilter();
   setDateToday();
-  renderHero();
   renderAll();
 
   // seed a friendly demo entry the very first time
