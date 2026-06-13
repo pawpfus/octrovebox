@@ -49,6 +49,10 @@ let state = {
   lastChest: null,      // YYYY-MM-DD of last daily-chest open
   chestStreak: 0,       // consecutive days opening the chest
   rainbow: false,       // konami-code rainbow mode
+  zoneSeen: [],         // world zones already announced (by net worth)
+  bounties: null,       // { week:'YYYY-MM-DD'(Monday), done:[ids] } — weekly bounty progress
+  bountyStreak: 0,      // weeks where all bounties were cleared
+  bountyClaimed: '',    // week key already celebrated as complete
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -108,6 +112,10 @@ const els = {
   // monthly recap
   recapBtn: $('recapBtn'), recapOverlay: $('recapOverlay'), recapClose: $('recapClose'),
   recapMonth: $('recapMonth'), recapGrade: $('recapGrade'), recapRows: $('recapRows'),
+  // world zones + weekly bounties + combo meter
+  zoneTag: $('zoneTag'), zoneFill: $('zoneFill'), zoneNext: $('zoneNext'),
+  bountyList: $('bountyList'), bountyReset: $('bountyReset'), bountyReward: $('bountyReward'),
+  comboPop: $('comboPop'),
 };
 
 /* ============================================================
@@ -976,6 +984,182 @@ function renderThemes() {
   });
 }
 
+/* ============================================================
+   WORLD ZONES — your net worth is a journey across biomes,
+   and reaching THE COSMOS (the full starfield) is the endgame.
+============================================================ */
+const ZONES = [
+  { id: 'meadow', name: 'GREEN MEADOW',  icon: '🌱', min: 0 },
+  { id: 'forest', name: 'WHISPER WOODS', icon: '🌲', min: 5000000 },
+  { id: 'cave',   name: 'CRYSTAL CAVE',  icon: '💎', min: 25000000 },
+  { id: 'desert', name: 'GOLDEN DUNES',  icon: '🏜️', min: 75000000 },
+  { id: 'peak',   name: 'FROZEN PEAK',   icon: '🏔️', min: 150000000 },
+  { id: 'cosmos', name: 'THE COSMOS',    icon: '🌌', min: 300000000 },
+];
+// how brightly the starfield burns in each zone — dim on the ground, blazing in space
+const ZONE_STAR = { meadow: 0.12, forest: 0.22, cave: 0.38, desert: 0.55, peak: 0.8, cosmos: 1.5 };
+function zoneIndexFor(balance) {
+  let idx = 0;
+  ZONES.forEach((z, i) => { if (balance >= z.min) idx = i; });
+  return idx;
+}
+function renderZone() {
+  const bal = totals().balance;
+  const idx = zoneIndexFor(bal);
+  const z = ZONES[idx];
+  document.documentElement.dataset.zone = z.id;
+  els.zoneTag.textContent = z.icon + ' ' + z.name;
+  const next = ZONES[idx + 1];
+  if (next) {
+    const pct = clamp(Math.round(((bal - z.min) / (next.min - z.min)) * 100), 0, 100);
+    els.zoneFill.style.width = pct + '%';
+    els.zoneNext.textContent = 'NEXT: ' + next.name;
+  } else {
+    els.zoneFill.style.width = '100%';
+    els.zoneNext.textContent = '★ MAX ZONE ★';
+  }
+  // celebrate the first time the player reaches a new zone (never on load or at the start)
+  if (!state.zoneSeen.includes(z.id)) {
+    state.zoneSeen.push(z.id); save();
+    if (appReady && idx > 0) {
+      coinRain(z.id === 'cosmos' ? 50 : 28); sfx.victory();
+      showToast((z.id === 'cosmos' ? '🌌 FINAL ZONE REACHED — ' : '🗺️ NEW ZONE — ') + z.name + '!');
+    }
+  }
+}
+
+/* ============================================================
+   WEEKLY BOUNTIES — three rotating challenges that reset every
+   week, computed live from this week's entries.
+============================================================ */
+// Monday-anchored week so bounties reset on a clean weekly boundary
+function weekStart(d = new Date()) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); // back up to Monday
+  return x;
+}
+const weekKey = () => tsToYmd(weekStart().getTime());
+function weekTx() {
+  const s = weekStart().getTime(), e = s + 7 * 86400000;
+  return state.transactions.filter((t) => { const d = txDate(t); return d >= s && d < e; });
+}
+const BOUNTIES = [
+  { id: 'b_log5',  icon: '📝', name: 'BUSY WEEK',    desc: 'Log 5 entries this week',   prog: () => ({ cur: Math.min(weekTx().length, 5), goal: 5 }) },
+  { id: 'b_log10', icon: '📚', name: 'GRINDER',      desc: 'Log 10 entries this week',  prog: () => ({ cur: Math.min(weekTx().length, 10), goal: 10 }) },
+  { id: 'b_inc',   icon: '💰', name: 'PAYDAY',       desc: 'Log income this week',      prog: () => ({ cur: weekTx().some((t) => t.type === 'income') ? 1 : 0, goal: 1 }) },
+  { id: 'b_days3', icon: '📅', name: 'STEADY HAND',  desc: 'Log on 3 separate days',    prog: () => ({ cur: Math.min(new Set(weekTx().map((t) => tsToYmd(txDate(t)))).size, 3), goal: 3 }) },
+  { id: 'b_cat3',  icon: '🎨', name: 'EXPLORER',     desc: 'Spend in 3 categories',     prog: () => ({ cur: Math.min(new Set(weekTx().filter((t) => t.type === 'expense').map((t) => t.category)).size, 3), goal: 3 }) },
+  { id: 'b_save',  icon: '📈', name: 'IN THE GREEN', desc: 'Earn more than you spend',  prog: () => { let i = 0, e = 0; weekTx().forEach((t) => t.type === 'income' ? i += t.amount : e += t.amount); return { cur: (i > e && i > 0) ? 1 : 0, goal: 1 }; } },
+  { id: 'b_chest', icon: '🎁', name: 'LOOT HOUND',   desc: 'Open the daily chest',      prog: () => { const s = weekStart().getTime(), e = s + 7 * 86400000, lc = state.lastChest ? ymdToTs(state.lastChest) : 0; return { cur: (lc >= s && lc < e) ? 1 : 0, goal: 1 }; } },
+  { id: 'b_big',   icon: '⭐', name: 'BIG MOVE',     desc: 'Log an entry over Rp1jt',   prog: () => ({ cur: weekTx().some((t) => t.amount >= 1000000) ? 1 : 0, goal: 1 }) },
+];
+// deterministically pick 3 bounties for the current week (seeded shuffle so the
+// set is stable all week and rotates from week to week)
+function weekBounties() {
+  const wk = weekKey();
+  let seed = 0; for (let i = 0; i < wk.length; i++) seed = (seed * 31 + wk.charCodeAt(i)) >>> 0;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const idx = BOUNTIES.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  return idx.slice(0, 3).map((i) => BOUNTIES[i]);
+}
+function ensureBountyWeek() {
+  const wk = weekKey();
+  if (!state.bounties || state.bounties.week !== wk) { state.bounties = { week: wk, done: [] }; save(); }
+}
+function renderBounties() {
+  ensureBountyWeek();
+  const picks = weekBounties();
+  els.bountyList.innerHTML = '';
+  let doneCount = 0;
+  picks.forEach((b) => {
+    const { cur, goal } = b.prog();
+    const done = cur >= goal;
+    const pct = Math.min(100, Math.round((cur / goal) * 100));
+    if (done) {
+      doneCount++;
+      if (!state.bounties.done.includes(b.id)) {
+        state.bounties.done.push(b.id); save();
+        if (appReady) { sfx.victory(); coinRain(10); showToast('⚔ BOUNTY DONE: ' + b.name + '!'); }
+      }
+    }
+    const row = document.createElement('div');
+    row.className = 'bounty-item' + (done ? ' done' : '');
+    row.innerHTML = `
+      <span class="bn-ico">${done ? '✅' : b.icon}</span>
+      <span class="bn-body">
+        <span class="bn-name">${b.name}</span>
+        <span class="bn-desc">${b.desc}</span>
+        <span class="bn-track"><span class="bn-fill" style="width:${pct}%"></span></span>
+      </span>
+      <span class="bn-status">${done ? 'DONE' : pct + '%'}</span>`;
+    els.bountyList.appendChild(row);
+  });
+  // countdown to the next Monday reset
+  const days = Math.max(1, Math.ceil((weekStart().getTime() + 7 * 86400000 - Date.now()) / 86400000));
+  els.bountyReset.textContent = 'RESETS IN ' + days + 'D';
+  // all cleared → reward + weekly streak (celebrated once per week)
+  if (doneCount >= picks.length) {
+    els.bountyReward.textContent = '🏆 ALL BOUNTIES CLEARED! 🏆';
+    els.bountyReward.classList.add('claimed');
+    if (state.bountyClaimed !== state.bounties.week) {
+      state.bountyClaimed = state.bounties.week;
+      state.bountyStreak = (state.bountyStreak || 0) + 1; save();
+      if (appReady) { coinRain(40); sfx.victory(); showToast('🏆 WEEKLY BOUNTIES COMPLETE — WEEK ' + state.bountyStreak + '!'); }
+    }
+  } else {
+    els.bountyReward.textContent = doneCount + ' / ' + picks.length + ' CLEARED · FINISH ALL FOR A REWARD';
+    els.bountyReward.classList.remove('claimed');
+  }
+}
+
+/* ============================================================
+   COMBO METER — logging entries in quick succession builds a
+   multiplier with escalating blips. Session-only (not saved).
+============================================================ */
+const combo = { count: 0, timer: null };
+const COMBO_WINDOW = 9000; // ms before the chain breaks
+function bumpCombo() {
+  combo.count += 1;
+  clearTimeout(combo.timer);
+  combo.timer = setTimeout(endCombo, COMBO_WINDOW);
+  const c = combo.count;
+  if (c >= 2) {
+    showCombo(c);
+    if (state.soundOn) { try { beep([300 + Math.min(c, 14) * 70], 0.05, 'square', 0.045); } catch (e) {} }
+    vibe(8);
+    if (c === 5 || (c >= 10 && c % 5 === 0)) { sfx.victory(); coinRain(c >= 10 ? 12 : 6); }
+  }
+}
+function endCombo() { combo.count = 0; if (els.comboPop) els.comboPop.classList.remove('show'); }
+function showCombo(c) {
+  if (!els.comboPop) return;
+  els.comboPop.innerHTML = 'COMBO<b>×' + c + '</b>';
+  els.comboPop.classList.toggle('fire', c >= 5);
+  els.comboPop.classList.add('show');
+  els.comboPop.animate(
+    [{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }],
+    { duration: 280, easing: 'cubic-bezier(.18,.89,.32,1.28)' }
+  );
+}
+
+/* ============================================================
+   BUDGET-DRIVEN WEATHER — the sky reacts to your Budget Boss:
+   clear when healthy, clouding over as you near the limit, rain
+   in the danger zone, and a storm once you blow the budget.
+============================================================ */
+function weatherMode() {
+  if (!state.budget) return 'clear';
+  const spent = monthSpend();
+  if (spent > state.budget) return 'storm';
+  const remain = 1 - spent / state.budget;
+  if (remain <= 0.2) return 'rain';
+  if (remain <= 0.5) return 'cloud';
+  return 'clear';
+}
+function renderWeather() { document.documentElement.dataset.weather = weatherMode(); }
+
 /* ---------------- COIN RAIN + KONAMI CHEAT ---------------- */
 function coinRain(n = 24) {
   for (let i = 0; i < n; i++) {
@@ -1041,9 +1225,12 @@ function renderAll(prevLevel) {
   renderStreak();
   renderChart();
   renderQuests();
+  renderBounties();
   renderOracle();
   renderThemes();
   renderChest();
+  renderZone();
+  renderWeather();
 }
 
 /* ============================================================
@@ -1158,6 +1345,7 @@ function addTx(e) {
   renderAll(prevLevel);
   if (currentType === 'income') flyCoinsTo(els.balanceCard); // coins fly into the balance
   if (currentType === 'expense') hitBoss(amount); // boss takes a hit
+  bumpCombo();       // rapid-logging combo multiplier
   scatterBuddies(); // the pixel buddies bolt away in surprise
   maybeEncounter();  // a chance at a random RPG event
 
@@ -1407,6 +1595,10 @@ function importBackup(file) {
     if (state.musicOn) startMusic(); else stopMusic();
     state.budgetBreached = !!data.budgetBreached;
     state.goalCelebrated = !!data.goalCelebrated;
+    state.zoneSeen = Array.isArray(data.zoneSeen) ? data.zoneSeen : [];
+    state.bounties = (data.bounties && typeof data.bounties === 'object') ? data.bounties : null;
+    state.bountyStreak = Number(data.bountyStreak) || 0;
+    state.bountyClaimed = data.bountyClaimed || '';
     save();
     sfx.coin();
     showToast('📂 BACKUP RESTORED! ' + state.transactions.length + ' ENTRIES');
@@ -2011,10 +2203,11 @@ if (state.musicOn) {
     // sun / moon positioned by time of day
     const frac = ph.hf / 24;
     drawBody(ph.body, frac * w, 66 + 26 * Math.cos(frac * 2 * Math.PI), ph.bodyCol);
-    // stars (dimmer by day)
+    // stars (dimmer by day, and dimmer in low zones — they blaze in THE COSMOS)
+    const zmul = ZONE_STAR[document.documentElement.dataset.zone] || 1;
     for (const st of stars) {
       if (animate) { st.y += st.sp; if (st.y > h) { st.y = -2; st.x = Math.random() * w; } st.tw += 0.05; }
-      ctx.globalAlpha = (animate ? 0.45 + 0.55 * Math.abs(Math.sin(st.tw)) : 0.8) * ph.starMul;
+      ctx.globalAlpha = Math.min(1, (animate ? 0.45 + 0.55 * Math.abs(Math.sin(st.tw)) : 0.8) * ph.starMul * zmul);
       ctx.fillStyle = st.c;
       ctx.fillRect(st.x | 0, st.y | 0, st.s, st.s);
     }
@@ -2036,4 +2229,66 @@ if (state.musicOn) {
   } else {
     requestAnimationFrame(loop);
   }
+})();
+
+/* ============================================================
+   BUDGET WEATHER (foreground particles, driven by data-weather)
+============================================================ */
+(function weather() {
+  const cv = document.getElementById('weather');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let w, h, mode = '', drops = [], clouds = [], flash = 0;
+  function newDrop() {
+    return { x: Math.random() * w, y: Math.random() * -h, len: (mode === 'storm' ? 14 : 9) + Math.random() * 8, sp: (mode === 'storm' ? 10 : 6) + Math.random() * 5 };
+  }
+  function build() {
+    const rain = mode === 'rain' ? Math.round(w / 14) : mode === 'storm' ? Math.round(w / 7) : 0;
+    drops = []; for (let i = 0; i < rain; i++) { const d = newDrop(); d.y = Math.random() * h; drops.push(d); }
+    const cloud = mode === 'cloud' ? 3 : mode === 'storm' ? 5 : 0;
+    clouds = []; for (let i = 0; i < cloud; i++) clouds.push({ x: Math.random() * w, y: 20 + Math.random() * h * 0.28, sp: 0.08 + Math.random() * 0.18, s: 46 + Math.random() * 70 });
+  }
+  function resize() {
+    const W = window.innerWidth, H = window.innerHeight;
+    if (!W || !H) { setTimeout(resize, 250); return; }
+    w = cv.width = W; h = cv.height = H; build();
+  }
+  function paint() {
+    if (cv.width !== window.innerWidth || cv.height !== window.innerHeight) resize();
+    const m = document.documentElement.dataset.weather || 'clear';
+    if (m !== mode) { mode = m; build(); }
+    ctx.clearRect(0, 0, w, h);
+    if (mode === 'clear') return;
+    // drifting pixel clouds
+    if (clouds.length) {
+      ctx.fillStyle = mode === 'storm' ? 'rgba(70,78,104,0.16)' : 'rgba(150,160,190,0.12)';
+      clouds.forEach((c) => {
+        c.x += c.sp; if (c.x - c.s > w) c.x = -c.s;
+        ctx.fillRect(c.x | 0, c.y | 0, c.s, (c.s * 0.4) | 0);
+        ctx.fillRect((c.x + c.s * 0.3) | 0, (c.y - c.s * 0.16) | 0, (c.s * 0.5) | 0, (c.s * 0.34) | 0);
+      });
+    }
+    // falling pixel rain
+    if (drops.length) {
+      ctx.strokeStyle = mode === 'storm' ? 'rgba(150,185,255,0.5)' : 'rgba(130,170,255,0.38)';
+      ctx.lineWidth = 2; ctx.beginPath();
+      drops.forEach((d) => {
+        d.y += d.sp; d.x += d.sp * 0.3;
+        if (d.y > h) { d.y = -d.len; d.x = Math.random() * w; }
+        ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.sp * 0.6, d.y - d.len);
+      });
+      ctx.stroke();
+    }
+    // storm lightning flash (visual only — never plays uninvited audio)
+    if (mode === 'storm') {
+      if (flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (flash * 0.22).toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); flash -= 0.06; }
+      else if (Math.random() < 0.004) flash = 1;
+    }
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 300));
+  if (reduce) return; // honour reduced-motion: no particles
+  (function loop() { paint(); requestAnimationFrame(loop); })();
 })();

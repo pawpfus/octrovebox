@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=78" />
+  <link rel="stylesheet" href="styles.css?v=79" />
 </head>
 
 <body>
@@ -30,8 +30,14 @@
     <button type="button" id="updateBtn">⮞ REFRESH</button>
   </div>
 
+  <!-- world-zone biome ground (behind the starfield) -->
+  <div class="zone-layer" id="zoneLayer" aria-hidden="true"></div>
+
   <!-- parallax starfield (behind everything) -->
   <canvas class="stars" id="stars"></canvas>
+
+  <!-- budget-driven weather particles (foreground) -->
+  <canvas class="weather" id="weather" aria-hidden="true"></canvas>
 
   <!-- scanline + crt overlay -->
   <div class="crt"></div>
@@ -52,6 +58,11 @@
       <div class="xp-row">
         <span class="xp-track"><span class="xp-fill" id="xpFill"></span></span>
         <span class="xp-next" id="xpNext">0 / 1000 XP</span>
+      </div>
+      <div class="zone-row" id="zoneRow">
+        <span class="zone-tag" id="zoneTag">🌱 GREEN MEADOW</span>
+        <span class="zone-track"><span class="zone-fill" id="zoneFill"></span></span>
+        <span class="zone-next" id="zoneNext">NEXT: WHISPER WOODS</span>
       </div>
     </header>
 
@@ -278,6 +289,14 @@
             <div class="chest-say" id="chestSay">Tap to open today's chest!</div>
           </div>
         </div>
+          <div class="bounty-block">
+          <div class="bounty-head">
+            <span class="bounty-title">⚔ WEEKLY BOUNTIES</span>
+            <span class="bounty-reset" id="bountyReset">RESETS IN —</span>
+          </div>
+          <div class="bounty-grid" id="bountyList"></div>
+          <div class="bounty-reward" id="bountyReward">CLEAR ALL 3 FOR A REWARD</div>
+        </div>
         <div class="quest-grid" id="questList"></div>
       </div>
     </section>
@@ -361,10 +380,13 @@
     </div>
   </div>
 
+  <!-- combo meter popup (rapid-logging multiplier) -->
+  <div class="combo-pop" id="comboPop" aria-hidden="true"></div>
+
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=78"></script>
+  <script src="app.js?v=79"></script>
 </body>
 
 </html>

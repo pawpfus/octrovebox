@@ -71,6 +71,12 @@ A tiny buzz on supported devices (Android) for key actions and milestones — ea
 ### 🎁 Daily chest
 A daily bounty on the Quest Board — open it once per day for a coin-shower animation and a random tip, building a daily-login streak.
 
+### ⚔️ Weekly bounties
+Three rotating challenges on the Quest Board that **reset every Monday**, computed live from the current week's entries (log 5 entries, log income, spend across 3 categories, open the chest, and more). The set is seeded by the week so it's stable all week and rotates afterward. Clear all three for a celebration and a weekly-clear streak, with a live "resets in N days" countdown.
+
+### 🔥 Combo meter
+Logging several entries in quick succession builds a **combo multiplier** — a pulsing "COMBO ×N" badge with escalating chiptune blips that bursts into an "on fire" state at ×5+, rewarding focused logging sessions. The chain breaks after a short idle gap (session-only, never saved).
+
 ### 🎨 Unlockable skins
 Retro theme palettes that re-skin the whole app — Classic, Game Boy, SNES, Arcade, **Mushroom** (sky-blue & brick) and **Jungle** (canopy green & Wumpa orange) unlock as your balance grows, and a secret **Midas** gold skin unlocks only after you complete every Side Quest.
 
@@ -82,6 +88,12 @@ Pac-Man and the four ghosts (drawn as crisp SVG sprites) drift and bounce freely
 
 ### 🎶 Chiptune jukebox
 Looping 8-bit tracks generated live with the Web Audio API (no audio files) — **one original theme per skin**. The MUSIC button cycles OFF → Classic → Game Boy → SNES → Arcade → Mushroom → Jungle → Midas, mirroring the skin list. Every track is an original chiptune tune written to match its skin's mood (heroic NES march, lo-fi handheld, lush 16-bit pads, neon arcade pulse, platformer romp, tribal-jungle groove, regal golden fanfare), and selecting any skin auto-plays its theme while music is on.
+
+### 🗺️ World zones
+Your net worth is a journey across biomes. As your balance grows you advance through **GREEN MEADOW → WHISPER WOODS → CRYSTAL CAVE → GOLDEN DUNES → FROZEN PEAK → THE COSMOS**, each repainting the pixel horizon behind the app, with a live progress bar to the next zone in the header. The starfield is the **endgame**: stars are dim on the ground and grow brighter each zone, blazing in full only when you reach THE COSMOS — the final level of achievement. Reaching a new zone fires a celebration.
+
+### 🌧️ Budget-driven weather
+The sky reacts to your Budget Boss. Stay healthy and it's **clear**; as you approach the limit it **clouds over**, then **rains** in the danger zone, and breaks into a **lightning storm** once you blow the budget — wordless, ambient feedback on how the month is going (respects reduced-motion).
 
 ### ✨ Parallax starfield + day/night
 Slow-drifting pixel stars twinkle behind the panels, and the sky shifts with your real local time — warm dawn, bright day, dusk, and a deep starry night with a moon (respects reduced-motion).
