@@ -544,26 +544,24 @@ h1 {
   letter-spacing: 1px;
 }
 
-/* the HP / XP bar shell — a recessed glass capsule */
+/* HP / XP bars share the Spending Map bar theme (flat track, pixel notches,
+   flowing two-tone fill with a chunky inset bevel) */
 .hpbar-track {
   display: block;
-  height: 20px;
-  background: linear-gradient(180deg, #0a0a1a, #16162f);
+  height: 18px;
+  background: var(--bg-2);
   border: 3px solid var(--shadow);
   position: relative;
   overflow: hidden;
-  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .6), inset -2px -2px 0 rgba(255, 255, 255, .05);
 }
 
-/* segmented "HP pip" dividers painted over the fill for that arcade look */
+/* pixel segment notches over the fill, like a classic HP gauge */
 .hpbar-track::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(90deg,
-      rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 10px,
-      rgba(0, 0, 0, .5) 10px, rgba(0, 0, 0, .5) 12px);
+  background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(5, 5, 16, .45) 9px 11px);
 }
 
 .hpbar-fill,
@@ -571,47 +569,33 @@ h1 {
   display: block;
   height: 100%;
   width: 0;
-  position: relative;
-  box-shadow: inset 0 3px 0 rgba(255, 255, 255, .35), inset 0 -4px 0 rgba(0, 0, 0, .3);
-  transition: width .55s cubic-bezier(.18, .89, .32, 1.28), background-color .3s, background-image .3s;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .25), inset 0 -2px 0 rgba(0, 0, 0, .3);
+  background-size: 200% 100%;
+  animation: flow 2.5s linear infinite;
+  transition: width .6s cubic-bezier(.18, .89, .32, 1.28), background-color .3s, background-image .3s;
 }
 
-/* glassy top sheen on every fill */
-.hpbar-fill::after,
-.xpbar-fill::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 45%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, 0));
-  pointer-events: none;
-}
-
-/* HP color states (set via class on fill) — gradients give the bar volume */
+/* HP color states (set via class on fill) — flowing two-tone gradients */
 .hpbar-fill.hp-ok {
-  background-image: linear-gradient(180deg, #7cff6b, #1f9d3a);
+  background-image: linear-gradient(90deg, var(--green-dk), var(--green));
 }
 
 .hpbar-fill.hp-warn {
-  background-image: linear-gradient(180deg, #ffe98a, #e0a300);
+  background-image: linear-gradient(90deg, var(--gold-dk), var(--gold));
 }
 
 .hpbar-fill.hp-danger {
-  background-image: linear-gradient(180deg, #ff8181, #c01616);
-  animation: blink 0.6s steps(2) infinite;
+  background-image: linear-gradient(90deg, #8a1212, var(--red));
+  animation: flow 2.5s linear infinite, blink 0.6s steps(2) infinite;
 }
 
 .hpbar-fill.hp-dead {
-  background-image: linear-gradient(180deg, #ff8181, #b01010);
+  background-image: linear-gradient(90deg, #7a0e0e, var(--red));
 }
 
-/* savings XP bar — golden treasure gradient that streams */
+/* savings XP bar — golden treasure stream */
 .xpbar-fill {
-  background-image: linear-gradient(90deg, var(--gold-dk), var(--gold), var(--gold-dk));
-  background-size: 200% 100%;
-  animation: flow 2.5s linear infinite;
+  background-image: linear-gradient(90deg, var(--gold-dk), var(--gold));
 }
 
 .goal-panel.complete .xpbar-fill {
@@ -719,34 +703,32 @@ h1 {
 
 .mboss-bar-track {
   display: block;
-  height: 14px;
-  background: linear-gradient(180deg, #0a0a1a, #16162f);
+  height: 18px;
+  background: var(--bg-2);
   border: 3px solid var(--shadow);
   position: relative;
   overflow: hidden;
-  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .6);
 }
 
-/* segmented pips, matching the boss bars */
+/* pixel segment notches, matching the Spending Map bars */
 .mboss-bar-track::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(90deg,
-      rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 8px,
-      rgba(0, 0, 0, .5) 8px, rgba(0, 0, 0, .5) 10px);
+  background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(5, 5, 16, .45) 9px 11px);
 }
 
 .mboss-bar-fill {
   display: block;
   height: 100%;
   width: 0;
-  position: relative;
-  /* overlays the inline background-color set in JS for a 3-D sheen */
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .4), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, .28));
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .35), inset 0 -3px 0 rgba(0, 0, 0, .3);
-  transition: width .55s cubic-bezier(.18, .89, .32, 1.28), background-color .3s;
+  /* a moving sheen stripe slides over the inline status colour set in JS */
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, .3) 50%, rgba(255, 255, 255, 0) 100%);
+  background-size: 200% 100%;
+  animation: flow 2.5s linear infinite;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .25), inset 0 -2px 0 rgba(0, 0, 0, .3);
+  transition: width .6s cubic-bezier(.18, .89, .32, 1.28), background-color .3s;
 }
 
 .mb-del {
