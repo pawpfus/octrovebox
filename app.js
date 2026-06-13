@@ -346,16 +346,18 @@ function renderCats() {
   els.catBars.innerHTML = '';
   els.catEmpty.style.display = entries.length ? 'none' : 'block';
 
-  entries.forEach(([id, amt]) => {
+  const total = entries.reduce((s, e) => s + e[1], 0);
+  entries.forEach(([id, amt], i) => {
     const c = catInfo('expense', id);
     const pct = Math.round((amt / max) * 100);
+    const share = total > 0 ? Math.round((amt / total) * 100) : 0;
     const color = CAT_COLORS[id] || '#9a9ad0';
     const row = document.createElement('div');
     row.className = 'cat-row';
     row.innerHTML = `
-      <span class="cat-name"><span>${c.icon}</span>${c.name}</span>
+      <span class="cat-name"><span class="cat-slot" style="border-color:${color}">${c.icon}</span><span class="cat-label">${c.name}${i === 0 ? ' <span class="cat-crown">👑</span>' : ''}</span></span>
       <span class="cat-track"><span class="cat-fill" style="background-image:linear-gradient(90deg, ${color}, ${color}aa)"></span></span>
-      <span class="cat-amt" style="color:${color}">${fmt(amt)}</span>
+      <span class="cat-amt" style="color:${color}">${fmt(amt)}<span class="cat-share">${share}%</span></span>
     `;
     els.catBars.appendChild(row);
     requestAnimationFrame(() => { row.querySelector('.cat-fill').style.width = pct + '%'; });
@@ -541,13 +543,13 @@ function renderChart() {
   els.chart.innerHTML = '';
   months.forEach((d) => {
     const col = document.createElement('div');
-    col.className = 'chart-col';
+    col.className = 'chart-col' + (d.current ? ' current' : '');
     col.innerHTML = `
       <div class="chart-bars">
         <div class="cbar cbar-in" title="EARN ${fmt(d.income)}">${d.income ? `<span class="cbar-val">${kfmt(d.income)}</span>` : ''}</div>
         <div class="cbar cbar-out" title="SPEND ${fmt(d.expense)}">${d.expense ? `<span class="cbar-val">${kfmt(d.expense)}</span>` : ''}</div>
       </div>
-      <div class="chart-label ${d.current ? 'current' : ''}">${MONTHS[d.m]}</div>
+      <div class="chart-label ${d.current ? 'current' : ''}">${d.current ? '🚩 ' : ''}${MONTHS[d.m]}</div>
     `;
     els.chart.appendChild(col);
     requestAnimationFrame(() => {
@@ -989,7 +991,6 @@ function activateCheat() {
 
 /* ---------------- RANDOM ENCOUNTERS ---------------- */
 const ENCOUNTERS = [
-  { msg: '🧙 A wandering merchant nods approvingly.', coins: 0 },
   { msg: '🪙 You found a lucky coin on the ground!', coins: 14 },
   { msg: '👺 A goblin tried to pickpocket you — you dodged!', coins: 0 },
   { msg: '✨ A shooting star streaks past. Make a wish!', coins: 10 },
@@ -1783,6 +1784,12 @@ const TRACKS = [
     pad:  [45, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0], padChord: [0, 6, 3], padDur: 2.4,
     lead: [0, 0, 77, 0, 76, 0, 0, 72, 0, 0, 70, 0, 69, 0, 0, 0], leadType: 'triangle', leadDur: 0.7, leadVol: 0.034,
     twinkle: [81, 83, 86, 89], twinkleCluster: true,
+  },
+  { // classic: Ode to Joy (Beethoven, public domain) as a stately 8-bit court piece
+    name: 'CLASSIC', stepMs: 250, drone: false,
+    bass: [48, 0, 43, 0, 48, 0, 43, 0, 48, 0, 43, 0, 48, 43, 48, 0], bassType: 'triangle', bassDur: 0.24, bassVol: 0.042,
+    lead: [64, 64, 65, 67, 67, 65, 64, 62, 60, 60, 62, 64, 64, 62, 62, 0], leadType: 'square', leadDur: 0.23, leadVol: 0.04,
+    twinkle: [84, 88, 91],
   },
 ];
 const music = { timer: null, step: 0 };

@@ -41,6 +41,11 @@ a, button, input, select, textarea, label, [role="button"], [tabindex] {
   -webkit-touch-callout: none;
 }
 
+/* tappable game surfaces shouldn't flash or select text on mobile */
+.oracle-stage, .qboard-banner, .chest-btn, .theme-btn, .toggle-btn, .filter-btn {
+  -webkit-user-select: none; user-select: none;
+}
+
 /* background lives on <html> so the fixed starfield canvas (z-index:-1)
    can show through the transparent <body> */
 html {
@@ -751,32 +756,29 @@ h1 {
 }
 
 .chart {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-around;
-  gap: 6px;
-  height: 170px;
-  padding: 10px 4px 0;
+  display: flex; align-items: flex-end; justify-content: space-around;
+  gap: 6px; height: 170px; padding: 10px 4px 0;
+  position: relative;
+  /* faint cartographer's grid */
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 28px);
 }
-
+/* compass rose in the corner of the map */
+.chart::before {
+  content: '🧭'; position: absolute; top: 4px; right: 6px;
+  font-size: 18px; opacity: .5; pointer-events: none;
+  filter: drop-shadow(2px 2px 0 var(--shadow));
+  animation: hover 4s ease-in-out infinite;
+}
 .chart-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  height: 100%;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; height: 100%;
+  /* dashed expedition route along the baseline */
+  border-bottom: 2px dashed rgba(255, 210, 63, .25);
+  padding-bottom: 6px;
 }
-
-.chart-bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 4px;
-  flex: 1;
-  width: 100%;
-}
-
+.chart-col.current { border-bottom-color: var(--gold); }
+.chart-bars { display: flex; align-items: flex-end; justify-content: center; gap: 4px; flex: 1; width: 100%; }
 .cbar {
   width: 40%;
   max-width: 22px;
@@ -786,17 +788,17 @@ h1 {
   position: relative;
   transition: height .6s cubic-bezier(.18, .89, .32, 1.28);
 }
-
 .cbar-in {
-  background: var(--green);
-  box-shadow: inset 2px 0 0 rgba(255, 255, 255, .3);
+  background: linear-gradient(180deg, #b6ffbf 0%, var(--green) 35%, var(--green-dk) 100%);
+  box-shadow: inset 2px 0 0 rgba(255,255,255,.35), inset -2px 0 0 rgba(0,0,0,.25);
 }
-
 .cbar-out {
-  background: var(--red);
-  box-shadow: inset 2px 0 0 rgba(255, 255, 255, .3);
+  background: linear-gradient(180deg, #ffb3b3 0%, var(--red) 35%, var(--red-dk) 100%);
+  box-shadow: inset 2px 0 0 rgba(255,255,255,.35), inset -2px 0 0 rgba(0,0,0,.25);
 }
-
+/* the current month glows like the party's campfire */
+.chart-col.current .cbar-in  { filter: drop-shadow(0 0 5px rgba(75, 227, 90, .6)); }
+.chart-col.current .cbar-out { filter: drop-shadow(0 0 5px rgba(255, 93, 93, .6)); }
 .cbar .cbar-val {
   position: absolute;
   top: -14px;
@@ -807,14 +809,8 @@ h1 {
   white-space: nowrap;
 }
 
-.chart-label {
-  font-size: 8px;
-  color: var(--ink-dim);
-}
-
-.chart-label.current {
-  color: var(--gold);
-}
+.chart-label { font-size: 8px; color: var(--ink-dim); }
+.chart-label.current { color: var(--gold); text-shadow: 0 0 6px rgba(255, 210, 63, .5); }
 
 /* =========================== LAYOUT GRID =========================== */
 .grid {
@@ -1350,66 +1346,44 @@ select {
   line-height: 2;
 }
 
-/* =========================== CATEGORY BARS =========================== */
-.cat-panel {
-  margin-bottom: 18px;
+/* =========================== CATEGORY BARS (inventory style) =========================== */
+.cat-panel { margin-bottom: 18px; }
+.cat-bars { display: flex; flex-direction: column; gap: 14px; }
+.cat-row { display: grid; grid-template-columns: 116px 1fr 70px; align-items: center; gap: 12px; }
+.cat-name { font-size: 8px; display: flex; align-items: center; gap: 7px; min-width: 0; }
+/* item-slot frame around the category icon */
+.cat-slot {
+  flex: 0 0 auto; width: 24px; height: 24px;
+  display: grid; place-items: center; font-size: 13px;
+  background: var(--bg-2); border: 2px solid var(--shadow);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .08);
 }
-
-.cat-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.cat-row {
-  display: grid;
-  grid-template-columns: 110px 1fr 70px;
-  align-items: center;
-  gap: 12px;
-}
-
-.cat-name {
-  font-size: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
+.cat-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-crown { font-size: 9px; display: inline-block; animation: hover 2s ease-in-out infinite; }
 .cat-track {
-  height: 18px;
-  background: var(--bg-2);
+  height: 18px; background: var(--bg-2);
   border: 3px solid var(--shadow);
-  position: relative;
-  overflow: hidden;
+  position: relative; overflow: hidden;
 }
-
+/* pixel segment notches over the fill, like a classic HP gauge */
+.cat-track::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(5, 5, 16, .45) 9px 11px);
+}
 .cat-fill {
   display: block;
   height: 100%;
   width: 0;
   background-image: linear-gradient(90deg, var(--blue), var(--purple));
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .25);
-  transition: width .6s cubic-bezier(.18, .89, .32, 1.28);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.25), inset 0 -2px 0 rgba(0,0,0,.3);
+  transition: width .6s cubic-bezier(.18,.89,.32,1.28);
   /* animated stripe like a loading bar */
   background-size: 200% 100%;
   animation: flow 2.5s linear infinite;
 }
-
-@keyframes flow {
-  from {
-    background-position: 0 0;
-  }
-
-  to {
-    background-position: 200% 0;
-  }
-}
-
-.cat-amt {
-  font-size: 8px;
-  text-align: right;
-  color: var(--red);
-}
+@keyframes flow { from { background-position: 0 0;} to { background-position: 200% 0;} }
+.cat-amt { font-size: 8px; text-align: right; color: var(--red); }
+.cat-amt .cat-share { display: block; font-size: 6px; color: var(--ink-dim); margin-top: 4px; }
 
 /* =========================== FOOTER =========================== */
 .foot {
