@@ -49,7 +49,6 @@ let state = {
   lastChest: null,      // YYYY-MM-DD of last daily-chest open
   chestStreak: 0,       // consecutive days opening the chest
   rainbow: false,       // konami-code rainbow mode
-  zoneSeen: [],         // world zones already announced (by net worth)
   bounties: null,       // { week:'YYYY-MM-DD'(Monday), done:[ids] } — weekly bounty progress
   bountyStreak: 0,      // weeks where all bounties were cleared
   bountyClaimed: '',    // week key already celebrated as complete
@@ -114,7 +113,7 @@ const els = {
   recapBtn: $('recapBtn'), recapOverlay: $('recapOverlay'), recapClose: $('recapClose'),
   recapMonth: $('recapMonth'), recapGrade: $('recapGrade'), recapRows: $('recapRows'),
   // world zones + weekly bounties + combo meter
-  zoneTag: $('zoneTag'), zoneFill: $('zoneFill'), zoneNext: $('zoneNext'),
+  zoneTag: $('zoneTag'), zoneFill: $('zoneFill'),
   bountyList: $('bountyList'), bountyReset: $('bountyReset'), bountyReward: $('bountyReward'),
   comboPop: $('comboPop'),
 };
@@ -984,6 +983,7 @@ function renderThemes() {
     if (unlocked) {
       btn.addEventListener('click', () => {
         state.theme = t.id; save(); applyTheme(t.id); sfx.click(); renderThemes();
+        renderZone();          // skin, zone, and music all move together
         showToast('🎨 SKIN: ' + t.name);
         playSkinTrack(t.id);
       });
@@ -1006,49 +1006,33 @@ const ZONES = [
   { id: 'city',   name: 'NEON CITY',     icon: '🏙️', min: 0,         skin: 'default' },
   { id: 'meadow', name: 'GREEN MEADOW',  icon: '🌱', min: 50000000,  skin: 'gameboy' },
   { id: 'cave',   name: 'CRYSTAL CAVE',  icon: '💎', min: 75000000,  skin: 'snes' },
-  { id: 'desert', name: 'GOLDEN DUNES',  icon: '🏜️', min: 100000000, skin: 'arcade' },
-  { id: 'peak',   name: 'FROZEN PEAK',   icon: '🏔️', min: 125000000, skin: 'mario' },
+  { id: 'peak',   name: 'FROZEN PEAK',   icon: '🏔️', min: 100000000, skin: 'arcade' },
+  { id: 'desert', name: 'GOLDEN DUNES',  icon: '🏜️', min: 125000000, skin: 'mario' },
   { id: 'forest', name: 'WHISPER WOODS', icon: '🌲', min: 150000000, skin: 'jungle' },
   { id: 'cosmos', name: 'THE COSMOS',    icon: '🌌', allDeeds: true,  skin: 'midas' },
 ];
 // how brightly the starfield burns in each zone — dim in the city, blazing in space
-const ZONE_STAR = { city: 0.12, meadow: 0.22, cave: 0.38, desert: 0.52, peak: 0.68, forest: 0.85, cosmos: 1.5 };
+const ZONE_STAR = { city: 0.12, meadow: 0.22, cave: 0.38, peak: 0.52, desert: 0.68, forest: 0.85, cosmos: 1.5 };
 const allDeedsDone = () => state.questsDone.length >= CHALLENGES.length;
-function currentZoneIndex() {
-  // completing every deed unlocks MIDAS and ascends you to THE COSMOS
-  if (allDeedsDone()) return ZONES.findIndex((z) => z.id === 'cosmos');
-  const bal = totals().balance;
-  let idx = 0;
-  ZONES.forEach((z, i) => { if (z.min != null && bal >= z.min) idx = i; });
-  return idx;
-}
 function renderZone() {
-  const idx = currentZoneIndex();
-  const z = ZONES[idx];
+  // your ACTIVE SKIN decides which realm you stand in — skin, zone, and music
+  // all switch together when you pick a skin in the Vault.
+  const z = ZONES.find((zz) => zz.skin === state.theme) || ZONES[0];
   document.documentElement.dataset.zone = z.id;
   els.zoneTag.textContent = z.icon + ' ' + z.name;
-  const next = ZONES[idx + 1];
-  if (z.id === 'cosmos') {
+  // silent progress bar: how close your net worth is to unlocking the next realm
+  const bal = totals().balance;
+  let cur = 0;
+  ZONES.forEach((zz, i) => { if (zz.min != null && bal >= zz.min) cur = i; });
+  const next = ZONES[cur + 1];
+  if (allDeedsDone()) {
     els.zoneFill.style.width = '100%';
-    els.zoneNext.textContent = '★ MAX ZONE ★';
   } else if (next && next.allDeeds) {
-    // the final stretch is gated by completing every deed, not by balance
-    const done = state.questsDone.length, total = CHALLENGES.length;
-    els.zoneFill.style.width = clamp(Math.round((done / total) * 100), 0, 100) + '%';
-    els.zoneNext.textContent = 'NEXT: ' + next.name + ' (' + done + '/' + total + ' DEEDS)';
+    els.zoneFill.style.width = clamp(Math.round((state.questsDone.length / CHALLENGES.length) * 100), 0, 100) + '%';
   } else if (next) {
-    const bal = totals().balance;
-    const pct = clamp(Math.round(((bal - z.min) / (next.min - z.min)) * 100), 0, 100);
-    els.zoneFill.style.width = pct + '%';
-    els.zoneNext.textContent = 'NEXT: ' + next.name;
-  }
-  // celebrate the first time the player reaches a new zone (never on load or at the start)
-  if (!state.zoneSeen.includes(z.id)) {
-    state.zoneSeen.push(z.id); save();
-    if (appReady && idx > 0) {
-      coinRain(z.id === 'cosmos' ? 50 : 28); sfx.victory();
-      showToast((z.id === 'cosmos' ? '🌌 FINAL ZONE REACHED — ' : '🗺️ NEW ZONE — ') + z.name + '!');
-    }
+    els.zoneFill.style.width = clamp(Math.round(((bal - ZONES[cur].min) / (next.min - ZONES[cur].min)) * 100), 0, 100) + '%';
+  } else {
+    els.zoneFill.style.width = '100%';
   }
 }
 
@@ -1619,7 +1603,6 @@ function importBackup(file) {
     if (state.musicOn) startMusic(); else stopMusic();
     state.budgetBreached = !!data.budgetBreached;
     state.goalCelebrated = !!data.goalCelebrated;
-    state.zoneSeen = Array.isArray(data.zoneSeen) ? data.zoneSeen : [];
     state.bounties = (data.bounties && typeof data.bounties === 'object') ? data.bounties : null;
     state.bountyStreak = Number(data.bountyStreak) || 0;
     state.bountyClaimed = data.bountyClaimed || '';
