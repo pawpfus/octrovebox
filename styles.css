@@ -2239,6 +2239,14 @@ select {
 .vault-banner .qb-arrow { color: #b8c8e0; }
 .vault-banner.open .qb-arrow { transform: rotate(180deg); }
 
+/* OPTIONS panel reuses the vault door, in a warmer utility tone */
+.options-panel { margin-bottom: 18px; padding: 12px; }
+.opt-banner { background: linear-gradient(180deg, #4a3a2a 0%, #33281b 55%, #221a10 100%); }
+.opt-banner .vault-title { color: var(--gold); }
+.opt-banner .vault-sub { color: #c9a96a; }
+.opt-banner .qb-arrow { color: var(--gold); }
+.options-panel .vault-scroll { padding-top: 4px; }
+
 /* vault interior unrolls like the quest scroll */
 .vault-scroll { transform-origin: top; animation: unroll .4s cubic-bezier(.18, .89, .32, 1.18); margin-top: 10px; }
 .vault-scroll[hidden] { display: none; }

@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=69" />
+  <link rel="stylesheet" href="styles.css?v=70" />
 </head>
 
 <body>
@@ -304,15 +304,29 @@
       </div>
     </section>
 
-    <footer class="foot">
-      <div class="foot-actions">
-        <button class="io-btn" id="recapBtn">📜 RECAP</button>
-        <button class="io-btn" id="backupBtn">💾 BACKUP</button>
-        <button class="io-btn" id="restoreBtn">📂 RESTORE</button>
-        <button class="export-btn" id="exportBtn">⎙ EXPORT PDF</button>
-        <button class="danger-btn" id="resetBtn">↺ ERASE SAVE FILE</button>
-        <input type="file" id="restoreInput" accept="application/json,.json" hidden />
+    <!-- ===== OPTIONS — tools & data ===== -->
+    <section class="panel options-panel">
+      <button type="button" class="vault-banner opt-banner" id="optToggle">
+        <span class="vault-dial" id="optGear">⚙</span>
+        <span class="qb-text">
+          <span class="vault-title">⚙ OPTIONS ⚙</span>
+          <span class="vault-sub">TOOLS &amp; SAVE DATA</span>
+        </span>
+        <span class="qb-arrow" id="optArrow">▼</span>
+      </button>
+      <div class="vault-scroll" id="optScroll" hidden>
+        <div class="foot-actions">
+          <button class="io-btn" id="recapBtn">📜 RECAP</button>
+          <button class="io-btn" id="backupBtn">💾 BACKUP</button>
+          <button class="io-btn" id="restoreBtn">📂 RESTORE</button>
+          <button class="export-btn" id="exportBtn">⎙ EXPORT PDF</button>
+          <button class="danger-btn" id="resetBtn">↺ ERASE SAVE FILE</button>
+          <input type="file" id="restoreInput" accept="application/json,.json" hidden />
+        </div>
       </div>
+    </section>
+
+    <footer class="foot">
       <span class="copyright">© 200X COIN QUEST · INSERT COIN</span>
     </footer>
   </div>
@@ -350,7 +364,7 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=69"></script>
+  <script src="app.js?v=70"></script>
 </body>
 
 </html>

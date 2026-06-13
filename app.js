@@ -104,6 +104,7 @@ const els = {
   chestBtn: $('chestBtn'), chestStreak: $('chestStreak'), chestSay: $('chestSay'),
   themeGrid: $('themeGrid'),
   vaultToggle: $('vaultToggle'), vaultScroll: $('vaultScroll'), vaultDial: $('vaultDial'), vaultSub: $('vaultSub'),
+  optToggle: $('optToggle'), optScroll: $('optScroll'),
   // monthly recap
   recapBtn: $('recapBtn'), recapOverlay: $('recapOverlay'), recapClose: $('recapClose'),
   recapMonth: $('recapMonth'), recapGrade: $('recapGrade'), recapRows: $('recapRows'),
@@ -1511,6 +1512,12 @@ els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOv
 els.oracleStage.addEventListener('click', oracleTap);
 els.questToggle.addEventListener('click', toggleQuestBoard);
 els.vaultToggle.addEventListener('click', toggleVault);
+els.optToggle.addEventListener('click', () => {
+  const opening = els.optScroll.hidden;
+  els.optScroll.hidden = !opening;
+  els.optToggle.classList.toggle('open', opening);
+  if (opening) beep([392, 523], 0.05, 'square', 0.04); else sfx.click();
+});
 els.chestBtn.addEventListener('click', openChest);
 
 // Konami code (keyboard) → rainbow cheat
