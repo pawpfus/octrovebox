@@ -939,6 +939,16 @@ function applyTheme(id) {
   if (id && id !== 'default') document.body.dataset.theme = id;
   else delete document.body.dataset.theme;
 }
+// when the player picks a skin that has its own theme song, switch the jukebox
+// to it — but only if music is already playing, so we never start audio uninvited
+function playSkinTrack(id) {
+  if (!state.musicOn) return;
+  const i = TRACKS.findIndex((t) => t.skin === id);
+  if (i < 0 || i === state.musicTrack) return;
+  state.musicTrack = i; save(); setMusicLabel();
+  stopMusic(); music.step = 0; startMusic();
+  showToast('♫ ' + TRACKS[i].name + ' THEME');
+}
 function renderThemes() {
   els.themeGrid.innerHTML = '';
   THEMES.forEach((t) => {
@@ -957,6 +967,7 @@ function renderThemes() {
       btn.addEventListener('click', () => {
         state.theme = t.id; save(); applyTheme(t.id); sfx.click(); renderThemes();
         showToast('🎨 SKIN: ' + t.name);
+        playSkinTrack(t.id);
       });
     } else {
       btn.addEventListener('click', () => { sfx.error(); showToast('🔒 LOCKED — KEEP PLAYING TO UNLOCK!'); });
@@ -1844,6 +1855,18 @@ const TRACKS = [
     bass: [41, 41, 41, 41, 41, 41, 41, 41, 36, 36, 36, 36, 36, 36, 36, 36], bassType: 'square', bassDur: 0.1, bassVol: 0.05,
     lead: [0, 65, 65, 65, 65, 67, 68, 70, 72, 70, 68, 67, 65, 63, 65, 0], leadType: 'square', leadDur: 0.12, leadVol: 0.04,
     twinkle: [89, 91, 96], twinkleCluster: true,
+  },
+  { // mushroom: original bouncy plumber-platformer romp (C–Am–F–G oom-pah) — pairs with the Mushroom skin
+    name: 'MUSHROOM', stepMs: 150, drone: false, skin: 'mario',
+    bass: [48, 55, 48, 55, 45, 52, 45, 52, 41, 48, 41, 48, 43, 50, 43, 50], bassType: 'triangle', bassDur: 0.13, bassVol: 0.05,
+    lead: [72, 76, 79, 0, 76, 72, 69, 0, 77, 81, 84, 0, 79, 74, 67, 0], leadType: 'square', leadDur: 0.12, leadVol: 0.04,
+    twinkle: [88, 91, 96],
+  },
+  { // jungle: original tribal D-minor-pentatonic groove with syncopated low toms — pairs with the Jungle skin
+    name: 'JUNGLE', stepMs: 165, drone: false, skin: 'jungle',
+    bass: [38, 38, 0, 38, 0, 38, 36, 0, 33, 33, 0, 33, 0, 41, 0, 41], bassType: 'triangle', bassDur: 0.12, bassVol: 0.055,
+    lead: [62, 0, 65, 67, 0, 69, 67, 65, 62, 0, 60, 62, 0, 65, 67, 0], leadType: 'square', leadDur: 0.14, leadVol: 0.04,
+    twinkle: [74, 77, 81], twinkleCluster: true,
   },
 ];
 const music = { timer: null, step: 0 };

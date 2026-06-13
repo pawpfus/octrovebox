@@ -555,15 +555,6 @@ h1 {
   overflow: hidden;
 }
 
-/* pixel segment notches over the fill, like a classic HP gauge */
-.hpbar-track::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(5, 5, 16, .45) 9px 11px);
-}
-
 .hpbar-fill,
 .xpbar-fill {
   display: block;
@@ -708,15 +699,6 @@ h1 {
   border: 3px solid var(--shadow);
   position: relative;
   overflow: hidden;
-}
-
-/* pixel segment notches, matching the Spending Map bars */
-.mboss-bar-track::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(5, 5, 16, .45) 9px 11px);
 }
 
 .mboss-bar-fill {
@@ -1389,11 +1371,6 @@ select {
   height: 18px; background: var(--bg-2);
   border: 3px solid var(--shadow);
   position: relative; overflow: hidden;
-}
-/* pixel segment notches over the fill, like a classic HP gauge */
-.cat-track::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(5, 5, 16, .45) 9px 11px);
 }
 .cat-fill {
   display: block;
