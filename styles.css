@@ -2845,27 +2845,44 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
   margin-bottom: 12px;
 }
 .recur-inline-head .recur-sub { color: var(--ink-dim); }
-.recur-list:not(:empty) { margin-bottom: 4px; }
+/* scrolls like the Deeds list once there are several rules */
+.recur-list {
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.recur-list::-webkit-scrollbar { width: 6px; }
+.recur-list::-webkit-scrollbar-thumb { background: var(--panel-lt); }
 .recur-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 10px;
+  gap: 8px;
+  padding: 9px 8px;
   background: var(--bg-2);
   border: 3px solid var(--shadow);
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
-.rc-ico { font-size: 16px; flex-shrink: 0; }
+.recur-row:last-child { margin-bottom: 0; }
+.rc-ico { font-size: 14px; flex-shrink: 0; }
 .rc-body { flex: 1; min-width: 0; }
 .rc-name {
   display: block;
-  font-size: 9px;
+  font-size: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rc-meta { display: block; font-size: 7px; color: var(--ink-dim); margin-top: 6px; }
-.rc-amt { font-size: clamp(8px, 2.5vw, 11px); white-space: nowrap; flex-shrink: 0; }
+.rc-meta {
+  display: block;
+  font-size: 7px;
+  color: var(--ink-dim);
+  margin-top: 5px;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rc-amt { font-size: clamp(7px, 2.2vw, 10px); white-space: nowrap; flex-shrink: 0; }
 .rc-amt.income { color: var(--green); }
 .rc-amt.expense { color: var(--red); }
 .rc-del {

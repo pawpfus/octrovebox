@@ -1344,7 +1344,7 @@ function renderRecurring() {
       <span class="rc-ico">${r.freq === 'weekly' ? '📅' : '🗓️'}</span>
       <span class="rc-body">
         <span class="rc-name">${escapeHtml(r.desc)}</span>
-        <span class="rc-meta">${c.name} · ${freqLabel(r.freq)} · NEXT ${next}</span>
+        <span class="rc-meta">${freqLabel(r.freq)} ▸ ${next}</span>
       </span>
       <span class="rc-amt ${r.type}">${r.type === 'income' ? '+' : '-'}${fmt(r.amount).replace('-', '')}</span>
       <button class="rc-del" title="Stop repeating" data-id="${r.id}">✕</button>`;
@@ -2351,11 +2351,11 @@ if ('serviceWorker' in navigator) {
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  // density scales with viewport AREA; phones get far fewer particles so the
-  // effect stays subtle on small screens
+  // density scales with viewport AREA; phones get fewer (but bolder — see paint)
+  // particles so the effect reads clearly without cluttering a small screen
   const dens = (div, min) => {
     const n = Math.max(min, Math.round((w * h) / div));
-    return w <= 600 ? Math.max(5, Math.round(n * 0.35)) : n;
+    return w <= 600 ? Math.max(10, Math.round(n * 0.5)) : n;
   };
   function build() {
     parts = [];
@@ -2366,13 +2366,13 @@ if ('serviceWorker' in navigator) {
       for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, len: rnd(10, 18), sp: rnd(2.5, 5) });
     } else if (mode.kind === 'snow') {
       const n = dens(14000, 38);
-      for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, sz: rnd(2, 4) | 0, sp: rnd(0.5, 1.6), ph: Math.random() * 6.28 });
+      for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, sz: rnd(mob ? 3 : 2, mob ? 6 : 4) | 0, sp: rnd(0.5, 1.6), ph: Math.random() * 6.28 });
     } else if (mode.kind === 'fish') {
       const n = mob ? 3 : Math.max(6, Math.round((w * h) / 80000));
       for (let i = 0; i < n; i++) { const dir = Math.random() < 0.5 ? 1 : -1; parts.push({ x: Math.random() * w, y: rnd(h * 0.2, h * 0.9), sp: dir * rnd(0.4, 1.1), sz: rnd(5, 9) | 0, col: pick(mode.cols), ph: Math.random() * 6.28 }); }
     } else { // mote
       const n = dens(26000, 24);
-      for (let i = 0; i < n; i++) { const a = Math.random() * 6.28; const s = rnd(0.15, 0.5); parts.push({ x: Math.random() * w, y: Math.random() * h, vx: Math.cos(a) * s, vy: Math.sin(a) * s, sz: rnd(2, 4) | 0, col: pick(mode.cols), tw: Math.random() * 6.28 }); }
+      for (let i = 0; i < n; i++) { const a = Math.random() * 6.28; const s = rnd(0.15, 0.5); parts.push({ x: Math.random() * w, y: Math.random() * h, vx: Math.cos(a) * s, vy: Math.sin(a) * s, sz: rnd(mob ? 3 : 2, mob ? 6 : 4) | 0, col: pick(mode.cols), tw: Math.random() * 6.28 }); }
     }
   }
   function resize() {
@@ -2398,7 +2398,9 @@ if ('serviceWorker' in navigator) {
     ctx.clearRect(0, 0, w, h);
     if (!mode) return;
     if (mode.kind === 'rain') {
-      ctx.strokeStyle = 'rgba(160,190,255,.5)'; ctx.lineWidth = 2; ctx.beginPath();
+      const mob = w <= 600;
+      ctx.strokeStyle = mob ? 'rgba(185,208,255,.72)' : 'rgba(160,190,255,.5)';
+      ctx.lineWidth = mob ? 3 : 2; ctx.beginPath();
       for (const p of parts) { p.y += p.sp; p.x += p.sp * 0.18; if (p.y > h) { p.y = -p.len; p.x = Math.random() * w; } ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.sp * 0.36, p.y - p.len); }
       ctx.stroke();
     } else if (mode.kind === 'snow') {
