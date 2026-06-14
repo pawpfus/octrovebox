@@ -1918,11 +1918,16 @@ if ('serviceWorker' in navigator) {
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  // density scales with viewport AREA (not just width) so phones aren't sparse
-  const dens = (div, min) => Math.max(min, Math.round((w * h) / div));
+  // density scales with viewport AREA; phones get far fewer particles so the
+  // effect stays subtle on small screens
+  const dens = (div, min) => {
+    const n = Math.max(min, Math.round((w * h) / div));
+    return w <= 600 ? Math.max(5, Math.round(n * 0.35)) : n;
+  };
   function build() {
     parts = [];
     if (!mode) return;
+    const mob = w <= 600;
     if (mode.kind === 'rain') {
       const n = dens(9000, 44);
       for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, len: rnd(10, 18), sp: rnd(2.5, 5) });
@@ -1930,7 +1935,7 @@ if ('serviceWorker' in navigator) {
       const n = dens(14000, 38);
       for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, sz: rnd(2, 4) | 0, sp: rnd(0.5, 1.6), ph: Math.random() * 6.28 });
     } else if (mode.kind === 'fish') {
-      const n = Math.max(6, Math.round((w * h) / 80000));
+      const n = mob ? 3 : Math.max(6, Math.round((w * h) / 80000));
       for (let i = 0; i < n; i++) { const dir = Math.random() < 0.5 ? 1 : -1; parts.push({ x: Math.random() * w, y: rnd(h * 0.2, h * 0.9), sp: dir * rnd(0.4, 1.1), sz: rnd(5, 9) | 0, col: pick(mode.cols), ph: Math.random() * 6.28 }); }
     } else { // mote
       const n = dens(26000, 24);
