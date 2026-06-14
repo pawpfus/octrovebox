@@ -2911,8 +2911,16 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 }
 .rc-del:hover { color: var(--red); }
 
-/* options currency field */
+/* options currency + effects fields */
 .opt-field { margin-bottom: 12px; }
+.fx-btn { width: 100%; }
+.fx-hint {
+  display: block;
+  font-size: 6px;
+  line-height: 1.7;
+  color: var(--ink-dim);
+  margin-top: 8px;
+}
 
 /* ============================================================
    ONBOARDING — first-run tour overlay

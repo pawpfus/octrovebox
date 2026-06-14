@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=94" />
+  <link rel="stylesheet" href="styles.css?v=95" />
 </head>
 
 <body>
@@ -364,6 +364,11 @@
           <span class="field-label">💱 CURRENCY</span>
           <div class="select-wrap"><select id="currencySelect"></select></div>
         </label>
+        <div class="field opt-field">
+          <span class="field-label">✨ AMBIENT EFFECTS</span>
+          <button type="button" class="io-btn fx-btn" id="fxBtn">✨ EFFECTS: AUTO</button>
+          <span class="fx-hint">AUTO follows your device's reduce-motion setting · ON forces rain/snow/stars · OFF disables them</span>
+        </div>
         <div class="foot-actions">
           <button class="io-btn" id="recapBtn">📜 RECAP</button>
           <button class="io-btn" id="backupBtn">💾 BACKUP</button>
@@ -463,7 +468,7 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=94"></script>
+  <script src="app.js?v=95"></script>
 </body>
 
 </html>

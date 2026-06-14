@@ -60,6 +60,7 @@ let state = {
   lastBackup: 0,        // ts of the last exported backup (0 = never)
   backupNudge: '',      // YYYY-MM-DD we last reminded about backing up
   onboarded: false,     // has the first-run tour been seen/dismissed?
+  effects: 'auto',      // ambient animation: 'auto' (follow system) | 'on' | 'off'
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -126,8 +127,8 @@ const els = {
   lockOverlay: $('lockOverlay'), lockSub: $('lockSub'), lockDots: $('lockDots'), lockPad: $('lockPad'),
   lockForgot: $('lockForgot'), lockCancel: $('lockCancel'),
   pinSetBtn: $('pinSetBtn'), pinOffBtn: $('pinOffBtn'),
-  // currency
-  currencySelect: $('currencySelect'),
+  // currency + effects
+  currencySelect: $('currencySelect'), fxBtn: $('fxBtn'),
   // recurring (auto-pilot) — lives inside the New Entry panel
   repeatInput: $('repeatInput'),
   recurInline: $('recurInline'), recurList: $('recurList'), recurSub: $('recurSub'),
@@ -1846,6 +1847,7 @@ function importBackup(file) {
     state.lastBackup = Number(data.lastBackup) || 0;
     state.schema = Number(data.schema) || 1;
     state.onboarded = true; // an imported save means an existing player — skip the tour
+    state.effects = ['auto', 'on', 'off'].includes(data.effects) ? data.effects : 'auto';
     // NOTE: pinHash is intentionally NOT imported, so a backup never locks this device
     save();
     sfx.coin();
@@ -2122,6 +2124,14 @@ if (els.currencySelect) els.currencySelect.addEventListener('change', () => {
   showToast('💱 CURRENCY: ' + state.currency + ' ' + cur().symbol);
 });
 
+// ambient effects override (auto → on → off)
+if (els.fxBtn) els.fxBtn.addEventListener('click', () => {
+  const order = ['auto', 'on', 'off'];
+  state.effects = order[(order.indexOf(state.effects || 'auto') + 1) % order.length];
+  save(); sfx.click(); setFxLabel();
+  showToast('✨ EFFECTS: ' + state.effects.toUpperCase() + (state.effects === 'auto' ? ' (FOLLOW SYSTEM)' : ''));
+});
+
 // auto-pilot (recurring) — collapse/expand the rules list
 if (els.recurHead) els.recurHead.addEventListener('click', () => {
   const opening = els.recurList.hidden;
@@ -2261,6 +2271,7 @@ function finishBoot() {
   els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
   applyTheme(state.theme);
   applyCurrency();
+  setFxLabel();
   document.body.classList.toggle('rainbow', !!state.rainbow);
   fillCategories();
   fillCatBudgetSelect();
@@ -2335,6 +2346,22 @@ if ('serviceWorker' in navigator) {
 }
 
 /* ============================================================
+   AMBIENT EFFECTS GATE — the starfield, weather, and floats all
+   consult this. 'auto' honours the system "reduce motion" setting;
+   'on'/'off' (from Options) let the user override it either way.
+============================================================ */
+function prefersReduce() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+function fxAnimate() {
+  const m = state.effects || 'auto';
+  if (m === 'on') return true;
+  if (m === 'off') return false;
+  return !prefersReduce();
+}
+function setFxLabel() {
+  if (els.fxBtn) els.fxBtn.textContent = '✨ EFFECTS: ' + (state.effects || 'auto').toUpperCase();
+}
+
+/* ============================================================
    THEMED AMBIENT FLOATS — particles that match the active zone:
    city rain, frozen-peak snow, undersea fish, and twinkling motes
    tinted to each other biome. Replaces the old roaming buddies.
@@ -2343,7 +2370,6 @@ if ('serviceWorker' in navigator) {
   const cv = document.getElementById('ambient');
   if (!cv) return;
   const ctx = cv.getContext('2d');
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; // honour no-motion
 
   // zone -> particle mode (+ palette for motes / fish)
   const MODES = {
@@ -2401,14 +2427,15 @@ if ('serviceWorker' in navigator) {
   }
   function paint() {
     if (cv.width !== window.innerWidth || cv.height !== window.innerHeight) resize();
+    if (!fxAnimate()) { ctx.clearRect(0, 0, w, h); return; }   // effects off → nothing
     const z = document.documentElement.dataset.zone || '';
     if (z !== key) { key = z; mode = MODES[z] || null; build(); }
     ctx.clearRect(0, 0, w, h);
     if (!mode) return;
     if (mode.kind === 'rain') {
       const mob = w <= 600;
-      ctx.strokeStyle = mob ? 'rgba(185,208,255,.72)' : 'rgba(160,190,255,.5)';
-      ctx.lineWidth = mob ? 3 : 2; ctx.beginPath();
+      ctx.strokeStyle = mob ? 'rgba(170,198,255,.58)' : 'rgba(160,190,255,.5)';
+      ctx.lineWidth = 2; ctx.beginPath();
       for (const p of parts) { p.y += p.sp; p.x += p.sp * 0.18; if (p.y > h) { p.y = -p.len; p.x = Math.random() * w; } ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.sp * 0.36, p.y - p.len); }
       ctx.stroke();
     } else if (mode.kind === 'snow') {
@@ -2602,7 +2629,6 @@ if (state.musicOn) {
   const cv = document.getElementById('stars');
   if (!cv) return;
   const ctx = cv.getContext('2d');
-  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const COLORS = ['#ffffff', '#ffffff', '#ffd23f', '#4fa9ff', '#b06bff'];
   let w, h, stars;
   function resize() {
@@ -2682,18 +2708,13 @@ if (state.musicOn) {
     // self-heal: mobile browsers can settle the viewport after load without a
     // usable resize event, leaving the canvas 0x0 or stale — fix it every frame
     if (cv.width !== window.innerWidth || cv.height !== window.innerHeight) resize();
-    paint(true);
+    paint(fxAnimate());   // animate (twinkle/drift) only when effects are on; else static stars
     requestAnimationFrame(loop);
   }
   resize();
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 300));
-  if (reduce) {
-    paint(false);
-    setInterval(() => { resize(); paint(false); }, 60000); // keep phase current without animation
-  } else {
-    requestAnimationFrame(loop);
-  }
+  requestAnimationFrame(loop);
 })();
 
 /* ============================================================
@@ -2703,7 +2724,6 @@ if (state.musicOn) {
   const cv = document.getElementById('weather');
   if (!cv) return;
   const ctx = cv.getContext('2d');
-  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let w, h, mode = '', drops = [], clouds = [], flash = 0;
   function newDrop() {
     return { x: Math.random() * w, y: Math.random() * -h, len: (mode === 'storm' ? 14 : 9) + Math.random() * 8, sp: (mode === 'storm' ? 10 : 6) + Math.random() * 5 };
@@ -2721,6 +2741,7 @@ if (state.musicOn) {
   }
   function paint() {
     if (cv.width !== window.innerWidth || cv.height !== window.innerHeight) resize();
+    if (!fxAnimate()) { ctx.clearRect(0, 0, w, h); return; }   // effects off → no weather
     const m = document.documentElement.dataset.weather || 'clear';
     if (m !== mode) { mode = m; build(); }
     ctx.clearRect(0, 0, w, h);
@@ -2754,6 +2775,7 @@ if (state.musicOn) {
   resize();
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 300));
-  if (reduce) return; // honour reduced-motion: no particles
+  // the loop always runs; paint() gates itself on fxAnimate() (honours the
+  // EFFECTS setting / system reduce-motion) and clears when off
   (function loop() { paint(); requestAnimationFrame(loop); })();
 })();
