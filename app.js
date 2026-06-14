@@ -1918,20 +1918,22 @@ if ('serviceWorker' in navigator) {
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+  // density scales with viewport AREA (not just width) so phones aren't sparse
+  const dens = (div, min) => Math.max(min, Math.round((w * h) / div));
   function build() {
     parts = [];
     if (!mode) return;
     if (mode.kind === 'rain') {
-      const n = Math.round(w / 16);
-      for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, len: rnd(8, 16), sp: rnd(2.5, 5) });
+      const n = dens(9000, 44);
+      for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, len: rnd(10, 18), sp: rnd(2.5, 5) });
     } else if (mode.kind === 'snow') {
-      const n = Math.round(w / 22);
+      const n = dens(14000, 38);
       for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, sz: rnd(2, 4) | 0, sp: rnd(0.5, 1.6), ph: Math.random() * 6.28 });
     } else if (mode.kind === 'fish') {
-      const n = 7;
+      const n = Math.max(6, Math.round((w * h) / 80000));
       for (let i = 0; i < n; i++) { const dir = Math.random() < 0.5 ? 1 : -1; parts.push({ x: Math.random() * w, y: rnd(h * 0.2, h * 0.9), sp: dir * rnd(0.4, 1.1), sz: rnd(5, 9) | 0, col: pick(mode.cols), ph: Math.random() * 6.28 }); }
     } else { // mote
-      const n = Math.round(w / 42);
+      const n = dens(26000, 24);
       for (let i = 0; i < n; i++) { const a = Math.random() * 6.28; const s = rnd(0.15, 0.5); parts.push({ x: Math.random() * w, y: Math.random() * h, vx: Math.cos(a) * s, vy: Math.sin(a) * s, sz: rnd(2, 4) | 0, col: pick(mode.cols), tw: Math.random() * 6.28 }); }
     }
   }
@@ -1958,7 +1960,7 @@ if ('serviceWorker' in navigator) {
     ctx.clearRect(0, 0, w, h);
     if (!mode) return;
     if (mode.kind === 'rain') {
-      ctx.strokeStyle = 'rgba(150,180,255,.32)'; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.strokeStyle = 'rgba(160,190,255,.5)'; ctx.lineWidth = 2; ctx.beginPath();
       for (const p of parts) { p.y += p.sp; p.x += p.sp * 0.18; if (p.y > h) { p.y = -p.len; p.x = Math.random() * w; } ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.sp * 0.36, p.y - p.len); }
       ctx.stroke();
     } else if (mode.kind === 'snow') {

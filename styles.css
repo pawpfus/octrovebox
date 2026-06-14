@@ -1290,7 +1290,7 @@ select {
 }
 
 .tx-amount {
-  font-size: 11px;
+  font-size: clamp(8px, 2.5vw, 11px);
   white-space: nowrap;
 }
 
