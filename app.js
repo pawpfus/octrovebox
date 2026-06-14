@@ -1377,7 +1377,7 @@ function maybeBackupReminder() {
    an option to load explorable sample data.
 ============================================================ */
 const OB_STEPS = [
-  { art: '🎮', title: 'WELCOME TO OCTROVEBOX', body: 'Track your money like a retro RPG. Earn gold, fight the Budget Boss, and complete quests — all saved privately on your own device.' },
+  { art: '<img class="ob-logo" src="icon-192.png?v=72" alt="Octrovebox" />', title: 'WELCOME TO OCTROVEBOX', body: 'Track your money like a retro RPG. Earn gold, fight the Budget Boss, and complete quests — all saved privately on your own device.' },
   { art: '★',  title: 'SET YOUR BALANCE',     body: 'Tap START ✎ on the BALANCE card to enter how much money you have right now. Everything else builds from there.' },
   { art: '⮞',  title: 'LOG AN ENTRY',         body: 'Use + NEW ENTRY to record what you SPEND or EARN. Set REPEAT to auto-log salary, rent, or subscriptions every week or month.' },
   { art: '⚔️', title: 'BEAT THE BOSS',        body: 'Set a monthly budget to spawn the Budget Boss, chase savings quests, and unlock skins, zones, and music as your gold grows.' },
@@ -1385,7 +1385,7 @@ const OB_STEPS = [
 let obIdx = 0;
 function renderOnboard() {
   const s = OB_STEPS[obIdx];
-  els.obArt.textContent = s.art;
+  els.obArt.innerHTML = s.art;   // art may be an emoji or the logo <img>
   els.obTitle.textContent = s.title;
   els.obBody.textContent = s.body;
   els.obBack.hidden = obIdx === 0;
@@ -2371,10 +2371,10 @@ function setFxLabel() {
   if (!cv) return;
   const ctx = cv.getContext('2d');
 
-  // zone -> particle mode (+ palette for motes / fish). NEON CITY has no ambient
-  // float — its rain is the budget-driven weather layer (the faster drops), so
-  // we don't double up with a second, slower rain here.
+  // zone -> particle mode (+ palette for motes / fish). NEON CITY (Classic skin)
+  // gets a driving rainstorm as its signature ambient effect.
   const MODES = {
+    city:     { kind: 'rain' },
     peak:     { kind: 'snow' },
     undersea: { kind: 'fish',  cols: ['#ff9f1c', '#2fd0c0', '#ff6bc4', '#ffd23f'] },
     meadow:   { kind: 'mote',  cols: ['#6cd957', '#a8e063', '#ffd23f'] },   // pollen / leaves
@@ -2382,7 +2382,7 @@ function setFxLabel() {
     desert:   { kind: 'mote',  cols: ['#ffd23f', '#ffe08a', '#ffffff'] },   // fantasy fairy dust
     cosmos:   { kind: 'mote',  cols: ['#ffd23f', '#ffffff', '#b06bff'] },   // stardust
   };
-  let w, h, mode = null, key = '', parts = [];
+  let w, h, mode = null, key = '', parts = [], flash = 0;
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -2396,7 +2396,10 @@ function setFxLabel() {
     parts = [];
     if (!mode) return;
     const mob = w <= 600;
-    if (mode.kind === 'snow') {
+    if (mode.kind === 'rain') {                  // driving rainstorm (Classic / city)
+      const n = dens(9000, 50);
+      for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, len: rnd(14, 24), sp: rnd(8, 14) });
+    } else if (mode.kind === 'snow') {
       const n = dens(14000, 38);
       for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, sz: rnd(mob ? 3 : 2, mob ? 6 : 4) | 0, sp: rnd(0.5, 1.6), ph: Math.random() * 6.28 });
     } else if (mode.kind === 'fish') {
@@ -2430,7 +2433,15 @@ function setFxLabel() {
     if (z !== key) { key = z; mode = MODES[z] || null; build(); }
     ctx.clearRect(0, 0, w, h);
     if (!mode) return;
-    if (mode.kind === 'snow') {
+    if (mode.kind === 'rain') {                  // fast diagonal rain + occasional lightning
+      const mob = w <= 600;
+      ctx.strokeStyle = mob ? 'rgba(170,198,255,.6)' : 'rgba(150,185,255,.5)';
+      ctx.lineWidth = 2; ctx.beginPath();
+      for (const p of parts) { p.y += p.sp; p.x += p.sp * 0.28; if (p.y > h) { p.y = -p.len; p.x = Math.random() * w; } ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.sp * 0.5, p.y - p.len); }
+      ctx.stroke();
+      if (flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (flash * 0.12).toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); flash -= 0.05; }
+      else if (Math.random() < 0.0025) flash = 1;
+    } else if (mode.kind === 'snow') {
       ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.85;
       for (const p of parts) { p.ph += 0.02; p.y += p.sp; p.x += Math.sin(p.ph) * 0.4; if (p.y > h) { p.y = -4; p.x = Math.random() * w; } ctx.fillRect(p.x | 0, p.y | 0, p.sz, p.sz); }
       ctx.globalAlpha = 1;
