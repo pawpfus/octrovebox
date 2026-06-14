@@ -1578,7 +1578,7 @@ function addTx(e) {
       id: newId(), type: currentType, desc, amount, category,
       freq: rep, nextDue: addPeriod(pickerDate, rep), lastRun: pickerDate,
     });
-    showToast('🔁 AUTO-PILOT SET: ' + freqLabel(rep) + ' "' + desc + '"');
+    showToast('🔁 REPEAT SET: ' + freqLabel(rep) + ' "' + desc + '"');
   }
   if (els.repeatInput) els.repeatInput.value = 'off';
   save();

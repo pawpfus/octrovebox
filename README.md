@@ -59,8 +59,8 @@ A pixel bar chart of the last six months, with paired green (earn) / red (spend)
 ### 🔒 PIN lock + at-rest encryption
 An optional 4-digit app lock (set it in Options). A pixel keypad gates the app on launch and re-locks after the app has been backgrounded for a while. Setting a PIN also **encrypts your save at rest** — the whole data store is sealed with AES-GCM, keyed by a PBKDF2 hash of your PIN, using the browser's built-in WebCrypto (still **100% offline**, no libraries). On disk your entries become unreadable ciphertext, and entering the correct PIN is what decrypts them. Because of that, **a forgotten PIN means the data cannot be recovered** — so keep a backup. (On older browsers without WebCrypto it falls back to a salted-hash UI gate without encryption.)
 
-### 🔁 Auto-Pilot (recurring entries)
-Tick **🔁 REPEAT** when adding an entry to turn it into a recurring rule — perfect for salary, rent, or subscriptions. Octrovebox then **auto-logs it every week or month**, even catching up on any occurrences you missed while away (monthly rules clamp cleanly to short months, so a "31st" rule never skips February). View or stop your rules anytime from the **AUTO-PILOT** panel.
+### 🔁 Repeat (recurring entries)
+Tick **🔁 REPEAT** when adding an entry to turn it into a recurring rule — perfect for salary, rent, or subscriptions. Octrovebox then **auto-logs it every week or month**, even catching up on any occurrences you missed while away (monthly rules clamp cleanly to short months, so a "31st" rule never skips February). View or stop your rules anytime from the **ON REPEAT** list right under the New Entry form.
 
 ### 💱 Currency & locale
 Pick your currency in Options — Rupiah, US Dollar, Euro, Pound, Yen, Rupee, Won, and many more. Every figure, chart, and input re-formats instantly with the right symbol and digit grouping for that locale.
