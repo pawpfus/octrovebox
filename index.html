@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=89" />
+  <link rel="stylesheet" href="styles.css?v=90" />
 </head>
 
 <body>
@@ -222,6 +222,17 @@
                 class="df-ico">📅</span></button>
           </label>
 
+          <label class="field">
+            <span class="field-label">🔁 REPEAT (AUTO-PILOT)</span>
+            <div class="select-wrap">
+              <select id="repeatInput">
+                <option value="off">DON'T REPEAT</option>
+                <option value="weekly">EVERY WEEK</option>
+                <option value="monthly">EVERY MONTH</option>
+              </select>
+            </div>
+          </label>
+
           <button type="submit" class="submit-btn" id="submitBtn">⮞ ADD ENTRY</button>
         </form>
       </section>
@@ -270,6 +281,24 @@
         </div>
       </div>
       <div class="chart" id="chart"></div>
+    </section>
+
+    <!-- ===== AUTO-PILOT — recurring entries ===== -->
+    <section class="panel recur-panel">
+      <button type="button" class="vault-banner" id="recurToggle">
+        <span class="vault-dial">🔁</span>
+        <span class="qb-text">
+          <span class="vault-title">🔁 AUTO-PILOT</span>
+          <span class="vault-sub" id="recurSub">AUTO-LOG SALARY, RENT…</span>
+        </span>
+        <span class="qb-arrow">▼</span>
+      </button>
+      <div class="vault-scroll" id="recurScroll" hidden>
+        <div class="recur-list" id="recurList"></div>
+        <div class="empty-state small" id="recurEmpty">
+          <p>NO RECURRING ENTRIES YET.<br />SET "🔁 REPEAT" WHEN ADDING ONE!</p>
+        </div>
+      </div>
     </section>
 
     <!-- ===== SIDE QUESTS — RPG quest board ===== -->
@@ -340,6 +369,10 @@
         <span class="qb-arrow" id="optArrow">▼</span>
       </button>
       <div class="vault-scroll" id="optScroll" hidden>
+        <label class="field opt-field">
+          <span class="field-label">💱 CURRENCY</span>
+          <div class="select-wrap"><select id="currencySelect"></select></div>
+        </label>
         <div class="foot-actions">
           <button class="io-btn" id="recapBtn">📜 RECAP</button>
           <button class="io-btn" id="backupBtn">💾 BACKUP</button>
@@ -417,13 +450,29 @@
     </div>
   </div>
 
+  <!-- first-run onboarding tour -->
+  <div class="onboard-overlay" id="onboardOverlay" hidden>
+    <div class="onboard-card">
+      <div class="ob-art" id="obArt">🎮</div>
+      <div class="ob-title" id="obTitle">WELCOME TO OCTROVEBOX</div>
+      <p class="ob-body" id="obBody"></p>
+      <div class="ob-dots" id="obDots"></div>
+      <div class="ob-actions">
+        <button type="button" class="io-btn ob-skip" id="obSkip">SKIP</button>
+        <button type="button" class="io-btn ob-back" id="obBack" hidden>◀ BACK</button>
+        <button type="button" class="submit-btn ob-next" id="obNext">NEXT ▶</button>
+      </div>
+      <button type="button" class="ob-sample" id="obSample" hidden>🎁 LOAD SAMPLE DATA TO EXPLORE</button>
+    </div>
+  </div>
+
   <!-- combo meter popup (rapid-logging multiplier) -->
   <div class="combo-pop" id="comboPop" aria-hidden="true"></div>
 
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=89"></script>
+  <script src="app.js?v=90"></script>
 </body>
 
 </html>

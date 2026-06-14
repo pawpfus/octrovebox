@@ -4,6 +4,7 @@
 ============================================================ */
 
 const STORE_KEY = 'coinQuest.v1';
+const SCHEMA = 2;               // data schema version (bump when the save shape changes)
 
 const CATEGORIES = {
   expense: [
@@ -53,6 +54,12 @@ let state = {
   bountyStreak: 0,      // weeks where all bounties were cleared
   bountyClaimed: '',    // week key already celebrated as complete
   pinHash: null,        // hash of the app-lock PIN (null = no lock)
+  schema: SCHEMA,       // data schema version (for backups / migrations)
+  currency: 'IDR',      // active currency code (see CURRENCIES)
+  recurring: [],        // auto-pilot templates: { id, type, desc, amount, category, freq, nextDue, lastRun }
+  lastBackup: 0,        // ts of the last exported backup (0 = never)
+  backupNudge: '',      // YYYY-MM-DD we last reminded about backing up
+  onboarded: false,     // has the first-run tour been seen/dismissed?
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -119,6 +126,15 @@ const els = {
   lockOverlay: $('lockOverlay'), lockSub: $('lockSub'), lockDots: $('lockDots'), lockPad: $('lockPad'),
   lockForgot: $('lockForgot'), lockCancel: $('lockCancel'),
   pinSetBtn: $('pinSetBtn'), pinOffBtn: $('pinOffBtn'),
+  // currency
+  currencySelect: $('currencySelect'),
+  // recurring (auto-pilot)
+  repeatInput: $('repeatInput'),
+  recurToggle: $('recurToggle'), recurScroll: $('recurScroll'), recurList: $('recurList'),
+  recurEmpty: $('recurEmpty'), recurSub: $('recurSub'),
+  // onboarding tour
+  onboardOverlay: $('onboardOverlay'), obArt: $('obArt'), obTitle: $('obTitle'), obBody: $('obBody'),
+  obDots: $('obDots'), obNext: $('obNext'), obBack: $('obBack'), obSkip: $('obSkip'), obSample: $('obSample'),
 };
 
 /* ============================================================
@@ -163,24 +179,84 @@ const sfx = {
 /* ============================================================
    PERSISTENCE
 ============================================================ */
+// when a PIN is set we encrypt the whole save at rest with AES-GCM, keyed by a
+// PBKDF2 hash of the PIN. WebCrypto is async, so save() chains writes; load()
+// stashes the encrypted blob until the PIN unlocks it (see attemptUnlock).
+const CRYPTO_OK = !!(window.crypto && window.crypto.subtle);
+let cryptoKey = null;          // derived AES-GCM key (set once a PIN is active)
+let cryptoSalt = null;         // Uint8Array salt paired with the key
+let encryptedWrapper = null;   // parsed { enc } blob from disk, awaiting the PIN
+let saveChain = Promise.resolve();
+const b64 = (bytes) => btoa(String.fromCharCode.apply(null, bytes));
+const unb64 = (str) => Uint8Array.from(atob(str), (ch) => ch.charCodeAt(0));
+
+async function deriveKey(pin, saltBytes) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode('octrovebox:' + pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: saltBytes, iterations: 150000, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+async function encryptAndStore(plaintext) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ctBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(plaintext));
+  const wrapper = { v: 1, enc: 'aesgcm', salt: b64(cryptoSalt), iv: b64(iv), ct: b64(new Uint8Array(ctBuf)) };
+  localStorage.setItem(STORE_KEY, JSON.stringify(wrapper));
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) state = { ...state, ...JSON.parse(raw) };
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.enc === 'aesgcm') { encryptedWrapper = parsed; return; } // need the PIN first
+    state = { ...state, ...parsed };
   } catch (e) { /* ignore corrupt save */ }
 }
 function save() {
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  if (!cryptoKey) { localStorage.setItem(STORE_KEY, JSON.stringify(state)); return; }
+  // snapshot now (state may mutate before the async write lands) and chain the
+  // writes so concurrent saves can't race — last write wins
+  const snapshot = JSON.stringify(state);
+  saveChain = saveChain.then(() => encryptAndStore(snapshot)).catch(() => {});
 }
 
 /* ============================================================
    HELPERS
 ============================================================ */
-const fmt = (n) => {
-  const neg = n < 0;
-  const v = Math.abs(n).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  return (neg ? '-Rp' : 'Rp') + v;
+// supported currencies — symbol drives the prefix, locale drives digit grouping,
+// frac = how many decimal places to show (0 for zero-decimal currencies)
+const CURRENCIES = {
+  IDR: { symbol: 'Rp',  locale: 'id-ID', frac: 0, name: 'INDONESIAN RUPIAH' },
+  USD: { symbol: '$',   locale: 'en-US', frac: 2, name: 'US DOLLAR' },
+  EUR: { symbol: '€',   locale: 'de-DE', frac: 2, name: 'EURO' },
+  GBP: { symbol: '£',   locale: 'en-GB', frac: 2, name: 'BRITISH POUND' },
+  JPY: { symbol: '¥',   locale: 'ja-JP', frac: 0, name: 'JAPANESE YEN' },
+  INR: { symbol: '₹',   locale: 'en-IN', frac: 0, name: 'INDIAN RUPEE' },
+  CNY: { symbol: '¥',   locale: 'zh-CN', frac: 2, name: 'CHINESE YUAN' },
+  KRW: { symbol: '₩',   locale: 'ko-KR', frac: 0, name: 'KOREAN WON' },
+  SGD: { symbol: 'S$',  locale: 'en-SG', frac: 2, name: 'SINGAPORE DOLLAR' },
+  MYR: { symbol: 'RM',  locale: 'ms-MY', frac: 2, name: 'MALAYSIAN RINGGIT' },
+  PHP: { symbol: '₱',   locale: 'en-PH', frac: 2, name: 'PHILIPPINE PESO' },
+  THB: { symbol: '฿',   locale: 'th-TH', frac: 2, name: 'THAI BAHT' },
+  VND: { symbol: '₫',   locale: 'vi-VN', frac: 0, name: 'VIETNAMESE DONG' },
+  AUD: { symbol: 'A$',  locale: 'en-AU', frac: 2, name: 'AUSTRALIAN DOLLAR' },
+  CAD: { symbol: 'C$',  locale: 'en-CA', frac: 2, name: 'CANADIAN DOLLAR' },
+  BRL: { symbol: 'R$',  locale: 'pt-BR', frac: 2, name: 'BRAZILIAN REAL' },
+  ZAR: { symbol: 'R',   locale: 'en-ZA', frac: 2, name: 'SOUTH AFRICAN RAND' },
+  NGN: { symbol: '₦',   locale: 'en-NG', frac: 0, name: 'NIGERIAN NAIRA' },
 };
+const cur = () => CURRENCIES[state.currency] || CURRENCIES.IDR;
+const fmt = (n) => {
+  const c = cur();
+  const neg = n < 0;
+  const v = Math.abs(n).toLocaleString(c.locale, { minimumFractionDigits: 0, maximumFractionDigits: c.frac });
+  return (neg ? '-' + c.symbol : c.symbol) + v;
+};
+// monotonic unique id — never collides even when several entries are created in the
+// same millisecond (e.g. recurring catch-up)
+let lastId = 0;
+function newId() { let id = Date.now(); if (id <= lastId) id = lastId + 1; lastId = id; return id; }
 function catInfo(type, id) {
   return CATEGORIES[type].find((c) => c.id === id) || { name: id, icon: '❓' };
 }
@@ -540,9 +616,10 @@ function renderStreak() {
 
 /* ---------------- WORLD MAP CHART (last 6 months) ---------------- */
 function kfmt(n) {
-  if (n >= 1000000) return 'Rp' + (n / 1000000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'jt';
-  if (n >= 1000) return 'Rp' + (n / 1000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'rb';
-  return 'Rp' + Math.round(n).toLocaleString('id-ID');
+  const c = cur();
+  if (n >= 1000000) return c.symbol + (n / 1000000).toLocaleString(c.locale, { maximumFractionDigits: 1 }) + 'M';
+  if (n >= 1000) return c.symbol + (n / 1000).toLocaleString(c.locale, { maximumFractionDigits: 1 }) + 'K';
+  return c.symbol + Math.round(n).toLocaleString(c.locale);
 }
 function renderChart() {
   const now = new Date();
@@ -1211,6 +1288,160 @@ function maybeEncounter() {
   setTimeout(() => { showToast(e.msg); if (e.coins) coinRain(e.coins); }, 750);
 }
 
+/* ============================================================
+   RECURRING TRANSACTIONS (AUTO-PILOT) — templates that auto-log
+   themselves on a weekly / monthly schedule, catching up on boot.
+============================================================ */
+// advance a timestamp by one period; monthly clamps to the month's last day
+// (e.g. Jan 31 -> Feb 28) so a "31st" rule never skips short months
+function addPeriod(ts, freq) {
+  const d = new Date(ts);
+  if (freq === 'weekly') { d.setDate(d.getDate() + 7); return d.getTime(); }
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + 1);
+  const dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, dim));
+  return d.getTime();
+}
+const freqLabel = (f) => (f === 'weekly' ? 'WEEKLY' : 'MONTHLY');
+// log any recurring entries whose next-due date has arrived. Returns how many
+// were added. A guard caps catch-up so a long-dormant rule can't loop forever.
+function runRecurring() {
+  const list = state.recurring || [];
+  if (!list.length) return 0;
+  const end = new Date(); end.setHours(23, 59, 59, 999);
+  const cap = end.getTime();
+  let added = 0;
+  list.forEach((r) => {
+    let guard = 0;
+    while (r.nextDue <= cap && guard < 240) {
+      state.transactions.push({
+        id: newId(), date: r.nextDue, type: r.type,
+        desc: r.desc, amount: r.amount, category: r.category, auto: true,
+      });
+      r.lastRun = r.nextDue;
+      r.nextDue = addPeriod(r.nextDue, r.freq);
+      added += 1; guard += 1;
+    }
+  });
+  if (added) save();
+  return added;
+}
+function renderRecurring() {
+  if (!els.recurList) return;
+  const list = state.recurring || [];
+  els.recurEmpty.style.display = list.length ? 'none' : 'block';
+  els.recurSub.textContent = list.length ? list.length + ' ACTIVE RULE' + (list.length > 1 ? 'S' : '') : 'AUTO-LOG SALARY, RENT…';
+  els.recurList.innerHTML = '';
+  list.slice().sort((a, b) => a.nextDue - b.nextDue).forEach((r) => {
+    const c = catInfo(r.type, r.category);
+    const next = new Date(r.nextDue).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const row = document.createElement('div');
+    row.className = 'recur-row';
+    row.innerHTML = `
+      <span class="rc-ico">${r.freq === 'weekly' ? '📅' : '🗓️'}</span>
+      <span class="rc-body">
+        <span class="rc-name">${escapeHtml(r.desc)}</span>
+        <span class="rc-meta">${c.name} · ${freqLabel(r.freq)} · NEXT ${next}</span>
+      </span>
+      <span class="rc-amt ${r.type}">${r.type === 'income' ? '+' : '-'}${fmt(r.amount).replace('-', '')}</span>
+      <button class="rc-del" title="Stop repeating" data-id="${r.id}">✕</button>`;
+    els.recurList.appendChild(row);
+  });
+}
+function removeRecurring(id) {
+  state.recurring = (state.recurring || []).filter((r) => r.id !== Number(id));
+  save(); sfx.delete(); renderRecurring();
+  showToast('🔁 RECURRING RULE STOPPED');
+}
+
+/* ============================================================
+   AUTO-BACKUP REMINDER — a gentle nudge to export a backup when
+   data is piling up and hasn't been saved off-device in a while.
+============================================================ */
+const BACKUP_INTERVAL = 14 * 86400000; // 14 days
+function maybeBackupReminder() {
+  if (state.transactions.length < 8) return;
+  if (Date.now() - (state.lastBackup || 0) < BACKUP_INTERVAL) return;
+  if (state.backupNudge === todayStr()) return;     // already nudged today
+  state.backupNudge = todayStr(); save();
+  setTimeout(() => showToast('💾 TIP: BACK UP YOUR DATA — OPTIONS ▸ BACKUP'), 3800);
+}
+
+/* ============================================================
+   ONBOARDING — a short first-run tour for brand-new players, with
+   an option to load explorable sample data.
+============================================================ */
+const OB_STEPS = [
+  { art: '🎮', title: 'WELCOME TO OCTROVEBOX', body: 'Track your money like a retro RPG. Earn gold, fight the Budget Boss, and complete quests — all saved privately on your own device.' },
+  { art: '★',  title: 'SET YOUR BALANCE',     body: 'Tap START ✎ on the BALANCE card to enter how much money you have right now. Everything else builds from there.' },
+  { art: '⮞',  title: 'LOG AN ENTRY',         body: 'Use + NEW ENTRY to record what you SPEND or EARN. Set REPEAT to auto-log salary, rent, or subscriptions every week or month.' },
+  { art: '⚔️', title: 'BEAT THE BOSS',        body: 'Set a monthly budget to spawn the Budget Boss, chase savings quests, and unlock skins, zones, and music as your gold grows.' },
+];
+let obIdx = 0;
+function renderOnboard() {
+  const s = OB_STEPS[obIdx];
+  els.obArt.textContent = s.art;
+  els.obTitle.textContent = s.title;
+  els.obBody.textContent = s.body;
+  els.obBack.hidden = obIdx === 0;
+  const last = obIdx === OB_STEPS.length - 1;
+  els.obNext.textContent = last ? '▶ START' : 'NEXT ▶';
+  els.obSample.hidden = !last;
+  els.obDots.innerHTML = OB_STEPS.map((_, i) => `<span class="ob-dot${i === obIdx ? ' on' : ''}"></span>`).join('');
+}
+function showOnboard() { obIdx = 0; renderOnboard(); els.onboardOverlay.hidden = false; }
+function finishOnboard(sample) {
+  state.onboarded = true; save();
+  els.onboardOverlay.hidden = true;
+  if (sample) loadSampleData(); else sfx.click();
+}
+function maybeOnboard() {
+  if (!state.onboarded && state.transactions.length === 0) showOnboard();
+}
+function loadSampleData() {
+  const now = Date.now(), day = 86400000;
+  state.openingBalance = 2000000;
+  state.budget = 3000000;
+  state.budgetBreached = false;
+  state.goal = { name: 'NEW LAPTOP', target: 15000000 };
+  state.goalCelebrated = false;
+  const samp = [
+    ['income',  'MONTHLY SALARY', 'salary',  8000000, 28],
+    ['expense', 'GROCERIES',      'food',     350000, 25],
+    ['expense', 'BUS PASS',       'transit',  200000, 24],
+    ['expense', 'MOVIE NIGHT',    'fun',      120000, 20],
+    ['expense', 'ELECTRIC BILL',  'bills',    450000, 18],
+    ['income',  'FREELANCE GIG',  'side',    1500000, 15],
+    ['expense', 'MORNING COFFEE', 'food',      45000, 12],
+    ['expense', 'NEW SHOES',      'shop',     600000,  8],
+    ['expense', 'PHARMACY',       'health',    90000,  5],
+    ['expense', 'LUNCH OUT',      'food',      75000,  2],
+  ];
+  samp.forEach(([type, desc, category, amount, ago]) => {
+    state.transactions.push({ id: newId(), date: now - ago * day, type, desc, amount, category });
+  });
+  save(); sfx.victory(); coinRain(24);
+  renderAll();
+  showToast('🎁 SAMPLE DATA LOADED — EXPLORE AWAY!');
+}
+
+/* reflect the chosen currency everywhere: the symbol prefixes on inputs and the
+   amount placeholder. Number rendering itself flows through fmt()/kfmt(). */
+function applyCurrency() {
+  const c = cur();
+  document.querySelectorAll('.dollar, .dollar2').forEach((el) => { el.textContent = c.symbol; });
+  if (els.amount) els.amount.placeholder = c.frac ? '0.00' : '0';
+  if (els.currencySelect) els.currencySelect.value = state.currency;
+}
+function fillCurrencySelect() {
+  if (!els.currencySelect) return;
+  els.currencySelect.innerHTML = Object.entries(CURRENCIES)
+    .map(([code, c]) => `<option value="${code}">${c.symbol} ${code} · ${c.name}</option>`).join('');
+  els.currencySelect.value = state.currency;
+}
+
 function renderAll(prevLevel) {
   renderStats(prevLevel);
   renderList();
@@ -1225,6 +1456,7 @@ function renderAll(prevLevel) {
   renderOracle();
   renderThemes();
   renderChest();
+  renderRecurring();
   renderZone();
   renderWeather();
 }
@@ -1327,14 +1559,26 @@ function addTx(e) {
 
   const prevLevel = levelFor(totals().income);
 
+  const category = els.category.value;
   state.transactions.push({
-    id: Date.now(),
+    id: newId(),
     date: pickerDate,
     type: currentType,
     desc,
     amount,
-    category: els.category.value,
+    category,
   });
+
+  // "repeat" set → also create an auto-pilot rule, due one period from this entry
+  const rep = els.repeatInput ? els.repeatInput.value : 'off';
+  if (rep === 'weekly' || rep === 'monthly') {
+    state.recurring.push({
+      id: newId(), type: currentType, desc, amount, category,
+      freq: rep, nextDue: addPeriod(pickerDate, rep), lastRun: pickerDate,
+    });
+    showToast('🔁 AUTO-PILOT SET: ' + freqLabel(rep) + ' "' + desc + '"');
+  }
+  if (els.repeatInput) els.repeatInput.value = 'off';
   save();
 
   currentType === 'income' ? sfx.coin() : sfx.spend();
@@ -1544,6 +1788,7 @@ function buildReport() {
 /* ---- backup (export JSON) & restore (import JSON) ---- */
 function exportBackup() {
   sfx.click();
+  state.lastBackup = Date.now(); state.schema = SCHEMA; save();
   const json = JSON.stringify(state, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1567,6 +1812,7 @@ function importBackup(file) {
     if (!data || !Array.isArray(data.transactions)) {
       sfx.error(); showToast('⚠ NOT AN OCTROVEBOX BACKUP'); return;
     }
+    if (Number(data.schema) > SCHEMA && !confirm('This backup is from a NEWER version of Octrovebox.\nSome data may not load correctly. Restore anyway?')) return;
     if (!confirm('RESTORE THIS BACKUP?\nIt will REPLACE your current data.')) return;
     state.transactions = data.transactions;
     state.openingBalance = Number(data.openingBalance) || 0;
@@ -1593,10 +1839,17 @@ function importBackup(file) {
     state.bounties = (data.bounties && typeof data.bounties === 'object') ? data.bounties : null;
     state.bountyStreak = Number(data.bountyStreak) || 0;
     state.bountyClaimed = data.bountyClaimed || '';
+    state.currency = (data.currency && CURRENCIES[data.currency]) ? data.currency : 'IDR';
+    state.recurring = Array.isArray(data.recurring) ? data.recurring : [];
+    state.lastBackup = Number(data.lastBackup) || 0;
+    state.schema = Number(data.schema) || 1;
+    state.onboarded = true; // an imported save means an existing player — skip the tour
+    // NOTE: pinHash is intentionally NOT imported, so a backup never locks this device
     save();
     sfx.coin();
     showToast('📂 BACKUP RESTORED! ' + state.transactions.length + ' ENTRIES');
     els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
+    applyCurrency();
     renderAll();
   };
   reader.onerror = () => { sfx.error(); showToast('⚠ COULD NOT READ FILE'); };
@@ -1738,6 +1991,38 @@ function showLock(mode, onSet) {
   renderLockDots();
 }
 function hideLock() { els.lockOverlay.hidden = true; lock.buf = ''; lock.first = ''; }
+// verify an entered PIN. In encrypted mode, success == the blob decrypts; in the
+// legacy hash-only mode (or no WebCrypto), success == the salted hash matches.
+async function attemptUnlock(pin) {
+  if (encryptedWrapper) {
+    try {
+      const salt = unb64(encryptedWrapper.salt);
+      const key = await deriveKey(pin, salt);
+      const ptBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(encryptedWrapper.iv) }, key, unb64(encryptedWrapper.ct));
+      state = { ...state, ...JSON.parse(new TextDecoder().decode(ptBuf)) };
+      cryptoKey = key; cryptoSalt = salt; encryptedWrapper = null;
+      return true;
+    } catch (e) { return false; }
+  }
+  return pinHashOf(pin) === state.pinHash;
+}
+// turn the lock on: derive a key (so the next save() encrypts) and store a marker hash
+async function enablePin(pin) {
+  state.pinHash = pinHashOf(pin);          // marker + fast in-session re-lock check
+  if (CRYPTO_OK) {
+    cryptoSalt = crypto.getRandomValues(new Uint8Array(16));
+    cryptoKey = await deriveKey(pin, cryptoSalt);
+  }
+  save();                                   // encrypts now if a key was derived
+  sfx.victory(); hideLock(); renderPinButtons();
+  showToast(CRYPTO_OK ? '🔒 PIN LOCK ON — DATA ENCRYPTED' : '🔒 PIN LOCK ON');
+  if (lock.onSet) lock.onSet();
+}
+// turn the lock off: drop the key so the next save() writes plain text
+function disablePin() {
+  state.pinHash = null; cryptoKey = null; cryptoSalt = null;
+  save(); renderPinButtons();
+}
 function lockKey(k) {
   if (k === 'cancel') { if (lock.mode === 'set') { hideLock(); sfx.click(); } return; }
   if (k === 'del') { lock.buf = lock.buf.slice(0, -1); renderLockDots(); return; }
@@ -1749,16 +2034,25 @@ function lockKey(k) {
   // a full PIN was entered — act on it
   setTimeout(() => {
     if (lock.mode === 'unlock') {
-      if (pinHashOf(lock.buf) === state.pinHash) { sfx.click(); hideLock(); }
-      else { lockShake(); sfx.error(); els.lockSub.textContent = 'WRONG PIN — TRY AGAIN'; lock.buf = ''; renderLockDots(); }
+      attemptUnlock(lock.buf).then((ok) => {
+        if (ok) {
+          sfx.click(); hideLock();
+          if (!appReady) {                  // first unlock after an encrypted boot
+            finishBoot();
+            setMusicLabel();
+            if (state.musicOn) { try { startMusic(); } catch (e) {} }
+          }
+        } else {
+          lockShake(); sfx.error(); els.lockSub.textContent = 'WRONG PIN — TRY AGAIN';
+          lock.buf = ''; renderLockDots();
+        }
+      });
     } else if (lock.mode === 'set') {
       lock.first = lock.buf; lock.buf = ''; lock.mode = 'confirm';
       els.lockSub.textContent = 'CONFIRM PIN'; renderLockDots();
     } else { // confirm
       if (lock.buf === lock.first) {
-        state.pinHash = pinHashOf(lock.buf); save();
-        sfx.victory(); hideLock(); renderPinButtons(); showToast('🔒 PIN LOCK ON');
-        if (lock.onSet) lock.onSet();
+        enablePin(lock.first);
       } else {
         lockShake(); sfx.error(); lock.mode = 'set'; lock.first = ''; lock.buf = '';
         els.lockSub.textContent = "PINS DIDN'T MATCH — SET PIN"; renderLockDots();
@@ -1799,16 +2093,53 @@ els.chestBtn.addEventListener('click', openChest);
 // PIN lock wiring
 els.lockPad.addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (b) lockKey(b.dataset.k); });
 els.lockForgot.addEventListener('click', () => {
-  if (confirm('Forgot your PIN?\nThis removes the lock but KEEPS all your data.')) {
-    state.pinHash = null; save(); hideLock(); renderPinButtons(); showToast('🔓 LOCK REMOVED — DATA KEPT');
+  if (encryptedWrapper) {
+    // the save is encrypted with the forgotten PIN — it cannot be recovered
+    if (confirm('Forgot your PIN?\n\nYour data is ENCRYPTED with it and CANNOT be recovered.\nContinuing will ERASE your save and start fresh.')) {
+      localStorage.removeItem(STORE_KEY);
+      location.reload();
+    }
+  } else if (confirm('Forgot your PIN?\nThis removes the lock but KEEPS all your data.')) {
+    disablePin(); hideLock(); showToast('🔓 LOCK REMOVED — DATA KEPT');
   }
 });
 els.pinSetBtn.addEventListener('click', () => showLock('set'));
 els.pinOffBtn.addEventListener('click', () => {
-  if (state.pinHash && confirm('Turn off the PIN lock?')) {
-    state.pinHash = null; save(); renderPinButtons(); sfx.click(); showToast('🔓 PIN LOCK OFF');
+  if (state.pinHash && confirm('Turn off the PIN lock?' + (CRYPTO_OK ? '\nYour data will be decrypted and stored as plain text.' : ''))) {
+    disablePin(); sfx.click(); showToast('🔓 PIN LOCK OFF');
   }
 });
+
+// currency picker — re-render everything so all figures pick up the new format
+if (els.currencySelect) els.currencySelect.addEventListener('change', () => {
+  if (!CURRENCIES[els.currencySelect.value]) return;
+  state.currency = els.currencySelect.value;
+  save(); sfx.coin();
+  applyCurrency();
+  renderAll();
+  showToast('💱 CURRENCY: ' + state.currency + ' ' + cur().symbol);
+});
+
+// auto-pilot (recurring) panel
+if (els.recurToggle) els.recurToggle.addEventListener('click', () => {
+  const opening = els.recurScroll.hidden;
+  els.recurScroll.hidden = !opening;
+  els.recurToggle.classList.toggle('open', opening);
+  if (opening) beep([330, 440, 587], 0.06, 'square', 0.04); else sfx.click();
+});
+if (els.recurList) els.recurList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.rc-del');
+  if (btn) removeRecurring(btn.dataset.id);
+});
+
+// onboarding tour
+if (els.obNext) els.obNext.addEventListener('click', () => {
+  if (obIdx >= OB_STEPS.length - 1) { finishOnboard(false); return; }
+  obIdx += 1; renderOnboard(); sfx.click();
+});
+if (els.obBack) els.obBack.addEventListener('click', () => { if (obIdx > 0) { obIdx -= 1; renderOnboard(); sfx.click(); } });
+if (els.obSkip) els.obSkip.addEventListener('click', () => finishOnboard(false));
+if (els.obSample) els.obSample.addEventListener('click', () => finishOnboard(true));
 
 /* ---- pokeable sprites: little reactive easter-eggs for extra game feel ---- */
 function wiggle(el) {
@@ -1921,25 +2252,37 @@ els.mute.addEventListener('click', () => {
 /* ============================================================
    BOOT
 ============================================================ */
-function init() {
-  load();
+// everything that needs the real (decrypted) state — runs immediately for a
+// plaintext save, or only after a correct PIN unlocks an encrypted one
+function finishBoot() {
   els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
   applyTheme(state.theme);
+  applyCurrency();
   document.body.classList.toggle('rainbow', !!state.rainbow);
   fillCategories();
   fillCatBudgetSelect();
   fillCatFilter();
   setDateToday();
+  const added = runRecurring();          // auto-log any due recurring entries
   renderAll();
-
-  // seed a friendly demo entry the very first time
-  if (state.transactions.length === 0 && !localStorage.getItem(STORE_KEY)) {
-    showToast('WELCOME! ADD YOUR FIRST ENTRY ⮞');
-  }
+  if (added) showToast('🔁 ' + added + ' RECURRING ENTR' + (added > 1 ? 'IES' : 'Y') + ' LOGGED');
   appReady = true; // from now on, completing a side quest celebrates
   typeOracle();    // type out the first Oracle tip for that RPG-textbox feel
+  maybeBackupReminder();
+  maybeOnboard();
+}
+function init() {
+  load();
+  fillCurrencySelect();
   renderPinButtons();
-  if (state.pinHash) showLock('unlock'); // gate the UI until the PIN is entered
+  if (encryptedWrapper) {
+    // the save is encrypted — gate first; finishBoot() runs after a correct PIN
+    els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
+    showLock('unlock');
+    return;
+  }
+  finishBoot();
+  if (state.pinHash) showLock('unlock'); // legacy hash-gate (plaintext save + PIN)
 }
 init();
 
