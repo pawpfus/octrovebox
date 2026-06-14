@@ -2371,9 +2371,10 @@ function setFxLabel() {
   if (!cv) return;
   const ctx = cv.getContext('2d');
 
-  // zone -> particle mode (+ palette for motes / fish)
+  // zone -> particle mode (+ palette for motes / fish). NEON CITY has no ambient
+  // float — its rain is the budget-driven weather layer (the faster drops), so
+  // we don't double up with a second, slower rain here.
   const MODES = {
-    city:     { kind: 'rain' },
     peak:     { kind: 'snow' },
     undersea: { kind: 'fish',  cols: ['#ff9f1c', '#2fd0c0', '#ff6bc4', '#ffd23f'] },
     meadow:   { kind: 'mote',  cols: ['#6cd957', '#a8e063', '#ffd23f'] },   // pollen / leaves
@@ -2395,10 +2396,7 @@ function setFxLabel() {
     parts = [];
     if (!mode) return;
     const mob = w <= 600;
-    if (mode.kind === 'rain') {
-      const n = dens(9000, 44);
-      for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, len: rnd(10, 18), sp: rnd(2.5, 5) });
-    } else if (mode.kind === 'snow') {
+    if (mode.kind === 'snow') {
       const n = dens(14000, 38);
       for (let i = 0; i < n; i++) parts.push({ x: Math.random() * w, y: Math.random() * h, sz: rnd(mob ? 3 : 2, mob ? 6 : 4) | 0, sp: rnd(0.5, 1.6), ph: Math.random() * 6.28 });
     } else if (mode.kind === 'fish') {
@@ -2432,13 +2430,7 @@ function setFxLabel() {
     if (z !== key) { key = z; mode = MODES[z] || null; build(); }
     ctx.clearRect(0, 0, w, h);
     if (!mode) return;
-    if (mode.kind === 'rain') {
-      const mob = w <= 600;
-      ctx.strokeStyle = mob ? 'rgba(170,198,255,.58)' : 'rgba(160,190,255,.5)';
-      ctx.lineWidth = 2; ctx.beginPath();
-      for (const p of parts) { p.y += p.sp; p.x += p.sp * 0.18; if (p.y > h) { p.y = -p.len; p.x = Math.random() * w; } ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.sp * 0.36, p.y - p.len); }
-      ctx.stroke();
-    } else if (mode.kind === 'snow') {
+    if (mode.kind === 'snow') {
       ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.85;
       for (const p of parts) { p.ph += 0.02; p.y += p.sp; p.x += Math.sin(p.ph) * 0.4; if (p.y > h) { p.y = -4; p.x = Math.random() * w; } ctx.fillRect(p.x | 0, p.y | 0, p.sz, p.sz); }
       ctx.globalAlpha = 1;
