@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=88" />
+  <link rel="stylesheet" href="styles.css?v=89" />
 </head>
 
 <body>
@@ -348,6 +348,10 @@
           <button class="danger-btn" id="resetBtn">↺ ERASE SAVE FILE</button>
           <input type="file" id="restoreInput" accept="application/json,.json" hidden />
         </div>
+        <div class="pin-actions">
+          <button class="io-btn" id="pinSetBtn">🔒 SET PIN LOCK</button>
+          <button class="io-btn" id="pinOffBtn" hidden>🔓 REMOVE LOCK</button>
+        </div>
       </div>
     </section>
 
@@ -386,13 +390,40 @@
     </div>
   </div>
 
+  <!-- PIN lock overlay (privacy gate; fully offline) -->
+  <div class="lock-overlay" id="lockOverlay" hidden>
+    <div class="lock-card">
+      <div class="lock-logo">🔒</div>
+      <div class="lock-title">OCTROVEBOX</div>
+      <div class="lock-sub" id="lockSub">ENTER PIN</div>
+      <div class="lock-dots" id="lockDots">
+        <span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span>
+      </div>
+      <div class="lock-pad" id="lockPad">
+        <button type="button" data-k="1">1</button>
+        <button type="button" data-k="2">2</button>
+        <button type="button" data-k="3">3</button>
+        <button type="button" data-k="4">4</button>
+        <button type="button" data-k="5">5</button>
+        <button type="button" data-k="6">6</button>
+        <button type="button" data-k="7">7</button>
+        <button type="button" data-k="8">8</button>
+        <button type="button" data-k="9">9</button>
+        <button type="button" class="lock-aux" data-k="del">⌫</button>
+        <button type="button" data-k="0">0</button>
+        <button type="button" class="lock-aux" data-k="cancel" id="lockCancel">✕</button>
+      </div>
+      <button type="button" class="lock-forgot" id="lockForgot">FORGOT PIN?</button>
+    </div>
+  </div>
+
   <!-- combo meter popup (rapid-logging multiplier) -->
   <div class="combo-pop" id="comboPop" aria-hidden="true"></div>
 
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=88"></script>
+  <script src="app.js?v=89"></script>
 </body>
 
 </html>

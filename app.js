@@ -52,6 +52,7 @@ let state = {
   bounties: null,       // { week:'YYYY-MM-DD'(Monday), done:[ids] } — weekly bounty progress
   bountyStreak: 0,      // weeks where all bounties were cleared
   bountyClaimed: '',    // week key already celebrated as complete
+  pinHash: null,        // hash of the app-lock PIN (null = no lock)
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -114,6 +115,10 @@ const els = {
   // weekly bounties + combo meter
   bountyList: $('bountyList'), bountyReset: $('bountyReset'), bountyReward: $('bountyReward'),
   comboPop: $('comboPop'),
+  // PIN lock
+  lockOverlay: $('lockOverlay'), lockSub: $('lockSub'), lockDots: $('lockDots'), lockPad: $('lockPad'),
+  lockForgot: $('lockForgot'), lockCancel: $('lockCancel'),
+  pinSetBtn: $('pinSetBtn'), pinOffBtn: $('pinOffBtn'),
 };
 
 /* ============================================================
@@ -1694,6 +1699,80 @@ function escapeHtml(s) {
 }
 
 /* ============================================================
+   PIN LOCK — a fully-offline privacy gate. We store only a salted
+   hash of the 4-digit PIN (never the PIN itself). This blocks the
+   UI; it is NOT encryption (localStorage stays plaintext).
+============================================================ */
+const PIN_LEN = 4;
+const AUTO_LOCK_MS = 90000;             // re-lock after this long in the background
+const lock = { mode: 'unlock', buf: '', first: '', hiddenAt: 0, onSet: null };
+// lightweight salted hash (cyrb53) — privacy gate only, not cryptographic security
+function pinHashOf(pin) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  const s = 'octrovebox:' + pin;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+function renderLockDots() {
+  [...els.lockDots.children].forEach((d, i) => d.classList.toggle('on', i < lock.buf.length));
+}
+function lockShake() {
+  els.lockDots.animate(
+    [{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(8px)' }, { transform: 'translateX(0)' }],
+    { duration: 260 }
+  );
+}
+// open the overlay. mode 'unlock' (startup/resume) or 'set' (from Options).
+function showLock(mode, onSet) {
+  lock.mode = mode; lock.buf = ''; lock.first = ''; lock.onSet = onSet || null;
+  els.lockSub.textContent = mode === 'set' ? 'SET A 4-DIGIT PIN' : 'ENTER PIN';
+  els.lockForgot.hidden = mode !== 'unlock';
+  els.lockCancel.style.visibility = mode === 'set' ? 'visible' : 'hidden';
+  els.lockOverlay.hidden = false;
+  renderLockDots();
+}
+function hideLock() { els.lockOverlay.hidden = true; lock.buf = ''; lock.first = ''; }
+function lockKey(k) {
+  if (k === 'cancel') { if (lock.mode === 'set') { hideLock(); sfx.click(); } return; }
+  if (k === 'del') { lock.buf = lock.buf.slice(0, -1); renderLockDots(); return; }
+  if (lock.buf.length >= PIN_LEN) return;
+  if (state.soundOn) { try { beep([880], 0.03, 'square', 0.03); } catch (e) {} }
+  lock.buf += k;
+  renderLockDots();
+  if (lock.buf.length < PIN_LEN) return;
+  // a full PIN was entered — act on it
+  setTimeout(() => {
+    if (lock.mode === 'unlock') {
+      if (pinHashOf(lock.buf) === state.pinHash) { sfx.click(); hideLock(); }
+      else { lockShake(); sfx.error(); els.lockSub.textContent = 'WRONG PIN — TRY AGAIN'; lock.buf = ''; renderLockDots(); }
+    } else if (lock.mode === 'set') {
+      lock.first = lock.buf; lock.buf = ''; lock.mode = 'confirm';
+      els.lockSub.textContent = 'CONFIRM PIN'; renderLockDots();
+    } else { // confirm
+      if (lock.buf === lock.first) {
+        state.pinHash = pinHashOf(lock.buf); save();
+        sfx.victory(); hideLock(); renderPinButtons(); showToast('🔒 PIN LOCK ON');
+        if (lock.onSet) lock.onSet();
+      } else {
+        lockShake(); sfx.error(); lock.mode = 'set'; lock.first = ''; lock.buf = '';
+        els.lockSub.textContent = "PINS DIDN'T MATCH — SET PIN"; renderLockDots();
+      }
+    }
+  }, 90);
+}
+// reflect the current lock state in the Options buttons
+function renderPinButtons() {
+  els.pinSetBtn.textContent = state.pinHash ? '🔒 CHANGE PIN' : '🔒 SET PIN LOCK';
+  els.pinOffBtn.hidden = !state.pinHash;
+}
+
+/* ============================================================
    WIRING
 ============================================================ */
 els.form.addEventListener('submit', addTx);
@@ -1716,6 +1795,20 @@ els.optToggle.addEventListener('click', () => {
   if (opening) beep([392, 523], 0.05, 'square', 0.04); else sfx.click();
 });
 els.chestBtn.addEventListener('click', openChest);
+
+// PIN lock wiring
+els.lockPad.addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (b) lockKey(b.dataset.k); });
+els.lockForgot.addEventListener('click', () => {
+  if (confirm('Forgot your PIN?\nThis removes the lock but KEEPS all your data.')) {
+    state.pinHash = null; save(); hideLock(); renderPinButtons(); showToast('🔓 LOCK REMOVED — DATA KEPT');
+  }
+});
+els.pinSetBtn.addEventListener('click', () => showLock('set'));
+els.pinOffBtn.addEventListener('click', () => {
+  if (state.pinHash && confirm('Turn off the PIN lock?')) {
+    state.pinHash = null; save(); renderPinButtons(); sfx.click(); showToast('🔓 PIN LOCK OFF');
+  }
+});
 
 /* ---- pokeable sprites: little reactive easter-eggs for extra game feel ---- */
 function wiggle(el) {
@@ -1845,6 +1938,8 @@ function init() {
   }
   appReady = true; // from now on, completing a side quest celebrates
   typeOracle();    // type out the first Oracle tip for that RPG-textbox feel
+  renderPinButtons();
+  if (state.pinHash) showLock('unlock'); // gate the UI until the PIN is entered
 }
 init();
 
@@ -2133,9 +2228,16 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     stopMusic();
     if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
-  } else if (state.musicOn) {
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    startMusic();
+    lock.hiddenAt = Date.now();
+  } else {
+    // re-lock if a PIN is set and we were away long enough
+    if (state.pinHash && els.lockOverlay.hidden && lock.hiddenAt && Date.now() - lock.hiddenAt > AUTO_LOCK_MS) {
+      showLock('unlock');
+    }
+    if (state.musicOn) {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      startMusic();
+    }
   }
 });
 // browsers block audio until a gesture — if music was on last session, start on first interaction

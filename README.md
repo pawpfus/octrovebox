@@ -56,6 +56,9 @@ A `🔥 X MO` counter in the HUD counts consecutive completed months you stayed 
 ### 📊 World Map — 6-Month History
 A pixel bar chart of the last six months, with paired green (earn) / red (spend) columns and the current month highlighted.
 
+### 🔒 PIN lock
+An optional 4-digit app lock (set it in Options). A pixel keypad gates the app on launch and re-locks after the app has been backgrounded for a while. It's a fully **offline** privacy gate — only a salted hash of the PIN is stored, never the PIN itself — and a "Forgot PIN?" option removes the lock while keeping all your data. (Note: it blocks the UI but does not encrypt your data at rest.)
+
 ### 💾 Backup & Restore
 Export all your data to a `.json` file you can save anywhere, and import it back later — so you can move data between devices or keep it safe before clearing your browser. (Your data lives only in this browser's `localStorage`; clearing site data deletes it, so back up first.)
 

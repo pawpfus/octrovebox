@@ -2751,6 +2751,59 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 .bounty-reward.claimed { color: var(--gold); border-color: var(--gold-dk); }
 
 /* ============================================================
+   PIN LOCK — full-screen privacy gate + keypad
+============================================================ */
+.lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;            /* above everything, incl. CRT + toasts */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(150% 100% at 50% -25%, var(--panel) 0%, var(--bg) 70%),
+    var(--bg);
+}
+.lock-overlay[hidden] { display: none; }   /* must beat display:flex */
+.lock-card { width: 100%; max-width: 300px; text-align: center; }
+.lock-logo { font-size: 38px; margin-bottom: 8px; }
+.lock-title { font-family: 'Press Start 2P', monospace; font-size: 15px; color: var(--gold); margin-bottom: 14px; }
+.lock-sub { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--ink-dim); margin-bottom: 18px; min-height: 10px; line-height: 1.5; }
+.lock-dots { display: flex; gap: 14px; justify-content: center; margin-bottom: 24px; }
+.lock-dot { width: 14px; height: 14px; background: var(--bg-2); border: 3px solid var(--shadow); }
+.lock-dot.on { background: var(--gold); box-shadow: inset 0 2px 0 rgba(255,255,255,.35); }
+.lock-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.lock-pad button {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 3px solid var(--shadow);
+  box-shadow: 3px 3px 0 var(--shadow);
+  padding: 15px 0;
+  cursor: pointer;
+}
+.lock-pad button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--shadow); }
+.lock-pad .lock-aux { font-size: 13px; color: var(--ink-dim); background: var(--bg-2); }
+.lock-forgot {
+  margin-top: 18px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  color: var(--ink-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.lock-forgot[hidden] { display: none; }
+
+/* Options PIN buttons */
+.pin-actions { display: flex; gap: 7px; margin-top: 7px; }
+.pin-actions .io-btn { flex: 1; }
+.pin-actions .io-btn[hidden] { display: none; }
+
+/* ============================================================
    DEEDS toggle — collapsible side-quest list on the Quest Board
 ============================================================ */
 .deeds-toggle {
