@@ -250,7 +250,7 @@ h1 {
 .stats {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr;
-  gap: 14px;
+  gap: 0;
   margin-bottom: 22px;
 }
 
@@ -1351,7 +1351,9 @@ select {
 }
 
 /* =========================== CATEGORY BARS (inventory style) =========================== */
-.mboss-panel { margin-bottom: 18px; }         /* space between category bosses and new entry */
+.goal-panel { margin-bottom: 18px; }          /* savings quest sits in the top cluster */
+.boss-panel { margin-bottom: 0; }             /* budget boss stacked flush with category bosses */
+.mboss-panel { margin-bottom: 18px; }         /* space after the boss stack */
 .cat-panel { margin-bottom: 0; }              /* spending map sits flush against world map */
 .chart-panel { margin-bottom: 10px; }         /* little gap before the quest board */
 .cat-bars { display: flex; flex-direction: column; gap: 14px; }
