@@ -1355,7 +1355,7 @@ select {
 .boss-panel { margin-bottom: 0; }             /* budget boss stacked flush with category bosses */
 .mboss-panel { margin-bottom: 18px; }         /* space after the boss stack */
 .cat-panel { margin-bottom: 0; }              /* spending map sits flush against world map */
-.chart-panel { margin-bottom: 10px; }         /* little gap before the quest board */
+.chart-panel { margin-bottom: 0; }            /* world map stacked flush with savings quest */
 .cat-bars { display: flex; flex-direction: column; gap: 14px; }
 .cat-row { display: grid; grid-template-columns: 116px 1fr 70px; align-items: center; gap: 12px; }
 .cat-name { font-size: 8px; display: flex; align-items: center; gap: 7px; min-width: 0; }
