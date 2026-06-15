@@ -1351,6 +1351,7 @@ select {
 }
 
 /* =========================== CATEGORY BARS (inventory style) =========================== */
+.mboss-panel { margin-bottom: 18px; }         /* space between category bosses and new entry */
 .cat-panel { margin-bottom: 0; }              /* spending map sits flush against world map */
 .chart-panel { margin-bottom: 10px; }         /* little gap before the quest board */
 .cat-bars { display: flex; flex-direction: column; gap: 14px; }
@@ -2473,6 +2474,7 @@ body[data-theme="midas"] {
 
   .grid {
     grid-template-columns: minmax(0, 1fr);
+    gap: 0;                 /* new entry & quest log stack flush on mobile */
   }
 
   .quest-row {
