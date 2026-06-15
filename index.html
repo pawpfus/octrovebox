@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=100" />
+  <link rel="stylesheet" href="styles.css?v=101" />
 </head>
 
 <body>
@@ -199,7 +199,28 @@
       </section>
     </div>
 
-    <!-- ===== SAVINGS QUEST (up beside new entry / quest log) ===== -->
+    <!-- ===== CATEGORY XP BARS (Spending Map) — below the quest log ===== -->
+    <section class="panel cat-panel">
+      <h2 class="panel-title">SPENDING MAP</h2>
+      <div class="cat-bars" id="catBars"></div>
+      <div class="empty-state small" id="catEmpty">
+        <p>NO SPENDING DATA. GO EARN SOME GOLD!</p>
+      </div>
+    </section>
+
+    <!-- ===== WORLD MAP — MONTH HISTORY ===== -->
+    <section class="panel chart-panel">
+      <div class="log-head">
+        <h2 class="panel-title">WORLD MAP · 6-MONTH HISTORY</h2>
+        <div class="chart-legend">
+          <span class="lg lg-in">▲ EARN</span>
+          <span class="lg lg-out">▼ SPEND</span>
+        </div>
+      </div>
+      <div class="chart" id="chart"></div>
+    </section>
+
+    <!-- ===== SAVINGS QUEST (below world map) ===== -->
     <div class="panel goal-panel" id="goalPanel">
       <div class="mini-head">
         <h2 class="panel-title">SAVINGS QUEST</h2>
@@ -265,27 +286,6 @@
         <input type="number" id="catBudgetInput" min="1" step="1" placeholder="LIMIT" />
         <button type="button" class="mini-save" id="catBudgetSave">SET</button>
       </div>
-    </section>
-
-    <!-- ===== CATEGORY XP BARS ===== -->
-    <section class="panel cat-panel">
-      <h2 class="panel-title">SPENDING MAP</h2>
-      <div class="cat-bars" id="catBars"></div>
-      <div class="empty-state small" id="catEmpty">
-        <p>NO SPENDING DATA. GO EARN SOME GOLD!</p>
-      </div>
-    </section>
-
-    <!-- ===== WORLD MAP — MONTH HISTORY ===== -->
-    <section class="panel chart-panel">
-      <div class="log-head">
-        <h2 class="panel-title">WORLD MAP · 6-MONTH HISTORY</h2>
-        <div class="chart-legend">
-          <span class="lg lg-in">▲ EARN</span>
-          <span class="lg lg-out">▼ SPEND</span>
-        </div>
-      </div>
-      <div class="chart" id="chart"></div>
     </section>
 
     <!-- ===== SIDE QUESTS — RPG quest board ===== -->
@@ -462,7 +462,7 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=100"></script>
+  <script src="app.js?v=101"></script>
 </body>
 
 </html>
