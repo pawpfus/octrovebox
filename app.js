@@ -136,6 +136,8 @@ const els = {
   // onboarding tour
   onboardOverlay: $('onboardOverlay'), obArt: $('obArt'), obTitle: $('obTitle'), obBody: $('obBody'),
   obDots: $('obDots'), obNext: $('obNext'), obBack: $('obBack'), obSkip: $('obSkip'), obSample: $('obSample'),
+  // PWA install
+  installBtn: $('installBtn'), installDone: $('installDone'),
 };
 
 /* ============================================================
@@ -2360,6 +2362,82 @@ if ('serviceWorker' in navigator) {
     } catch (e) { /* unsupported / file:// */ }
   });
 }
+
+/* ============================================================
+   PWA INSTALL — capture the browser's install prompt and surface
+   a tidy "INSTALL APP" button inside Options. Hidden when the app
+   is already installed / running standalone (or the browser can't
+   install it, e.g. iOS Safari, where we leave a hint instead).
+============================================================ */
+(function pwaInstall() {
+  const btn = els.installBtn, done = els.installDone;
+  if (!btn) return;
+
+  // already running as an installed app?
+  const standalone = () =>
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    window.navigator.standalone === true;
+
+  let deferred = null;
+
+  // chromium fires this when the app meets installability criteria
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();          // stop the mini-infobar; we drive it ourselves
+    deferred = e;
+    if (!standalone()) btn.hidden = false;
+  });
+
+  btn.addEventListener('click', async () => {
+    if (!deferred) return;
+    btn.disabled = true;
+    deferred.prompt();
+    try { await deferred.userChoice; } catch (_) {}
+    deferred = null;
+    btn.hidden = true;
+    btn.disabled = false;
+  });
+
+  // fired after a successful install (button + browser UI)
+  window.addEventListener('appinstalled', () => {
+    deferred = null;
+    btn.hidden = true;
+    if (done) done.hidden = false;
+    if (typeof showToast === 'function') showToast('📲 OCTROVEBOX INSTALLED!');
+  });
+
+  // iOS Safari has no beforeinstallprompt — show an Add-to-Home-Screen hint
+  const ua = navigator.userAgent || '';
+  const isIOS = /iphone|ipad|ipod/i.test(ua) && !window.MSStream;
+  if (isIOS && !standalone() && done) {
+    done.hidden = false;
+    done.textContent = '📲 TO INSTALL: SHARE → ADD TO HOME SCREEN';
+  } else if (standalone() && done) {
+    done.hidden = false; // already installed
+  }
+})();
+
+/* ---- launch shortcuts (manifest "shortcuts" deep-links) ---- */
+(function handleLaunchShortcut() {
+  let go;
+  try { go = new URLSearchParams(location.search).get('go'); } catch (_) { return; }
+  if (!go) return;
+  // run after first paint so panels/handlers are wired
+  window.addEventListener('load', () => setTimeout(() => {
+    if (go === 'add') {
+      const panel = document.querySelector('.form-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (els.desc) els.desc.focus({ preventScroll: true });
+    } else if (go === 'quests') {
+      if (els.questScroll && els.questScroll.hidden && els.questToggle) els.questToggle.click();
+      const panel = document.querySelector('.quests-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (go === 'backup') {
+      if (els.backupBtn) els.backupBtn.click();
+    }
+    // tidy the URL so a reload doesn't repeat the action
+    if (history.replaceState) history.replaceState(null, '', location.pathname);
+  }, 350));
+})();
 
 /* ============================================================
    AMBIENT EFFECTS GATE — the starfield, weather, and floats all

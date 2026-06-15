@@ -2927,6 +2927,19 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 }
 .rc-del:hover { color: var(--red); }
 
+/* PWA install button + status */
+.install-btn { width: 100%; margin-bottom: 12px; }
+.install-btn[hidden] { display: none; }
+.install-done {
+  display: block;
+  font-size: 6px;
+  line-height: 1.7;
+  color: var(--gold, #ffd23f);
+  text-align: center;
+  margin: 0 0 12px;
+}
+.install-done[hidden] { display: none; }
+
 /* options currency + effects fields */
 .opt-field { margin-bottom: 12px; }
 .fx-btn { width: 100%; margin-top: 10px; }   /* match the audio row's spacing */
