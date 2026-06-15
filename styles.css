@@ -250,9 +250,11 @@ h1 {
 .stats {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr;
-  gap: 14px;
+  gap: 0;
   margin-bottom: 22px;
 }
+/* gap after Balance only — Income and Spent stay flush */
+.stats .balance { margin-right: 14px; }
 
 /* the signature chunky pixel-bevel box */
 .stat-card,
@@ -2467,6 +2469,9 @@ body[data-theme="midas"] {
   .stats {
     grid-template-columns: 1fr;
   }
+
+  /* stacked vertically: gap goes below Balance, Income/Spent stay flush */
+  .stats .balance { margin-right: 0; margin-bottom: 14px; }
 
   /* keep "WORLD MAP · 6-MONTH HISTORY" on a single line on phones */
   .chart-panel .panel-title {
