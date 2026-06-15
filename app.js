@@ -1237,6 +1237,9 @@ function showCombo(c) {
    in the danger zone, and a storm once you blow the budget.
 ============================================================ */
 function weatherMode() {
+  // rain/storm weather is a Classic-skin (NEON CITY) effect only — other skins
+  // keep their own ambient (snow, fish, motes) with no rain
+  if (document.documentElement.dataset.zone !== 'city') return 'clear';
   if (!state.budget) return 'clear';
   const spent = monthSpend();
   if (spent > state.budget) return 'storm';
