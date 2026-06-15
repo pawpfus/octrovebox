@@ -1351,7 +1351,8 @@ select {
 }
 
 /* =========================== CATEGORY BARS (inventory style) =========================== */
-.cat-panel { margin-bottom: 18px; }
+.cat-panel { margin-bottom: 0; }              /* spending map sits flush against world map */
+.chart-panel { margin-bottom: 10px; }         /* little gap before the quest board */
 .cat-bars { display: flex; flex-direction: column; gap: 14px; }
 .cat-row { display: grid; grid-template-columns: 116px 1fr 70px; align-items: center; gap: 12px; }
 .cat-name { font-size: 8px; display: flex; align-items: center; gap: 7px; min-width: 0; }
@@ -1416,7 +1417,7 @@ select {
 
 /* =========================== SIDE QUESTS — RPG QUEST BOARD =========================== */
 .quests-panel {
-  margin-bottom: 18px;
+  margin-bottom: 0;
   padding: 12px;
 }
 
@@ -2214,7 +2215,7 @@ select {
 
 /* =========================== THE VAULT (skins + audio) =========================== */
 .theme-panel {
-  margin-bottom: 18px;
+  margin-bottom: 0;
   padding: 12px;
 }
 
@@ -2462,6 +2463,12 @@ body[data-theme="midas"] {
 @media (max-width: 720px) {
   .stats {
     grid-template-columns: 1fr;
+  }
+
+  /* keep "WORLD MAP · 6-MONTH HISTORY" on a single line on phones */
+  .chart-panel .panel-title {
+    font-size: 8px;
+    white-space: nowrap;
   }
 
   .grid {
@@ -2913,7 +2920,7 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 
 /* options currency + effects fields */
 .opt-field { margin-bottom: 12px; }
-.fx-btn { width: 100%; }
+.fx-btn { width: 100%; margin-top: 10px; }   /* match the audio row's spacing */
 .fx-hint {
   display: block;
   font-size: 6px;

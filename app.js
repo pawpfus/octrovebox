@@ -675,6 +675,19 @@ const EDU_TIPS = [
   '💡 Keep at least one month of expenses in instant-access cash before chasing higher returns.',
   '💡 Pay yourself first: treat savings like a fixed bill, not whatever happens to be left over.',
   '💡 Lifestyle creep is the stealth boss — when income rises, bank the raise before your spending learns about it.',
+  // — inspired by "The Psychology of Money" (Morgan Housel)
+  '📖 Wealth is the money you DON\'T spend — the car not bought, the upgrade skipped. It\'s invisible by nature, which is exactly why it\'s so easy to undervalue.',
+  '📖 Your savings RATE matters more than your income or your returns. You can build wealth on a modest salary, or stay broke on a huge one.',
+  '📖 Know your "enough." Without it the goalposts move forever, and you risk what you have and need for what you don\'t.',
+  '📖 The biggest dividend money pays is control over your time. That freedom is the highest form of wealth.',
+  '📖 Save even with no goal in mind. Plain savings buy you options, flexibility, and time to wait for better opportunities.',
+  '📖 Pick a plan you can actually stick with. A "reasonable" strategy you keep beats an "optimal" one you abandon in a panic.',
+  '📖 Leave room for error. The single biggest point of failure is needing everything to go right — a margin of safety keeps you in the game.',
+  '📖 Getting wealthy and staying wealthy are different skills: one rewards optimism and risk, the other humility and frugality.',
+  '📖 Happiness is results minus expectations. If your lifestyle climbs as fast as your income, you never actually feel ahead.',
+  '📖 Compounding rewards patience, not intensity. The real magic isn\'t huge returns — it\'s good-enough returns left uninterrupted for a very long time.',
+  '📖 Luck and risk are siblings. Don\'t judge your money moves only by the outcome — a good decision can still get an unlucky result.',
+  '📖 Nobody is crazy with money. Everyone\'s choices make sense given the life and era they\'ve lived through — including yours.',
 ];
 
 function distinctMonths() {
