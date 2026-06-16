@@ -2479,6 +2479,13 @@ body[data-theme="midas"] {
     white-space: nowrap;
   }
 
+  /* shrink the "EDUCATIONAL ONLY" disclaimer so it fits on phones */
+  .oracle-note {
+    font-size: 5px;
+    letter-spacing: 0.5px;
+    margin-top: 10px;
+  }
+
   .grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;                 /* new entry & quest log stack flush on mobile */
