@@ -4,6 +4,24 @@
    chunky beveled "sprite" panels, hard pixel shadows.
 ============================================================ */
 
+/* Self-hosted fonts (latin subset) — no external Google Fonts request,
+   so the app loads fast and works fully offline. font-display:swap keeps
+   text visible while the pixel font streams in. */
+@font-face {
+  font-family: 'Press Start 2P';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/press-start-2p-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'VT323';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/vt323-latin.woff2') format('woff2');
+}
+
 :root {
   --bg: #0b0b1f;
   --bg-2: #161635;

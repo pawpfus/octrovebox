@@ -2,13 +2,15 @@
    Network-first means the latest deployed version always wins when online,
    while the cached app shell keeps it working offline.
    Bump CACHE when you change any shell asset. */
-const CACHE = 'octrovebox-v109';
+const CACHE = 'octrovebox-v110';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './manifest.webmanifest',
+  './fonts/press-start-2p-latin.woff2',
+  './fonts/vt323-latin.woff2',
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-192.png',
