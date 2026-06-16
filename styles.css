@@ -2968,7 +2968,7 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 .install-done[hidden] { display: none; }
 
 /* ============================================================
-   THE GUILD — 2-player co-op (local, one install)
+   THE GUILD — 2-player co-op (collapsible panel, Vault-styled)
 ============================================================ */
 /* HUD player tag becomes a tappable switcher in Guild mode */
 .player-tag.switchable {
@@ -2978,36 +2978,52 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 }
 .player-tag.switchable::after { content: ' ⇄'; opacity: .8; }
 
-/* household dashboard */
-.guild-panel .guild-team {
-  font-size: 7px;
-  color: var(--ink-dim);
-  letter-spacing: 1px;
+/* mode toggle + roster live inside the collapsible scroll */
+.guild-btn { width: 100%; }
+.guild-setup { margin-top: 12px; }
+.guild-names {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
 }
-.guild-panel .guild-team .pos { color: var(--green); }
-.guild-panel .guild-team .neg { color: var(--red); }
+.guild-names .field { margin: 0; }
+.guild-save { width: 100%; }
+
+/* household dashboard */
+.guild-dash { margin-top: 14px; }
+.guild-dash[hidden] { display: none; }
+.guild-team {
+  font-size: 6px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+  letter-spacing: .5px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.guild-team .pos { color: var(--green); }
+.guild-team .neg { color: var(--red); }
 .guild-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
 }
 .guild-card {
   border: 2px solid var(--shadow);
   background: var(--bg-2);
-  padding: 10px;
+  padding: 9px;
   box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .35);
 }
 .guild-card.active { box-shadow: inset 0 0 0 2px currentColor; }
 .gc-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   margin-bottom: 8px;
 }
-.gc-ico { font-size: 14px; }
+.gc-ico { font-size: 11px; }
 .gc-name {
-  font-size: 8px;
+  font-size: 7px;
   letter-spacing: .5px;
   white-space: nowrap;
   overflow: hidden;
@@ -3018,24 +3034,26 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
   font-size: 5px;
   color: var(--bg);
   background: var(--gold);
-  padding: 2px 4px;
+  padding: 2px 3px;
   letter-spacing: .5px;
+  flex-shrink: 0;
 }
 .gc-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  font-size: 7px;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 6px;
   margin-top: 6px;
 }
 .gc-lbl { color: var(--ink-dim); }
+.gc-val { font-size: 7px; }
 .gc-val.pos { color: var(--green); }
 .gc-val.neg { color: var(--red); }
 .gc-net {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 2px solid var(--shadow);
-  font-size: 8px;
 }
 
 /* per-entry owner badge in the Quest Log */
@@ -3060,7 +3078,7 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 .gfilter-btn {
   flex: 1;
   font-family: inherit;
-  font-size: 7px;
+  font-size: 6px;
   padding: 7px 6px;
   color: var(--ink-dim);
   background: var(--bg-2);
@@ -3090,23 +3108,18 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
   border: 2px solid var(--shadow);
   background: var(--bg-2);
   padding: 6px 8px;
-  font-size: 7px;
+  font-size: 6px;
 }
-.coop-ico { font-size: 12px; }
+.coop-ico { font-size: 10px; }
 .coop-who {
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.coop-net { font-size: 7px; }
 .coop-net.pos { color: var(--green); }
 .coop-net.neg { color: var(--red); }
-
-/* Guild setup in Options */
-.guild-setup { margin: 10px 0; }
-.guild-setup .field { margin-bottom: 8px; }
-.guild-save { width: 100%; }
-.guild-btn { width: 100%; }
 
 /* options currency + effects fields */
 .opt-field { margin-bottom: 12px; }

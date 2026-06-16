@@ -144,7 +144,9 @@ const els = {
   installBtn: $('installBtn'), installDone: $('installDone'),
   // THE GUILD (2-player co-op)
   playerTag: $('playerTag'),
-  guildPanel: $('guildPanel'), guildCards: $('guildCards'), guildTeam: $('guildTeam'),
+  guildToggle: $('guildToggle'), guildScroll: $('guildScroll'),
+  guildDial: $('guildDial'), guildSub: $('guildSub'), guildArrow: $('guildArrow'),
+  guildDash: $('guildDash'), guildCards: $('guildCards'), guildTeam: $('guildTeam'),
   guildFilters: $('guildFilters'), goalCoop: $('goalCoop'),
   guildBtn: $('guildBtn'), guildSetup: $('guildSetup'),
   guildP1: $('guildP1'), guildP2: $('guildP2'), guildSave: $('guildSave'),
@@ -286,7 +288,7 @@ const tsToYmd = (ts) => { const d = new Date(ts); return d.getFullYear() + '-' +
 /* ---------------- THE GUILD (2-player co-op) ---------------- */
 // each player gets a distinct colour so badges/bars read at a glance
 const GUILD_COLORS = { p1: 'var(--gold)', p2: '#4fa9ff' };
-const GUILD_ICONS  = { p1: '🦸', p2: '🦸‍♀️' };
+const GUILD_ICONS  = { p1: '🕹️', p2: '🕹️' };
 // guards — `state.guild` may be missing/partial on old saves
 function guildOn() { return !!(state.guild && state.guild.on); }
 function activePlayer() { return (state.guild && state.guild.active === 'p2') ? 'p2' : 'p1'; }
@@ -598,7 +600,7 @@ function renderGoal() {
   const done = saved >= target;
 
   els.goalFill.style.width = pct + '%';
-  els.goalName.textContent = (guildOn() ? '🤝 ' : '') + state.goal.name;
+  els.goalName.textContent = (guildOn() ? '⚔ ' : '') + state.goal.name;
   els.goalPanel.classList.toggle('complete', done);
   renderGoalCoop(true);
 
@@ -631,9 +633,12 @@ function renderPlayerTag() {
 }
 // household dashboard: per-player earned/spent/net + who's carrying the team
 function renderGuild() {
-  if (!els.guildPanel) return;
-  if (!guildOn()) { els.guildPanel.hidden = true; return; }
-  els.guildPanel.hidden = false;
+  const on = guildOn();
+  if (els.guildSub) els.guildSub.textContent = on ? 'PARTY OF TWO — TRACKING TOGETHER' : 'SOLO PLAY — TAP TO FORM A PARTY';
+  if (els.guildSetup) els.guildSetup.hidden = !on;
+  if (!els.guildDash) return;
+  if (!on) { els.guildDash.hidden = true; return; }
+  els.guildDash.hidden = false;
   const s = guildSplit();
   els.guildCards.innerHTML = ['p1', 'p2'].map((k) => {
     const active = activePlayer() === k;
@@ -664,7 +669,7 @@ function renderPlayerFilter() {
     chip('p2', playerName('p2'), GUILD_COLORS.p2);
 }
 function setGuildLabel() {
-  if (els.guildBtn) els.guildBtn.textContent = '👥 GUILD MODE: ' + (guildOn() ? 'ON' : 'OFF');
+  if (els.guildBtn) els.guildBtn.textContent = '🛡 GUILD MODE: ' + (guildOn() ? 'ON' : 'OFF');
 }
 
 /* ---------------- CATEGORY MINI-BOSSES ---------------- */
@@ -1059,6 +1064,15 @@ function toggleQuestBoard() {
   els.questScroll.hidden = !opening;
   els.questToggle.classList.toggle('open', opening);
   if (opening) beep([523, 659, 784], 0.07, 'triangle', 0.04); // unroll fanfare
+  else sfx.click();
+}
+
+/* the guild: collapsible party panel (matches the Vault/Options style) */
+function toggleGuild() {
+  const opening = els.guildScroll.hidden;
+  els.guildScroll.hidden = !opening;
+  els.guildToggle.classList.toggle('open', opening);
+  if (opening) beep([392, 523, 659], 0.07, 'triangle', 0.04); // party-up fanfare
   else sfx.click();
 }
 
@@ -2233,6 +2247,7 @@ els.recapClose.addEventListener('click', closeRecap);
 els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOverlay) closeRecap(); });
 els.oracleStage.addEventListener('click', oracleTap);
 els.questToggle.addEventListener('click', toggleQuestBoard);
+if (els.guildToggle) els.guildToggle.addEventListener('click', toggleGuild);
 els.deedsToggle.addEventListener('click', toggleDeeds);
 els.vaultToggle.addEventListener('click', toggleVault);
 els.optToggle.addEventListener('click', () => {

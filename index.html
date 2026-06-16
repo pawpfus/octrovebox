@@ -19,7 +19,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=111" />
+  <link rel="stylesheet" href="styles.css?v=112" />
 </head>
 
 <body>
@@ -109,15 +109,6 @@
         <span class="stat-label">▼ SPENT</span>
         <span class="stat-value" id="expenseValue">Rp0</span>
       </div>
-    </section>
-
-    <!-- ===== THE GUILD — 2-player household split (hidden unless Guild mode) ===== -->
-    <section class="panel guild-panel" id="guildPanel" hidden>
-      <div class="log-head">
-        <h2 class="panel-title">🤝 THE GUILD</h2>
-        <span class="guild-team" id="guildTeam"></span>
-      </div>
-      <div class="guild-cards" id="guildCards"></div>
     </section>
 
     <!-- ===== NEW ENTRY + QUEST LOG (moved up) ===== -->
@@ -335,6 +326,39 @@
     </section>
 
 
+    <!-- ===== THE GUILD — 2-player co-op, collapsible like the Vault ===== -->
+    <section class="panel guild-panel">
+      <button type="button" class="vault-banner guild-banner" id="guildToggle">
+        <span class="vault-dial" id="guildDial">🛡</span>
+        <span class="qb-text">
+          <span class="vault-title">🛡 THE GUILD 🛡</span>
+          <span class="vault-sub" id="guildSub">SOLO PLAY — TAP TO FORM A PARTY</span>
+        </span>
+        <span class="qb-arrow" id="guildArrow">▼</span>
+      </button>
+      <div class="vault-scroll" id="guildScroll" hidden>
+        <button type="button" class="mute-btn guild-btn" id="guildBtn">🛡 GUILD MODE: OFF</button>
+        <div class="guild-setup" id="guildSetup" hidden>
+          <div class="guild-names">
+            <label class="field">
+              <span class="field-label">PLAYER 1</span>
+              <input type="text" id="guildP1" maxlength="14" placeholder="PLAYER 1" />
+            </label>
+            <label class="field">
+              <span class="field-label">PLAYER 2</span>
+              <input type="text" id="guildP2" maxlength="14" placeholder="PLAYER 2" />
+            </label>
+          </div>
+          <button type="button" class="mini-save guild-save" id="guildSave">SAVE ROSTER</button>
+        </div>
+        <div class="guild-dash" id="guildDash" hidden>
+          <div class="guild-team" id="guildTeam"></div>
+          <div class="guild-cards" id="guildCards"></div>
+        </div>
+        <span class="fx-hint">Two players share this device. Tap the PLAYER tag at the top to switch who's logging — every entry is tagged to them.</span>
+      </div>
+    </section>
+
     <!-- ===== THE VAULT — skins + audio, behind a sealed door ===== -->
     <section class="panel theme-panel">
       <button type="button" class="vault-banner" id="vaultToggle">
@@ -372,21 +396,6 @@
       <div class="vault-scroll" id="optScroll" hidden>
         <button type="button" class="submit-btn install-btn" id="installBtn" hidden>📲 INSTALL APP</button>
         <p class="install-done" id="installDone" hidden>✓ INSTALLED — LAUNCH FROM YOUR HOME SCREEN</p>
-
-        <div class="vault-section">👥 THE GUILD</div>
-        <button type="button" class="mute-btn guild-btn" id="guildBtn">👥 GUILD MODE: OFF</button>
-        <div class="guild-setup" id="guildSetup" hidden>
-          <label class="field">
-            <span class="field-label">PLAYER 1 NAME</span>
-            <input type="text" id="guildP1" maxlength="14" placeholder="e.g. HUSBAND" />
-          </label>
-          <label class="field">
-            <span class="field-label">PLAYER 2 NAME</span>
-            <input type="text" id="guildP2" maxlength="14" placeholder="e.g. WIFE" />
-          </label>
-          <button type="button" class="mini-save guild-save" id="guildSave">SAVE ROSTER</button>
-        </div>
-        <span class="fx-hint">Two players share this device. Tap the PLAYER tag at the top to switch who's logging — every entry is tagged to them.</span>
 
         <label class="field opt-field">
           <span class="field-label">💱 CURRENCY</span>
@@ -491,7 +500,7 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=111"></script>
+  <script src="app.js?v=112"></script>
 </body>
 
 </html>
