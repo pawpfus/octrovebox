@@ -19,7 +19,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=110" />
+  <link rel="stylesheet" href="styles.css?v=111" />
 </head>
 
 <body>
@@ -111,6 +111,15 @@
       </div>
     </section>
 
+    <!-- ===== THE GUILD — 2-player household split (hidden unless Guild mode) ===== -->
+    <section class="panel guild-panel" id="guildPanel" hidden>
+      <div class="log-head">
+        <h2 class="panel-title">🤝 THE GUILD</h2>
+        <span class="guild-team" id="guildTeam"></span>
+      </div>
+      <div class="guild-cards" id="guildCards"></div>
+    </section>
+
     <!-- ===== NEW ENTRY + QUEST LOG (moved up) ===== -->
     <div class="grid">
       <!-- ===== LEFT: ADD QUEST (transaction) ===== -->
@@ -188,6 +197,7 @@
             <div class="select-wrap"><select id="catFilter"></select></div>
             <div class="select-wrap"><select id="monthFilter"></select></div>
           </div>
+          <div class="guild-filters" id="guildFilters" hidden></div>
         </div>
         <div class="log-summary" id="logSummary"></div>
         <ul class="tx-list" id="txList"></ul>
@@ -236,6 +246,8 @@
           <div class="bar-text" id="goalText">SET A SAVINGS GOAL TO BEGIN</div>
         </div>
       </div>
+
+      <div class="guild-coop" id="goalCoop" hidden></div>
 
       <div class="editor hidden" id="goalEditor">
         <input type="text" id="goalNameInput" maxlength="18" placeholder="QUEST NAME" />
@@ -360,6 +372,22 @@
       <div class="vault-scroll" id="optScroll" hidden>
         <button type="button" class="submit-btn install-btn" id="installBtn" hidden>📲 INSTALL APP</button>
         <p class="install-done" id="installDone" hidden>✓ INSTALLED — LAUNCH FROM YOUR HOME SCREEN</p>
+
+        <div class="vault-section">👥 THE GUILD</div>
+        <button type="button" class="mute-btn guild-btn" id="guildBtn">👥 GUILD MODE: OFF</button>
+        <div class="guild-setup" id="guildSetup" hidden>
+          <label class="field">
+            <span class="field-label">PLAYER 1 NAME</span>
+            <input type="text" id="guildP1" maxlength="14" placeholder="e.g. HUSBAND" />
+          </label>
+          <label class="field">
+            <span class="field-label">PLAYER 2 NAME</span>
+            <input type="text" id="guildP2" maxlength="14" placeholder="e.g. WIFE" />
+          </label>
+          <button type="button" class="mini-save guild-save" id="guildSave">SAVE ROSTER</button>
+        </div>
+        <span class="fx-hint">Two players share this device. Tap the PLAYER tag at the top to switch who's logging — every entry is tagged to them.</span>
+
         <label class="field opt-field">
           <span class="field-label">💱 CURRENCY</span>
           <div class="select-wrap"><select id="currencySelect"></select></div>
@@ -463,7 +491,7 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=106"></script>
+  <script src="app.js?v=111"></script>
 </body>
 
 </html>

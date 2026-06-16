@@ -4,7 +4,7 @@
 ============================================================ */
 
 const STORE_KEY = 'coinQuest.v1';
-const SCHEMA = 2;               // data schema version (bump when the save shape changes)
+const SCHEMA = 3;               // data schema version (bump when the save shape changes)
 
 const CATEGORIES = {
   expense: [
@@ -61,12 +61,16 @@ let state = {
   backupNudge: '',      // YYYY-MM-DD we last reminded about backing up
   onboarded: false,     // has the first-run tour been seen/dismissed?
   effects: 'auto',      // ambient animation: 'auto' (follow system) | 'on' | 'off'
+  // THE GUILD — local 2-player household co-op (one install, no backend).
+  // off by default so solo players are untouched; entries carry an `owner`.
+  guild: { on: false, active: 'p1', names: { p1: 'PLAYER 1', p2: 'PLAYER 2' } },
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
 let currentFilter = 'all';      // type filter: all / income / expense
 let catFilterVal = 'all';       // quest-log category filter
 let monthFilterVal = 'all';     // quest-log month filter (y*12+m, or 'all')
+let playerFilterVal = 'all';    // quest-log player filter (all / p1 / p2) — Guild mode
 let editingId = null; // id of the transaction being edited (null = adding new)
 
 /* ---------------- elements ---------------- */
@@ -138,6 +142,12 @@ const els = {
   obDots: $('obDots'), obNext: $('obNext'), obBack: $('obBack'), obSkip: $('obSkip'), obSample: $('obSample'),
   // PWA install
   installBtn: $('installBtn'), installDone: $('installDone'),
+  // THE GUILD (2-player co-op)
+  playerTag: $('playerTag'),
+  guildPanel: $('guildPanel'), guildCards: $('guildCards'), guildTeam: $('guildTeam'),
+  guildFilters: $('guildFilters'), goalCoop: $('goalCoop'),
+  guildBtn: $('guildBtn'), guildSetup: $('guildSetup'),
+  guildP1: $('guildP1'), guildP2: $('guildP2'), guildSave: $('guildSave'),
 };
 
 /* ============================================================
@@ -273,6 +283,44 @@ const txDate = (t) => t.date || t.id;
 const ymdToTs = (s) => (s ? new Date(s + 'T12:00:00').getTime() : Date.now());
 const tsToYmd = (ts) => { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
+/* ---------------- THE GUILD (2-player co-op) ---------------- */
+// each player gets a distinct colour so badges/bars read at a glance
+const GUILD_COLORS = { p1: 'var(--gold)', p2: '#4fa9ff' };
+const GUILD_ICONS  = { p1: '🦸', p2: '🦸‍♀️' };
+// guards — `state.guild` may be missing/partial on old saves
+function guildOn() { return !!(state.guild && state.guild.on); }
+function activePlayer() { return (state.guild && state.guild.active === 'p2') ? 'p2' : 'p1'; }
+function playerName(k) {
+  const n = state.guild && state.guild.names && state.guild.names[k];
+  return (n && String(n).trim()) || (k === 'p2' ? 'PLAYER 2' : 'PLAYER 1');
+}
+const txOwner = (t) => (t.owner === 'p2' ? 'p2' : 'p1');
+// keep state.guild well-formed and stamp legacy entries with an owner (schema<3)
+function migrate() {
+  if (!state.guild || typeof state.guild !== 'object') state.guild = {};
+  if (state.guild.active !== 'p2') state.guild.active = 'p1';
+  state.guild.on = !!state.guild.on;
+  if (!state.guild.names || typeof state.guild.names !== 'object') state.guild.names = {};
+  state.guild.names.p1 = state.guild.names.p1 || 'PLAYER 1';
+  state.guild.names.p2 = state.guild.names.p2 || 'PLAYER 2';
+  if (Number(state.schema) < 3) {
+    state.transactions.forEach((t) => { if (t.owner !== 'p1' && t.owner !== 'p2') t.owner = 'p1'; });
+    (state.recurring || []).forEach((r) => { if (r.owner !== 'p1' && r.owner !== 'p2') r.owner = 'p1'; });
+  }
+  state.schema = SCHEMA;
+}
+// per-player income/expense/net split
+function guildSplit() {
+  const out = { p1: { income: 0, expense: 0 }, p2: { income: 0, expense: 0 } };
+  state.transactions.forEach((t) => {
+    const o = txOwner(t);
+    if (t.type === 'income') out[o].income += t.amount; else out[o].expense += t.amount;
+  });
+  out.p1.net = out.p1.income - out.p1.expense;
+  out.p2.net = out.p2.income - out.p2.expense;
+  return out;
+}
+
 const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
 // income + expense totals for a given year/month (optionally a single category)
@@ -365,6 +413,7 @@ function matchesFilters(t) {
   if (currentFilter !== 'all' && t.type !== currentFilter) return false;
   if (catFilterVal !== 'all' && t.category !== catFilterVal) return false;
   if (monthFilterVal !== 'all' && txMonthKey(t) !== Number(monthFilterVal)) return false;
+  if (guildOn() && playerFilterVal !== 'all' && txOwner(t) !== playerFilterVal) return false;
   return true;
 }
 
@@ -393,11 +442,15 @@ function renderList() {
     const dObj = new Date(txDate(t));
     const sameYear = dObj.getFullYear() === new Date().getFullYear();
     const date = dObj.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' });
+    const o = txOwner(t);
+    const ownerBadge = guildOn()
+      ? `<span class="tx-owner" style="color:${GUILD_COLORS[o]};border-color:${GUILD_COLORS[o]}">${escapeHtml(playerName(o))}</span>`
+      : '';
     li.innerHTML = `
       <span class="tx-icon" style="background:${CAT_COLORS[t.category] || '#2e2e63'}22;border-color:${CAT_COLORS[t.category] || '#050510'}">${c.icon}</span>
       <span class="tx-body">
         <span class="tx-desc">${escapeHtml(t.desc)}</span>
-        <span class="tx-meta">${c.name} · ${date}</span>
+        <span class="tx-meta">${c.name} · ${date}${ownerBadge}</span>
       </span>
       <span class="tx-amount ${t.type}">${t.type === 'income' ? '+' : '-'}${fmt(t.amount).replace('-','')}</span>
       <span class="tx-actions">
@@ -513,6 +566,20 @@ function renderBudget() {
 }
 
 /* ---------------- SAVINGS QUEST ---------------- */
+// co-op savings: show each partner's net contribution under the quest bar
+function renderGoalCoop(active) {
+  if (!els.goalCoop) return;
+  if (!active || !guildOn()) { els.goalCoop.hidden = true; els.goalCoop.innerHTML = ''; return; }
+  const s = guildSplit();
+  els.goalCoop.hidden = false;
+  els.goalCoop.innerHTML = ['p1', 'p2'].map((k) =>
+    `<span class="coop-chip" style="border-color:${GUILD_COLORS[k]}">
+       <span class="coop-ico">${GUILD_ICONS[k]}</span>
+       <span class="coop-who" style="color:${GUILD_COLORS[k]}">${escapeHtml(playerName(k))}</span>
+       <span class="coop-net ${s[k].net >= 0 ? 'pos' : 'neg'}">${s[k].net >= 0 ? '+' : ''}${fmt(s[k].net)}</span>
+     </span>`).join('');
+}
+
 function renderGoal() {
   if (!state.goal) {
     els.goalPanel.classList.remove('complete');
@@ -521,6 +588,7 @@ function renderGoal() {
     els.goalFill.style.width = '0%';
     els.goalText.className = 'bar-text';
     els.goalText.textContent = 'SET A SAVINGS GOAL TO BEGIN';
+    renderGoalCoop(false);
     return;
   }
 
@@ -530,8 +598,9 @@ function renderGoal() {
   const done = saved >= target;
 
   els.goalFill.style.width = pct + '%';
-  els.goalName.textContent = state.goal.name;
+  els.goalName.textContent = (guildOn() ? '🤝 ' : '') + state.goal.name;
   els.goalPanel.classList.toggle('complete', done);
+  renderGoalCoop(true);
 
   if (done) {
     els.goalChest.textContent = '🏆';
@@ -547,6 +616,55 @@ function renderGoal() {
     els.goalText.className = 'bar-text';
     if (state.goalCelebrated) { state.goalCelebrated = false; save(); }
   }
+}
+
+/* ---------------- THE GUILD — render ---------------- */
+// HUD tag: who is logging right now (tap to swap in Guild mode)
+function renderPlayerTag() {
+  if (!els.playerTag) return;
+  const on = guildOn();
+  const k = activePlayer();
+  els.playerTag.textContent = on ? (GUILD_ICONS[k] + ' ' + playerName(k)) : 'PLAYER 1';
+  els.playerTag.style.color = on ? GUILD_COLORS[k] : '';
+  els.playerTag.classList.toggle('switchable', on);
+  els.playerTag.title = on ? 'Tap to switch active player' : '';
+}
+// household dashboard: per-player earned/spent/net + who's carrying the team
+function renderGuild() {
+  if (!els.guildPanel) return;
+  if (!guildOn()) { els.guildPanel.hidden = true; return; }
+  els.guildPanel.hidden = false;
+  const s = guildSplit();
+  els.guildCards.innerHTML = ['p1', 'p2'].map((k) => {
+    const active = activePlayer() === k;
+    return `<div class="guild-card${active ? ' active' : ''}" style="border-color:${GUILD_COLORS[k]}">
+      <div class="gc-head"><span class="gc-ico">${GUILD_ICONS[k]}</span><span class="gc-name" style="color:${GUILD_COLORS[k]}">${escapeHtml(playerName(k))}</span>${active ? '<span class="gc-now">LOGGING</span>' : ''}</div>
+      <div class="gc-row"><span class="gc-lbl">▲ EARN</span><span class="gc-val pos">${fmt(s[k].income)}</span></div>
+      <div class="gc-row"><span class="gc-lbl">▼ SPENT</span><span class="gc-val neg">${fmt(s[k].expense)}</span></div>
+      <div class="gc-row gc-net"><span class="gc-lbl">NET</span><span class="gc-val ${s[k].net >= 0 ? 'pos' : 'neg'}">${s[k].net >= 0 ? '+' : ''}${fmt(s[k].net)}</span></div>
+    </div>`;
+  }).join('');
+  // team line: combined net + who contributed more this far
+  const teamNet = s.p1.net + s.p2.net;
+  let lead = 'EVEN MATCH';
+  if (s.p1.net > s.p2.net) lead = playerName('p1') + ' LEADS';
+  else if (s.p2.net > s.p1.net) lead = playerName('p2') + ' LEADS';
+  els.guildTeam.innerHTML = `TEAM NET <span class="${teamNet >= 0 ? 'pos' : 'neg'}">${teamNet >= 0 ? '+' : ''}${fmt(teamNet)}</span> · ${lead}`;
+}
+// quest-log player filter chips (BOTH / P1 / P2)
+function renderPlayerFilter() {
+  if (!els.guildFilters) return;
+  if (!guildOn()) { els.guildFilters.hidden = true; els.guildFilters.innerHTML = ''; return; }
+  els.guildFilters.hidden = false;
+  const chip = (val, label, color) =>
+    `<button type="button" class="gfilter-btn${playerFilterVal === val ? ' active' : ''}" data-player="${val}"${color ? ` style="--gf:${color}"` : ''}>${label}</button>`;
+  els.guildFilters.innerHTML =
+    chip('all', 'BOTH', '') +
+    chip('p1', playerName('p1'), GUILD_COLORS.p1) +
+    chip('p2', playerName('p2'), GUILD_COLORS.p2);
+}
+function setGuildLabel() {
+  if (els.guildBtn) els.guildBtn.textContent = '👥 GUILD MODE: ' + (guildOn() ? 'ON' : 'OFF');
 }
 
 /* ---------------- CATEGORY MINI-BOSSES ---------------- */
@@ -1338,6 +1456,7 @@ function runRecurring() {
       state.transactions.push({
         id: newId(), date: r.nextDue, type: r.type,
         desc: r.desc, amount: r.amount, category: r.category, auto: true,
+        owner: (r.owner === 'p2' ? 'p2' : 'p1'),
       });
       r.lastRun = r.nextDue;
       r.nextDue = addPeriod(r.nextDue, r.freq);
@@ -1465,6 +1584,9 @@ function fillCurrencySelect() {
 
 function renderAll(prevLevel) {
   renderStats(prevLevel);
+  renderPlayerTag();
+  renderGuild();
+  renderPlayerFilter();
   renderList();
   renderCats();
   renderBudget();
@@ -1581,6 +1703,7 @@ function addTx(e) {
   const prevLevel = levelFor(totals().income);
 
   const category = els.category.value;
+  const owner = activePlayer();
   state.transactions.push({
     id: newId(),
     date: pickerDate,
@@ -1588,13 +1711,14 @@ function addTx(e) {
     desc,
     amount,
     category,
+    owner,
   });
 
   // "repeat" set → also create an auto-pilot rule, due one period from this entry
   const rep = els.repeatInput ? els.repeatInput.value : 'off';
   if (rep === 'weekly' || rep === 'monthly') {
     state.recurring.push({
-      id: newId(), type: currentType, desc, amount, category,
+      id: newId(), type: currentType, desc, amount, category, owner,
       freq: rep, nextDue: addPeriod(pickerDate, rep), lastRun: pickerDate,
     });
     showToast('🔁 REPEAT SET: ' + freqLabel(rep) + ' "' + desc + '"');
@@ -1866,7 +1990,14 @@ function importBackup(file) {
     state.schema = Number(data.schema) || 1;
     state.onboarded = true; // an imported save means an existing player — skip the tour
     state.effects = ['auto', 'on', 'off'].includes(data.effects) ? data.effects : 'auto';
+    // THE GUILD — restore co-op roster (owners travel inside each transaction)
+    state.guild = (data.guild && typeof data.guild === 'object') ? data.guild : { on: false, active: 'p1', names: {} };
     // NOTE: pinHash is intentionally NOT imported, so a backup never locks this device
+    migrate();   // normalise guild + stamp any owner-less entries from older saves
+    setGuildLabel();
+    if (els.guildSetup) els.guildSetup.hidden = !guildOn();
+    if (els.guildP1) els.guildP1.value = playerName('p1');
+    if (els.guildP2) els.guildP2.value = playerName('p2');
     save();
     sfx.coin();
     showToast('📂 BACKUP RESTORED! ' + state.transactions.length + ' ENTRIES');
@@ -2150,6 +2281,46 @@ if (els.fxBtn) els.fxBtn.addEventListener('click', () => {
   showToast('✨ EFFECTS: ' + state.effects.toUpperCase() + (state.effects === 'auto' ? ' (FOLLOW SYSTEM)' : ''));
 });
 
+/* ---- THE GUILD (2-player co-op) controls ---- */
+// tap the HUD player tag to swap who's logging
+if (els.playerTag) els.playerTag.addEventListener('click', () => {
+  if (!guildOn()) return;
+  state.guild.active = activePlayer() === 'p1' ? 'p2' : 'p1';
+  save(); sfx.click();
+  renderPlayerTag(); renderGuild();
+  showToast('🎮 NOW LOGGING AS ' + playerName(activePlayer()));
+});
+// enable/disable Guild mode from Options
+if (els.guildBtn) els.guildBtn.addEventListener('click', () => {
+  state.guild.on = !guildOn();
+  save(); sfx.click(); setGuildLabel();
+  if (els.guildSetup) els.guildSetup.hidden = !guildOn();
+  if (guildOn()) {
+    if (els.guildP1) els.guildP1.value = playerName('p1');
+    if (els.guildP2) els.guildP2.value = playerName('p2');
+  } else { playerFilterVal = 'all'; }
+  renderAll();
+  showToast(guildOn() ? '👥 GUILD FORMED — TWO PLAYERS!' : '👤 BACK TO SOLO PLAY');
+});
+// save the two player names
+if (els.guildSave) els.guildSave.addEventListener('click', () => {
+  const n1 = (els.guildP1.value || '').trim().slice(0, 14);
+  const n2 = (els.guildP2.value || '').trim().slice(0, 14);
+  state.guild.names.p1 = n1 || 'PLAYER 1';
+  state.guild.names.p2 = n2 || 'PLAYER 2';
+  save(); sfx.coin();
+  renderAll();
+  showToast('✓ GUILD ROSTER SAVED');
+});
+// quest-log player filter chips
+if (els.guildFilters) els.guildFilters.addEventListener('click', (e) => {
+  const btn = e.target.closest('.gfilter-btn');
+  if (!btn) return;
+  playerFilterVal = btn.dataset.player;
+  sfx.click();
+  renderPlayerFilter(); renderList();
+});
+
 // auto-pilot (recurring) — collapse/expand the rules list
 if (els.recurHead) els.recurHead.addEventListener('click', () => {
   const opening = els.recurList.hidden;
@@ -2286,10 +2457,15 @@ els.mute.addEventListener('click', () => {
 // everything that needs the real (decrypted) state — runs immediately for a
 // plaintext save, or only after a correct PIN unlocks an encrypted one
 function finishBoot() {
+  migrate();   // normalise the guild + stamp legacy entries with an owner
   els.mute.textContent = '♪ SOUND: ' + (state.soundOn ? 'ON' : 'OFF');
   applyTheme(state.theme);
   applyCurrency();
   setFxLabel();
+  setGuildLabel();
+  if (els.guildSetup) els.guildSetup.hidden = !guildOn();
+  if (els.guildP1) els.guildP1.value = playerName('p1');
+  if (els.guildP2) els.guildP2.value = playerName('p2');
   document.body.classList.toggle('rainbow', !!state.rainbow);
   fillCategories();
   fillCatBudgetSelect();
