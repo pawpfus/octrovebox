@@ -2354,10 +2354,10 @@ body[data-theme="gameboy"] {
   --panel: #1e4d1e;
   --panel-lt: #306230;
   --ink: #d7f78a;
-  --ink-dim: #8bac0f;
-  --gold: #9bbc0f;
+  --ink-dim: #a7c83a;
+  --gold: #a4c714;
   --gold-dk: #557a0a;
-  --green: #9bbc0f;
+  --green: #a4c714;
   --green-dk: #557a0a;
   --red: #e0b020;
   --red-dk: #9a7400;
@@ -2405,19 +2405,21 @@ body[data-theme="arcade"] {
   --shadow: #000006;
 }
 
-/* Super Mario Bros — sky blue, brick, and coin gold */
+/* Super Mario Bros — sky blue, brick, and coin gold.
+   Panel darkened to a deep brick-brown so stat values stay WCAG-AA
+   readable (the old orange panel dropped red/green text near 1:1). */
 body[data-theme="mario"] {
   --bg: #5c94fc;
   --bg-2: #4377d6;
-  --panel: #c75000;
-  --panel-lt: #e06818;
+  --panel: #5e2300;
+  --panel-lt: #7a2e00;
   --ink: #fff8e8;
   --ink-dim: #ffdca8;
   --gold: #fbd000;
   --gold-dk: #c89400;
-  --green: #43b047;
+  --green: #5fd86a;
   --green-dk: #2a7d2e;
-  --red: #e52521;
+  --red: #ff7a5a;
   --red-dk: #a81818;
   --blue: #4fa9ff;
   --purple: #b06bff;
@@ -2432,12 +2434,12 @@ body[data-theme="undersea"] {
   --panel: #0c4a5e;
   --panel-lt: #126a82;
   --ink: #d6f7ff;
-  --ink-dim: #6fa9bd;
+  --ink-dim: #8fc4d6;
   --gold: #ffd23f;
   --gold-dk: #c8901a;
-  --green: #2fae6a;
+  --green: #45d98a;
   --green-dk: #1c7a48;
-  --red: #ff6b6b;
+  --red: #ffa0a0;
   --red-dk: #c03b3b;
   --blue: #2fd0c0;
   --purple: #b06bff;
