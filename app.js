@@ -2171,7 +2171,18 @@ async function attemptUnlock(pin) {
       return true;
     } catch (e) { return false; }
   }
-  return pinHashOf(pin) === state.pinHash;
+  // legacy hash-gate (plaintext save): verify the PIN…
+  if (pinHashOf(pin) !== state.pinHash) return false;
+  // …then transparently UPGRADE to real encryption so the data is no longer
+  // stored in plain text and "Forgot PIN" becomes genuinely unrecoverable.
+  if (CRYPTO_OK && !cryptoKey) {
+    try {
+      cryptoSalt = crypto.getRandomValues(new Uint8Array(16));
+      cryptoKey = await deriveKey(pin, cryptoSalt);
+      save();   // rewrites the save ENCRYPTED from now on
+    } catch (e) { /* fall back to the hash gate if crypto is unavailable */ }
+  }
+  return true;
 }
 // turn the lock on: derive a key (so the next save() encrypts) and store a marker hash
 async function enablePin(pin) {
@@ -2261,14 +2272,11 @@ els.chestBtn.addEventListener('click', openChest);
 // PIN lock wiring
 els.lockPad.addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (b) lockKey(b.dataset.k); });
 els.lockForgot.addEventListener('click', () => {
-  if (encryptedWrapper) {
-    // the save is encrypted with the forgotten PIN — it cannot be recovered
-    if (confirm('Forgot your PIN?\n\nYour data is ENCRYPTED with it and CANNOT be recovered.\nContinuing will ERASE your save and start fresh.')) {
-      localStorage.removeItem(STORE_KEY);
-      location.reload();
-    }
-  } else if (confirm('Forgot your PIN?\nThis removes the lock but KEEPS all your data.')) {
-    disablePin(); hideLock(); showToast('🔓 LOCK REMOVED — DATA KEPT');
+  // A real lock can't be skipped: the only way past a forgotten PIN is to wipe.
+  // (If you kept a backup file, you can restore it after starting fresh.)
+  if (confirm('Forgot your PIN?\n\nYour save is locked for your privacy and CANNOT be opened without it.\nThe only option is to ERASE this save and start fresh.\n\nErase now?')) {
+    localStorage.removeItem(STORE_KEY);
+    location.reload();
   }
 });
 els.pinSetBtn.addEventListener('click', () => showLock('set'));
