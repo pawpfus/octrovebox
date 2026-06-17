@@ -2158,6 +2158,9 @@ function showLock(mode, onSet) {
   renderLockDots();
 }
 function hideLock() { els.lockOverlay.hidden = true; lock.buf = ''; lock.first = ''; }
+// true while the PIN overlay is up — used to keep music silent so the keypad
+// clicks aren't drowned out behind the lock screen
+function lockOpen() { return !!(els.lockOverlay && !els.lockOverlay.hidden); }
 // verify an entered PIN. In encrypted mode, success == the blob decrypts; in the
 // legacy hash-only mode (or no WebCrypto), success == the salted hash matches.
 async function attemptUnlock(pin) {
@@ -2218,8 +2221,9 @@ function lockKey(k) {
           if (!appReady) {                  // first unlock after an encrypted boot
             finishBoot();
             setMusicLabel();
-            if (state.musicOn) { try { startMusic(); } catch (e) {} }
           }
+          // resume music only now that the lock is gone (kept silent behind it)
+          if (state.musicOn) { try { startMusic(); } catch (e) {} }
         } else {
           lockShake(); sfx.error(); els.lockSub.textContent = 'WRONG PIN — TRY AGAIN';
           lock.buf = ''; renderLockDots();
@@ -2905,15 +2909,23 @@ document.addEventListener('visibilitychange', () => {
     if (state.pinHash && els.lockOverlay.hidden && lock.hiddenAt && Date.now() - lock.hiddenAt > AUTO_LOCK_MS) {
       showLock('unlock');
     }
-    if (state.musicOn) {
+    // stay silent if we came back to a (re)locked screen — resumes after unlock
+    if (state.musicOn && !lockOpen()) {
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
       startMusic();
     }
   }
 });
-// browsers block audio until a gesture — if music was on last session, start on first interaction
+// browsers block audio until a gesture — if music was on last session, start on
+// first interaction, but NOT while the PIN screen is up (taps there are for the
+// keypad; we don't want music kicking in over the click sounds)
 if (state.musicOn) {
-  const kick = () => { startMusic(); window.removeEventListener('pointerdown', kick); window.removeEventListener('keydown', kick); };
+  const kick = () => {
+    if (lockOpen()) return;   // ignore PIN-pad taps; wait for a gesture after unlock
+    startMusic();
+    window.removeEventListener('pointerdown', kick);
+    window.removeEventListener('keydown', kick);
+  };
   window.addEventListener('pointerdown', kick);
   window.addEventListener('keydown', kick);
 }
