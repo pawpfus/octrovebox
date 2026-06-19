@@ -3501,11 +3501,14 @@ if (state.musicOn) {
       }
     }
 
-    // mid-water fish drift between floor and sprites
-    drawFish();
+    // mid-water fish drift between floor and sprites — but hide them during
+    // FISHING so the ambient drifters aren't mistaken for the catchable targets
+    if (!(game.on && game.mode === 'fish')) drawFish();
 
-    // depth-sorted sprites: stations + hero, back-to-front
-    const sprites = STATIONS.map((s) => ({ kind: 'station', s, depth: s.gx + s.gy }));
+    // depth-sorted sprites: stations + hero, back-to-front. While a minigame is
+    // running the kiosks are inert, so we clear them off the floor entirely to
+    // give a clean, unobstructed play field.
+    const sprites = game.on ? [] : STATIONS.map((s) => ({ kind: 'station', s, depth: s.gx + s.gy }));
     sprites.push({ kind: 'hero', depth: hero.gx + hero.gy });
     sprites.sort((a, b) => a.depth - b.depth);
     sprites.forEach((sp) => (sp.kind === 'hero' ? drawHero() : drawStation(sp.s)));
