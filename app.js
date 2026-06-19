@@ -3087,3 +3087,792 @@ if (state.musicOn) {
   // EFFECTS setting / system reduce-motion) and clears when off
   (function loop() { paint(); requestAnimationFrame(loop); })();
 })();
+
+/* ============================================================
+   THE PALACE — a walkable, isometric 2D view of your finances.
+   Tap "ENTER THE PALACE" and you steer an octopus around a tiled
+   throne room. Each station is a real dashboard feature: walk to
+   the ATM for your balance, the Quest Board for side quests, the
+   Treasury for your savings goal, the Boss Arena for the budget
+   boss, and the Oracle for a tip. Stepping on the door leaves.
+
+   It's a self-contained module: a fullscreen canvas tile-engine
+   (iso projection, depth-sorted sprites, camera follows the hero)
+   plus DOM "kiosk" dialogs that read straight from `state`. Runs
+   only while open, so it costs nothing on the normal dashboard.
+============================================================ */
+(function palace() {
+  const enterBtn = document.getElementById('palaceEnter');
+  if (!enterBtn) return;
+
+  // ---- iso world constants ----
+  const MAP = 11;            // 11x11 floor (gx, gy in 0..10)
+  const TW = 64, TH = 32;    // tile diamond width / height (classic 2:1 iso)
+  const SPEED = 5.2;         // hero movement, tiles per second
+
+  // ---- stations: the Deep is now a minigame arcade — three games + the way up ----
+  const STATIONS = [
+    { id: 'pearl', gx: 4, gy: 6, ico: '🎮', label: 'PEARL RUSH', tint: 'gold'  },
+    { id: 'fish',  gx: 6, gy: 4, ico: '🎣', label: 'FISHING',    tint: 'blue'  },
+    { id: 'raid',  gx: 8, gy: 8, ico: '⚔️', label: 'RAID BOSS',  tint: 'red'   },
+    { id: 'exit',  gx: 5, gy: 1, ico: '🌊', label: 'SURFACE',    tint: 'plain' },
+  ];
+
+  // ---- runtime state ----
+  let overlay, canvas, ctx, dialog, hintEl, hud, gameHud, pgScore, pgTime, musicBtn;
+  let W = 0, H = 0, dpr = 1, originX = 0, originY = 0;
+  let raf = 0, running = false, last = 0;
+  let built = false;
+  const hero = { gx: 5, gy: 5, tx: 5, ty: 5, face: 1, bob: 0 };
+  const held = {};            // keyboard direction state
+  let pendingOpen = null;     // station to auto-open once the hero arrives
+  let near = null;            // station currently in range (for the prompt)
+  let clock = 0;              // animation time (seconds) for shimmer / drift
+  let bubbles = [];           // rising bubble particles
+  let fish = [];              // drifting background fish
+  // minigame state — mode is 'pearl' | 'fish' | 'raid'
+  const game = { on: false, mode: null, score: 0, time: 0, items: [], spawn: 0, boss: null, cd: 0, flash: 0 };
+  let jukeWasOn = false;      // was the dashboard music playing before we dived?
+  const deepBgm = { timer: null, step: 0 };
+
+  // the octopus hero IS the Octrovebox logo — load it once, fall back to emoji
+  const heroImg = new Image();
+  let heroReady = false;
+  heroImg.onload = () => { heroReady = true; };
+  heroImg.src = 'icon-192.png?v=72';
+
+  // Fixed UNDERSEA palette — the Deep always reads aquatic, regardless of the
+  // dashboard skin. Deep blue water up top fading to lit turquoise on the floor,
+  // sandy reef decking, with coral/gold accents for the stations.
+  const palette = {
+    waterA: '#15618f', waterB: '#1f86b8',   // water tiles
+    causticTop: '#7fe9ff', causticBot: '#bff6ff',
+    deck:   '#e6c98f', deckEdge: '#caa15a', // sandy pool/reef rim
+    stone:  '#7c8a82', stoneLt: '#9fb0a6', stoneSh: '#566159', stoneMoss: '#5fae7a',
+    ink:    '#eaf8ff', gold: '#ffd23f',
+    blue:   '#5fd0ff', violet: '#c08bff', red: '#ff6f8c', green: '#5fe6a8',
+    deep:   '#06283d',
+  };
+  const tintColor = (t) => palette[t] || palette.gold;
+
+  /* ---- build the overlay DOM once, on first entry ---- */
+  function build() {
+    overlay = document.createElement('div');
+    overlay.className = 'palace-overlay';
+    overlay.id = 'palaceOverlay';
+    overlay.hidden = true;
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-label', 'The Palace — walkable finance view');
+    overlay.innerHTML = `
+      <canvas class="palace-canvas" id="palaceCanvas"></canvas>
+      <div class="palace-hud" id="palaceHud">
+        <span class="ph-title">≈ THE DEEP ≈</span>
+        <div class="ph-right">
+          <button type="button" class="ph-icon" id="palaceMusic" title="Toggle music">♫</button>
+          <button type="button" class="ph-exit" id="palaceExit" title="Surface — leave the deep">✕ SURFACE</button>
+        </div>
+      </div>
+      <div class="palace-game" id="palaceGame" hidden>
+        <span class="pg-score">🪙 <b id="pgScore">0</b></span>
+        <span class="pg-time">⏱ <b id="pgTime">30</b>s</span>
+      </div>
+      <div class="palace-hint" id="palaceHint" hidden></div>
+      <div class="palace-pad" id="palacePad" aria-hidden="true">
+        <button type="button" class="pp-btn pp-up"    data-dir="up">▲</button>
+        <button type="button" class="pp-btn pp-left"  data-dir="left">◀</button>
+        <button type="button" class="pp-btn pp-right" data-dir="right">▶</button>
+        <button type="button" class="pp-btn pp-down"  data-dir="down">▼</button>
+        <button type="button" class="pp-btn pp-act"   data-dir="act">★</button>
+      </div>
+      <div class="palace-tip" id="palaceTip">TAP TO SWIM · DIVE INTO A GAME · 🌊 SURFACE TO LEAVE</div>
+      <div class="palace-dialog" id="palaceDialog" hidden>
+        <div class="pd-card" id="palaceDialogCard"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    canvas = overlay.querySelector('#palaceCanvas');
+    ctx = canvas.getContext('2d');
+    dialog = overlay.querySelector('#palaceDialog');
+    hintEl = overlay.querySelector('#palaceHint');
+    hud = overlay.querySelector('#palaceHud');
+    gameHud = overlay.querySelector('#palaceGame');
+    pgScore = overlay.querySelector('#pgScore');
+    pgTime = overlay.querySelector('#pgTime');
+    musicBtn = overlay.querySelector('#palaceMusic');
+
+    overlay.querySelector('#palaceExit').addEventListener('click', () => exit());
+    musicBtn.addEventListener('click', toggleDeepMusic);
+
+    // tap / click to walk; tap a station to walk over and open it
+    canvas.addEventListener('pointerdown', onPointer);
+
+    // on-screen D-pad (mobile) — hold to move, ★ to interact
+    overlay.querySelector('#palacePad').addEventListener('pointerdown', onPadDown);
+    overlay.querySelector('#palacePad').addEventListener('pointerup', onPadUp);
+    overlay.querySelector('#palacePad').addEventListener('pointerleave', onPadUp);
+    overlay.querySelector('#palacePad').addEventListener('pointercancel', onPadUp);
+
+    // dialog: close on backdrop tap or ✕
+    dialog.addEventListener('pointerdown', (e) => { if (e.target === dialog) closeDialog(); });
+
+    built = true;
+  }
+
+  /* ---- iso projection helpers ---- */
+  function recenter() {
+    // camera keeps the hero in the middle (lifted slightly above center)
+    originX = W / 2 - (hero.gx - hero.gy) * (TW / 2);
+    originY = H / 2 - (hero.gx + hero.gy) * (TH / 2) - 36;
+  }
+  function toScreen(gx, gy) {
+    return { x: originX + (gx - gy) * (TW / 2), y: originY + (gx + gy) * (TH / 2) };
+  }
+  function toGrid(px, py) {
+    const dx = px - originX, dy = py - originY;
+    return {
+      gx: (dx / (TW / 2) + dy / (TH / 2)) / 2,
+      gy: (dy / (TH / 2) - dx / (TW / 2)) / 2,
+    };
+  }
+
+  /* ---- input ---- */
+  function onPointer(e) {
+    if (!dialog.hidden) return;
+    const r = canvas.getBoundingClientRect();
+    const g = toGrid(e.clientX - r.left, e.clientY - r.top);
+    // during PEARL RUSH, taps only steer — never open stations
+    if (!game.on) {
+      let hit = null, best = 1.1;
+      for (const s of STATIONS) {
+        const d = Math.hypot(g.gx - s.gx, g.gy - s.gy);
+        if (d < best) { best = d; hit = s; }
+      }
+      if (hit) { walkToStation(hit); return; }
+    }
+    // otherwise walk to the tapped tile (clamped inside the floor)
+    hero.tx = clamp(g.gx, 0.5, MAP - 1.5);
+    hero.ty = clamp(g.gy, 0.5, MAP - 1.5);
+    pendingOpen = null;
+    Object.keys(held).forEach((k) => delete held[k]);
+  }
+  function walkToStation(s) {
+    // stand on the tile just "south" of the station so the hero faces it
+    hero.tx = clamp(s.gx + 0.0, 0.5, MAP - 1.5);
+    hero.ty = clamp(s.gy + 0.9, 0.5, MAP - 1.5);
+    pendingOpen = s;
+    Object.keys(held).forEach((k) => delete held[k]);
+  }
+  function onPadDown(e) {
+    const b = e.target.closest('.pp-btn'); if (!b) return;
+    e.preventDefault();
+    const dir = b.dataset.dir;
+    if (dir === 'act') { interact(); return; }
+    held[dir] = true; pendingOpen = null;
+    b.classList.add('on');
+  }
+  function onPadUp(e) {
+    overlay.querySelectorAll('.pp-btn.on').forEach((b) => b.classList.remove('on'));
+    held.up = held.down = held.left = held.right = false;
+  }
+  function onKey(e, down) {
+    const k = e.key.toLowerCase();
+    let dir = null;
+    if (k === 'arrowup' || k === 'w') dir = 'up';
+    else if (k === 'arrowdown' || k === 's') dir = 'down';
+    else if (k === 'arrowleft' || k === 'a') dir = 'left';
+    else if (k === 'arrowright' || k === 'd') dir = 'right';
+    else if (down && (k === ' ' || k === 'enter')) { interact(); e.preventDefault(); return; }
+    else if (down && k === 'escape') { if (!dialog.hidden) closeDialog(); else exit(); return; }
+    if (!dir) return;
+    e.preventDefault();
+    if (down) { held[dir] = true; pendingOpen = null; } else held[dir] = false;
+  }
+  // act on the station in range (or walk-then-open the nearest)
+  function interact() {
+    if (!dialog.hidden) { closeDialog(); return; }
+    if (near) openStation(near);
+  }
+
+  /* ---- update + render loop ---- */
+  function step(ts) {
+    if (!running) return;
+    const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts;
+    update(dt);
+    draw();
+    raf = requestAnimationFrame(step);
+  }
+
+  function update(dt) {
+    // ambient sea life keeps drifting even behind an open kiosk
+    clock += dt;
+    for (const b of bubbles) {
+      b.y -= b.sp * dt;
+      b.x += Math.sin(clock * b.wob + b.ph) * 0.3;
+      if (b.y < -10) { b.y = H + 8; b.x = rnd(0, W); }
+    }
+    for (const f of fish) {
+      f.x += f.sp * dt;
+      f.y += Math.sin(clock * 0.8 + f.ph) * 0.25;
+      if (f.sp > 0 && f.x > W + 40) f.x = -40;
+      else if (f.sp < 0 && f.x < -40) f.x = W + 40;
+    }
+    if (!dialog.hidden) return; // movement frozen while a kiosk is open
+    // keyboard / d-pad steering takes over the tap target
+    let kdx = 0, kdy = 0;
+    if (held.up)    { kdx -= 1; kdy -= 1; }
+    if (held.down)  { kdx += 1; kdy += 1; }
+    if (held.left)  { kdx -= 1; kdy += 1; }
+    if (held.right) { kdx += 1; kdy -= 1; }
+    if (kdx || kdy) {
+      const m = Math.hypot(kdx, kdy);
+      hero.gx = clamp(hero.gx + (kdx / m) * SPEED * dt, 0.5, MAP - 1.5);
+      hero.gy = clamp(hero.gy + (kdy / m) * SPEED * dt, 0.5, MAP - 1.5);
+      hero.tx = hero.gx; hero.ty = hero.gy;
+      if (kdx !== 0) hero.face = kdx > 0 ? 1 : -1;
+    } else {
+      // glide toward the tapped target
+      const dx = hero.tx - hero.gx, dy = hero.ty - hero.gy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0.04) {
+        const move = Math.min(dist, SPEED * dt);
+        hero.gx += (dx / dist) * move;
+        hero.gy += (dy / dist) * move;
+        if (Math.abs(dx) > 0.001) hero.face = (dx - dy) > 0 ? 1 : -1;
+      } else if (pendingOpen) {
+        const s = pendingOpen; pendingOpen = null;
+        openStation(s);
+      }
+    }
+    hero.bob += dt * 6;
+
+    // during PEARL RUSH: collect pearls, no station prompts, no exit-tile trigger
+    if (game.on) { near = null; updateHint(); updateGame(dt); recenter(); return; }
+
+    // proximity prompt + auto-trigger the exit door
+    near = null; let bd = 1.25;
+    for (const s of STATIONS) {
+      const d = Math.hypot(hero.gx - s.gx, hero.gy - s.gy);
+      if (d < bd) { bd = d; near = s; }
+    }
+    if (near && near.id === 'exit' && bd < 0.6) { exit(); return; }
+    updateHint();
+    recenter();
+  }
+
+  function updateHint() {
+    if (near && near.id !== 'exit') {
+      hintEl.hidden = false;
+      hintEl.innerHTML = `<span class="ph-key">★ / SPACE</span> ${near.ico} ${near.label}`;
+    } else {
+      hintEl.hidden = true;
+    }
+  }
+
+  // draw one iso floor diamond centered at screen (x,y)
+  function diamond(x, y, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - TH / 2);
+    ctx.lineTo(x + TW / 2, y);
+    ctx.lineTo(x, y + TH / 2);
+    ctx.lineTo(x - TW / 2, y);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+  }
+
+  const isEdge = (gx, gy) => gx === 0 || gy === 0 || gx === MAP - 1 || gy === MAP - 1;
+
+  function draw() {
+    // deep-sea backdrop: dark up top, lit turquoise toward the floor
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, palette.deep);
+    bg.addColorStop(0.55, '#0a4d68');
+    bg.addColorStop(1, '#0e6c86');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    // god-rays slanting down from the surface
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+      const rx = W * (0.2 + i * 0.22) + Math.sin(clock * 0.2 + i) * 30;
+      const g = ctx.createLinearGradient(rx, 0, rx + 90, H);
+      g.addColorStop(0, 'rgba(150,235,255,0.10)');
+      g.addColorStop(1, 'rgba(150,235,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(rx, 0); ctx.lineTo(rx + 60, 0); ctx.lineTo(rx + 150, H); ctx.lineTo(rx + 30, H); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+
+    // background bubbles (the deepest, faintest ones drift behind everything)
+    drawBubbles(false);
+
+    // clean all-blue floor: every tile is animated water (no reef rim, no border)
+    for (let sum = 0; sum <= (MAP - 1) * 2; sum++) {
+      for (let gx = 0; gx < MAP; gx++) {
+        const gy = sum - gx;
+        if (gy < 0 || gy >= MAP) continue;
+        const p = toScreen(gx, gy);
+        if (p.x < -TW || p.x > W + TW || p.y < -TH || p.y > H + TH) continue;
+        // a slow diagonal swell brightens each tile like light rippling across a
+        // pool, with a faster bright caustic crest layered on top
+        diamond(p.x, p.y, palette.waterA, 'rgba(0,30,50,0.25)');
+        const wv = 0.5 + 0.5 * Math.sin(clock * 1.3 + gx * 0.7 + gy * 0.5);
+        ctx.globalAlpha = 0.45 * wv;
+        diamond(p.x, p.y, palette.waterB, null);
+        const a = 0.06 + 0.10 * (0.5 + 0.5 * Math.sin(clock * 2.1 + gx * 1.1 - gy * 0.6));
+        ctx.globalAlpha = a;
+        diamond(p.x, p.y - 1, palette.causticTop, null);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // mid-water fish drift between floor and sprites
+    drawFish();
+
+    // depth-sorted sprites: stations + hero, back-to-front
+    const sprites = STATIONS.map((s) => ({ kind: 'station', s, depth: s.gx + s.gy }));
+    sprites.push({ kind: 'hero', depth: hero.gx + hero.gy });
+    sprites.sort((a, b) => a.depth - b.depth);
+    sprites.forEach((sp) => (sp.kind === 'hero' ? drawHero() : drawStation(sp.s)));
+
+    // minigame actors draw above the floor
+    if (game.on) { if (game.mode === 'raid') drawBoss(); else drawItems(); }
+
+    // foreground bubbles float over the scene
+    drawBubbles(true);
+  }
+
+  // two passes: small bubbles sit behind the reef (front=false), bigger, brighter
+  // ones float in front of it (front=true)
+  function drawBubbles(front) {
+    ctx.save();
+    const base = front ? 0.85 : 0.42;
+    ctx.strokeStyle = 'rgba(220,250,255,0.85)'; ctx.lineWidth = 1;
+    for (const b of bubbles) {
+      if ((b.r >= 4.5) !== front) continue;
+      ctx.globalAlpha = base;
+      ctx.fillStyle = 'rgba(180,240,255,0.12)';
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.283); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';   // glint
+      ctx.beginPath(); ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.28, 0, 6.283); ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawFish() {
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const f of fish) {
+      ctx.globalAlpha = 0.85;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.scale(f.sp < 0 ? -1 : 1, 1);   // face travel direction
+      ctx.font = f.sz + 'px serif';
+      ctx.fillText(f.ico, 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawStation(s) {
+    const p = toScreen(s.gx, s.gy);
+    const col = tintColor(s.tint);
+    const active = near === s;
+    const LIFT = 15; // pedestal height
+
+    // soft glow pad on the floor
+    const r = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, TW * 0.75);
+    r.addColorStop(0, col + (active ? 'cc' : '77'));
+    r.addColorStop(1, col + '00');
+    ctx.fillStyle = r;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, TW * 0.72, TH * 0.72, 0, 0, 6.283); ctx.fill();
+
+    // SOLID raised stone pedestal — side walls give it real height
+    ctx.fillStyle = palette.stoneSh;
+    ctx.beginPath();
+    ctx.moveTo(p.x - TW / 2, p.y); ctx.lineTo(p.x, p.y + TH / 2);
+    ctx.lineTo(p.x, p.y + TH / 2 - LIFT); ctx.lineTo(p.x - TW / 2, p.y - LIFT); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = palette.stone;
+    ctx.beginPath();
+    ctx.moveTo(p.x + TW / 2, p.y); ctx.lineTo(p.x, p.y + TH / 2);
+    ctx.lineTo(p.x, p.y + TH / 2 - LIFT); ctx.lineTo(p.x + TW / 2, p.y - LIFT); ctx.closePath(); ctx.fill();
+    // opaque coloured top cap + light edge
+    diamond(p.x, p.y - LIFT, col, '#05131f');
+    ctx.globalAlpha = 0.35; diamond(p.x, p.y - LIFT - 1, palette.stoneLt, null); ctx.globalAlpha = 1;
+
+    // opaque medallion behind the icon so it reads crisply (no wash-out)
+    const iy = p.y - LIFT - 17 - (active ? 4 + Math.sin(hero.bob) * 2 : 0);
+    ctx.fillStyle = '#070f1c';
+    ctx.beginPath(); ctx.arc(p.x, iy, 18, 0, 6.283); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = col;
+    ctx.beginPath(); ctx.arc(p.x, iy, 18, 0, 6.283); ctx.stroke();
+
+    // the feature icon — fully opaque
+    ctx.font = '26px serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(s.ico, p.x, iy + 1);
+
+    // label plate below the pedestal
+    ctx.font = '900 9px "Press Start 2P", monospace';
+    ctx.textBaseline = 'middle';
+    const lw = ctx.measureText(s.label).width + 14;
+    ctx.fillStyle = 'rgba(5,5,16,0.88)';
+    roundRect(p.x - lw / 2, p.y + 4, lw, 16, 4); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 1; roundRect(p.x - lw / 2, p.y + 4, lw, 16, 4); ctx.stroke();
+    ctx.fillStyle = active ? col : palette.ink;
+    ctx.fillText(s.label, p.x, p.y + 13);
+  }
+
+  function drawHero() {
+    const p = toScreen(hero.gx, hero.gy);
+    const bob = Math.sin(hero.bob) * 3;
+
+    // rippling shadow on the water
+    ctx.fillStyle = 'rgba(0,20,35,0.45)';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 2, 17, 7, 0, 0, 6.283); ctx.fill();
+
+    // the Octrovebox logo octopus is the diver (flip to face travel direction)
+    ctx.save();
+    ctx.translate(p.x, p.y - 18 + bob);
+    ctx.scale(hero.face, 1);
+    if (heroReady) {
+      const S = 46;
+      ctx.shadowColor = 'rgba(95,208,255,0.55)'; ctx.shadowBlur = 10;
+      ctx.drawImage(heroImg, -S / 2, -S / 2, S, S);
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.font = '34px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🐙', 0, 0);
+    }
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /* ---- station dialogs: a START intro for each minigame ---- */
+  function openStation(s) {
+    if (s.id === 'exit') { exit(); return; }
+    const info = GAME_INFO[s.id];
+    if (!info) return;
+    if (typeof sfx !== 'undefined' && sfx.click) sfx.click();
+    const card = dialog.querySelector('#palaceDialogCard');
+    card.innerHTML =
+      `<button type="button" class="pd-close" title="Close">✕</button>
+       <div class="pd-head"><span class="pd-ico">${info.ico}</span><span class="pd-title">${info.title}</span></div>
+       <div class="pd-body" style="text-align:center">
+         <p class="pd-empty" style="opacity:.92">${info.desc}</p>
+         <p class="pd-note" style="opacity:.9">BEST: ${info.best()} ${info.unit}</p>
+         <button type="button" class="pd-go" id="pgStart">▶ START</button>
+       </div>`;
+    dialog.hidden = false;
+    card.querySelector('.pd-close').addEventListener('click', closeDialog);
+    card.querySelector('#pgStart').addEventListener('click', () => { closeDialog(); startGame(s.id); });
+  }
+  function closeDialog() { dialog.hidden = true; }
+
+  /* ---- underwater BGM: a slow generative sine-pad loop, gated by the master
+     SOUND toggle and a per-Deep mute. Self-contained so it never collides with
+     the dashboard chiptune jukebox (which we pause on the way down). ---- */
+  const DEEP_CHORDS = [[50, 57, 62], [48, 55, 60], [46, 53, 58], [53, 60, 65]]; // Dm Am Bb C-ish
+  function deepBgmStart() {
+    if (deepBgm.timer || !state.soundOn || state.deepMute) return;
+    try { getAudio(); } catch (e) { return; }
+    const tick = () => {
+      if (!state.soundOn || state.deepMute) return;
+      const ch = DEEP_CHORDS[deepBgm.step % DEEP_CHORDS.length];
+      ch.forEach((n) => mNote(N2F(n), 2.8, 'sine', 0.03));        // soft pad swell
+      if (Math.random() < 0.55) mNote(N2F(72 + (Math.random() * 9 | 0)), 0.45, 'sine', 0.018); // bubble shimmer
+      deepBgm.step++;
+    };
+    tick();
+    deepBgm.timer = setInterval(tick, 2600);
+  }
+  function deepBgmStop() { if (deepBgm.timer) { clearInterval(deepBgm.timer); deepBgm.timer = null; } }
+  function syncMusicBtn() {
+    if (!musicBtn) return;
+    const on = state.soundOn && !state.deepMute;
+    musicBtn.textContent = on ? '♫' : '♪';
+    musicBtn.classList.toggle('off', !on);
+  }
+  function toggleDeepMusic() {
+    if (typeof sfx !== 'undefined' && sfx.click) sfx.click();
+    state.deepMute = !state.deepMute;
+    if (typeof save === 'function') save();
+    if (state.deepMute) deepBgmStop(); else deepBgmStart();
+    syncMusicBtn();
+  }
+
+  /* ============================================================
+     MINIGAMES — three swim challenges sharing one engine:
+       pearl  collect static pearls that pop up around the floor
+       fish   chase darting fish and swim into them to net them
+       raid   ram the roaming Leviathan to drain its HP before time
+  ============================================================ */
+  const GAME_INFO = {
+    pearl: { ico: '🎮', title: 'PEARL RUSH', unit: 'PEARLS', best: () => state.deepBest || 0,
+      desc: 'Swim over glowing pearls to scoop them up.<br>Grab as many as you can in <b>30 seconds!</b>' },
+    fish:  { ico: '🎣', title: 'FISHING', unit: 'FISH', best: () => state.deepBestFish || 0,
+      desc: 'Chase the darting fish and swim into them to net them.<br>Catch as many as you can in <b>30 seconds!</b>' },
+    raid:  { ico: '⚔️', title: 'RAID BOSS', unit: 'HITS', best: () => state.deepBestRaid || 0,
+      desc: 'A Leviathan prowls the deep — <b>swim into it</b> to strike!<br>Land 24 hits before <b>45 seconds</b> run out.' },
+  };
+
+  function startGame(mode) {
+    game.on = true; game.mode = mode; game.score = 0; game.items = []; game.spawn = 0;
+    game.boss = null; game.cd = 0; game.flash = 0;
+    gameHud.hidden = false;
+    if (mode === 'pearl') { game.time = 30; for (let i = 0; i < 3; i++) spawnPearl(); }
+    else if (mode === 'fish') { game.time = 30; for (let i = 0; i < 4; i++) spawnFish(); }
+    else if (mode === 'raid') { game.time = 45; game.boss = { hp: 24, max: 24, gx: 5, gy: 3, vx: rnd(-1.4, 1.4), vy: rnd(-1.4, 1.4) }; }
+    updateHudScore();
+  }
+  function spawnPearl() {
+    if (game.items.length >= 6) return;
+    for (let t = 0; t < 12; t++) {
+      const gx = 1 + (Math.random() * (MAP - 2) | 0), gy = 1 + (Math.random() * (MAP - 2) | 0);
+      if (isEdge(gx, gy) || Math.hypot(gx - hero.gx, gy - hero.gy) < 1.2) continue;
+      game.items.push({ kind: 'pearl', gx: gx + rnd(-0.25, 0.25), gy: gy + rnd(-0.25, 0.25), ph: rnd(0, 6.28) });
+      return;
+    }
+  }
+  function spawnFish() {
+    for (let t = 0; t < 12; t++) {
+      const gx = 1.3 + Math.random() * (MAP - 2.6), gy = 1.3 + Math.random() * (MAP - 2.6);
+      if (Math.hypot(gx - hero.gx, gy - hero.gy) < 1.4) continue;
+      const a = rnd(0, 6.28), sp = rnd(0.7, 1.5);
+      game.items.push({ kind: 'fish', gx, gy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, ph: rnd(0, 6.28), ico: pick(['🐠', '🐟', '🐡']) });
+      return;
+    }
+  }
+  function updateHudScore() {
+    pgScore.textContent = game.score;
+    pgTime.textContent = Math.max(0, Math.ceil(game.time));
+  }
+  function updateGame(dt) {
+    game.time -= dt;
+    if (game.flash > 0) game.flash -= dt;
+
+    if (game.mode === 'pearl') {
+      game.spawn -= dt;
+      if (game.spawn <= 0) { spawnPearl(); game.spawn = rnd(0.8, 1.6); }
+      for (let i = game.items.length - 1; i >= 0; i--) {
+        const it = game.items[i];
+        if (Math.hypot(it.gx - hero.gx, it.gy - hero.gy) < 0.55) {
+          game.items.splice(i, 1); game.score++;
+          if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin();
+        }
+      }
+    } else if (game.mode === 'fish') {
+      game.spawn -= dt;
+      if (game.items.length < 4 && game.spawn <= 0) { spawnFish(); game.spawn = rnd(0.6, 1.2); }
+      for (let i = game.items.length - 1; i >= 0; i--) {
+        const f = game.items[i];
+        f.gx += f.vx * dt; f.gy += f.vy * dt;
+        if (f.gx < 1 || f.gx > MAP - 2) { f.vx *= -1; f.gx = clamp(f.gx, 1, MAP - 2); }
+        if (f.gy < 1 || f.gy > MAP - 2) { f.vy *= -1; f.gy = clamp(f.gy, 1, MAP - 2); }
+        if (Math.hypot(f.gx - hero.gx, f.gy - hero.gy) < 0.6) {
+          game.items.splice(i, 1); game.score++;
+          if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin();
+        }
+      }
+    } else if (game.mode === 'raid') {
+      const b = game.boss;
+      if (b) {
+        b.gx += b.vx * dt; b.gy += b.vy * dt;
+        if (b.gx < 2 || b.gx > MAP - 3) { b.vx *= -1; b.gx = clamp(b.gx, 2, MAP - 3); }
+        if (b.gy < 2 || b.gy > MAP - 3) { b.vy *= -1; b.gy = clamp(b.gy, 2, MAP - 3); }
+        if (game.cd > 0) game.cd -= dt;
+        if (game.cd <= 0 && Math.hypot(b.gx - hero.gx, b.gy - hero.gy) < 0.95) {
+          b.hp--; game.score++; game.cd = 0.5; game.flash = 0.18;
+          if (typeof sfx !== 'undefined' && sfx.spend) sfx.spend();
+        }
+        if (b.hp <= 0) { endGame(true); return; }
+      }
+    }
+    updateHudScore();
+    if (game.time <= 0) endGame(game.mode === 'raid' ? false : undefined);
+  }
+  // win is undefined for collect-games, true/false for the raid
+  function endGame(win) {
+    const mode = game.mode;
+    game.on = false; gameHud.hidden = true;
+    const info = GAME_INFO[mode];
+    let record = false, metric = '', bestLine = '', headline = 'TIME!';
+
+    if (mode === 'pearl') {
+      record = game.score > (state.deepBest || 0); state.deepBest = Math.max(state.deepBest || 0, game.score);
+      metric = '🪙 ' + game.score; bestLine = 'BEST: ' + state.deepBest + ' PEARLS';
+    } else if (mode === 'fish') {
+      record = game.score > (state.deepBestFish || 0); state.deepBestFish = Math.max(state.deepBestFish || 0, game.score);
+      metric = '🐟 ' + game.score; bestLine = 'BEST: ' + state.deepBestFish + ' FISH';
+    } else { // raid
+      if (win) {
+        const t = Math.max(1, Math.round(45 - game.time));
+        const prev = state.deepBestRaid || 0;
+        record = !prev || t < prev; state.deepBestRaid = record ? t : prev;
+        headline = '★ LEVIATHAN SLAIN! ★'; metric = '🏆 ' + t + 's'; bestLine = 'BEST: ' + state.deepBestRaid + 's';
+      } else {
+        headline = '💀 IT SURVIVED'; metric = game.score + ' / 24'; bestLine = 'LAND 24 HITS TO WIN';
+      }
+    }
+    if (typeof save === 'function') save();
+    if (typeof sfx !== 'undefined') { if (mode === 'raid' && !win) { if (sfx.roar) sfx.roar(); } else if (sfx.victory) sfx.victory(); }
+
+    const card = dialog.querySelector('#palaceDialogCard');
+    card.innerHTML =
+      `<button type="button" class="pd-close" title="Close">✕</button>
+       <div class="pd-head"><span class="pd-ico">${info.ico}</span><span class="pd-title">${info.title}</span></div>
+       <div class="pd-body" style="text-align:center">
+         <div class="pd-quest-name" style="font-size:13px">${record ? '★ NEW RECORD! ★' : headline}</div>
+         <div class="pg-final">${metric}</div>
+         <p class="pd-note" style="opacity:.9">${bestLine}</p>
+         <button type="button" class="pd-go" id="pgAgain">↺ DIVE AGAIN</button>
+       </div>`;
+    dialog.hidden = false;
+    card.querySelector('.pd-close').addEventListener('click', closeDialog);
+    card.querySelector('#pgAgain').addEventListener('click', () => { closeDialog(); startGame(mode); });
+  }
+
+  function drawItems() {
+    for (const it of game.items) {
+      const p = toScreen(it.gx, it.gy);
+      if (it.kind === 'fish') {
+        const bob = Math.sin(clock * 4 + it.ph) * 2;
+        ctx.save();
+        ctx.translate(p.x, p.y - 14 + bob);
+        // catch-glow halo so targets pop against the water
+        const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 18);
+        g.addColorStop(0, 'rgba(170,240,255,0.5)'); g.addColorStop(1, 'rgba(170,240,255,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 18, 0, 6.283); ctx.fill();
+        ctx.scale(it.vx < 0 ? -1 : 1, 1);
+        ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(it.ico, 0, 0);
+        ctx.restore();
+      } else { // glowing gold pearl
+        const bob = Math.sin(clock * 3 + it.ph) * 3, y = p.y - 16 + bob;
+        const g = ctx.createRadialGradient(p.x, y, 1, p.x, y, 14);
+        g.addColorStop(0, 'rgba(255,255,255,0.95)');
+        g.addColorStop(0.4, palette.gold);
+        g.addColorStop(1, palette.gold + '00');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, 11, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x - 3, y - 3, 2.5, 0, 6.283); ctx.fill();
+      }
+    }
+  }
+
+  function drawBoss() {
+    const b = game.boss; if (!b) return;
+    const p = toScreen(b.gx, b.gy);
+    const bob = Math.sin(clock * 2) * 4;
+    // shadow
+    ctx.fillStyle = 'rgba(0,20,35,0.4)';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 4, 30, 12, 0, 0, 6.283); ctx.fill();
+    // body (a pulse when freshly hit reads as a flinch)
+    const s = 1 + (game.flash > 0 ? 0.14 : 0);
+    ctx.save();
+    ctx.translate(p.x, p.y - 28 + bob);
+    if (game.flash > 0) { ctx.shadowColor = '#fff'; ctx.shadowBlur = 18; }
+    ctx.font = (52 * s | 0) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🦈', 0, 0);
+    ctx.restore();
+    // HP bar
+    const w = 76, h = 8, x = p.x - w / 2, y = p.y - 28 - 46;
+    ctx.fillStyle = 'rgba(5,12,22,0.85)'; roundRect(x - 2, y - 2, w + 4, h + 4, 3); ctx.fill();
+    ctx.fillStyle = palette.red; ctx.fillRect(x, y, w * clamp(b.hp / b.max, 0, 1), h);
+    ctx.font = '900 7px "Press Start 2P", monospace'; ctx.fillStyle = palette.ink;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('LEVIATHAN  ' + Math.max(0, b.hp) + '/' + b.max, p.x, y - 9);
+  }
+
+  /* ---- canvas sizing (dpr-aware) ---- */
+  function resize() {
+    if (!overlay || overlay.hidden) return;
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = overlay.clientWidth; H = overlay.clientHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    recenter();
+    seedBubbles();
+    seedFish();
+  }
+
+  /* ---- ambient sea life ---- */
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function seedBubbles() {
+    const n = Math.max(14, Math.round((W * H) / 26000));
+    bubbles = [];
+    for (let i = 0; i < n; i++) {
+      bubbles.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(2, 7), sp: rnd(18, 46), ph: rnd(0, 6.28), wob: rnd(0.4, 1.2) });
+    }
+  }
+  function seedFish() {
+    const n = Math.max(3, Math.round(W / 320));
+    fish = [];
+    const kinds = ['🐠', '🐟', '🐡', '🦐'];
+    for (let i = 0; i < n; i++) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      fish.push({ x: rnd(0, W), y: rnd(H * 0.18, H * 0.8), sp: dir * rnd(14, 34), sz: rnd(18, 28) | 0, ico: kinds[i % kinds.length], ph: rnd(0, 6.28) });
+    }
+  }
+  const pick = (a) => a[Math.random() * a.length | 0];
+
+  /* ---- enter / exit ---- */
+  function enter() {
+    if (!built) build();
+    // reset the hero to the center of the room each time
+    hero.gx = hero.tx = 5; hero.gy = hero.ty = 5; hero.face = 1; hero.bob = 0;
+    pendingOpen = null; near = null;
+    Object.keys(held).forEach((k) => delete held[k]);
+    overlay.hidden = false;
+    dialog.hidden = true;
+    game.on = false; if (gameHud) gameHud.hidden = true;
+    // pause the dashboard jukebox, then dive into the underwater BGM
+    jukeWasOn = !!music.timer; if (jukeWasOn) stopMusic();
+    syncMusicBtn(); deepBgmStart();
+    document.body.classList.add('palace-open');
+    resize();
+    running = true; last = performance.now();
+    raf = requestAnimationFrame(step);
+    window.addEventListener('keydown', kd);
+    window.addEventListener('keyup', ku);
+    window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', onVis);
+  }
+  function exit(scrollSel) {
+    running = false;
+    if (raf) cancelAnimationFrame(raf), raf = 0;
+    game.on = false; if (gameHud) gameHud.hidden = true;
+    deepBgmStop();
+    if (jukeWasOn) { try { startMusic(); } catch (e) {} jukeWasOn = false; } // resume the jukebox
+    if (overlay) overlay.hidden = true;
+    document.body.classList.remove('palace-open');
+    window.removeEventListener('keydown', kd);
+    window.removeEventListener('keyup', ku);
+    window.removeEventListener('resize', resize);
+    document.removeEventListener('visibilitychange', onVis);
+    if (typeof scrollSel === 'string') {
+      const t = document.querySelector(scrollSel);
+      if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+  const kd = (e) => onKey(e, true);
+  const ku = (e) => onKey(e, false);
+  const onVis = () => {                       // pause the loop + BGM when the tab is hidden
+    if (document.hidden) { running = false; if (raf) cancelAnimationFrame(raf), raf = 0; deepBgmStop(); }
+    else if (overlay && !overlay.hidden) { running = true; last = performance.now(); raf = requestAnimationFrame(step); deepBgmStart(); }
+  };
+
+  enterBtn.addEventListener('click', () => { if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin(); enter(); });
+})();
