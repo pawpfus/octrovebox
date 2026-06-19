@@ -3153,6 +3153,13 @@ if (state.musicOn) {
     { id: 'exit',  gx: 5, gy: 1, ico: '🌊', label: 'SURFACE',    tint: 'plain' },
   ];
 
+  const DECO = [
+    { gx: 2, gy: 2, ico: '🌿', scale: 1.2 }, { gx: 8, gy: 2, ico: '🪨', scale: 1.0 },
+    { gx: 3, gy: 8, ico: '🐚', scale: 0.8 }, { gx: 1, gy: 5, ico: '🌿', scale: 1.1 },
+    { gx: 9, gy: 4, ico: '🪸', scale: 1.3 }, { gx: 6, gy: 9, ico: '🪸', scale: 1.2 },
+    { gx: 4, gy: 1, ico: '🐚', scale: 0.7 }, { gx: 7, gy: 7, ico: '🪨', scale: 1.1 },
+  ];
+
   // ---- runtime state ----
   let overlay, canvas, ctx, dialog, hintEl, hud, gameHud, pgScore, pgTime, musicBtn;
   let W = 0, H = 0, dpr = 1, originX = 0, originY = 0;
@@ -3166,7 +3173,7 @@ if (state.musicOn) {
   let bubbles = [];           // rising bubble particles
   let fish = [];              // drifting background fish
   // minigame state — mode is 'pearl' | 'fish' | 'raid'
-  const game = { on: false, mode: null, score: 0, time: 0, items: [], spawn: 0, boss: null, cd: 0, flash: 0 };
+  const game = { on: false, mode: null, score: 0, time: 0, items: [], spawn: 0, boss: null, cd: 0, flash: 0, shake: 0, particles: [] };
   let jukeWasOn = false;      // was the dashboard music playing before we dived?
   const deepBgm = { timer: null, step: 0 };
 
@@ -3294,6 +3301,10 @@ if (state.musicOn) {
     // camera keeps the hero in the middle (lifted slightly above center)
     originX = W / 2 - (hero.gx - hero.gy) * (TW / 2);
     originY = H / 2 - (hero.gx + hero.gy) * (TH / 2) - 36;
+    if (game.shake > 0) {
+      originX += (Math.random() - 0.5) * 20 * game.shake;
+      originY += (Math.random() - 0.5) * 20 * game.shake;
+    }
   }
   function toScreen(gx, gy) {
     return { x: originX + (gx - gy) * (TW / 2), y: originY + (gx + gy) * (TH / 2) };
@@ -3420,6 +3431,15 @@ if (state.musicOn) {
     }
     hero.bob += dt * 6;
 
+    if (game.shake > 0) game.shake -= dt * 2;
+    if (game.particles.length) {
+      for (let i = game.particles.length - 1; i >= 0; i--) {
+        const p = game.particles[i];
+        p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+        if (p.life <= 0) game.particles.splice(i, 1);
+      }
+    }
+
     // during PEARL RUSH: collect pearls, no station prompts, no exit-tile trigger
     if (game.on) { near = null; updateHint(); updateGame(dt); recenter(); return; }
 
@@ -3488,6 +3508,25 @@ if (state.musicOn) {
         // a slow diagonal swell brightens each tile like light rippling across a
         // pool, with a faster bright caustic crest layered on top
         diamond(p.x, p.y, palette.waterA, 'rgba(0,30,50,0.25)');
+
+        // procedural floor texture (sand/reef grit)
+        if (!lowEnd) {
+          ctx.save(); ctx.translate(p.x, p.y);
+          ctx.fillStyle = 'rgba(0,0,0,0.06)';
+          // deterministic noise based on tile coords
+          const seed = (gx * 123.45 + gy * 678.9) % 1;
+          for (let i = 0; i < 4; i++) {
+            const tx = ((gx * 17 + gy * 7 + i * 91) % 40) - 20;
+            const ty = ((gx * 13 + gy * 19 + i * 37) % 20) - 10;
+            ctx.fillRect(tx, ty, 2, 2);
+          }
+          if (seed > 0.82) { // occasional reef spot
+            ctx.fillStyle = 'rgba(0,40,80,0.12)';
+            ctx.beginPath(); ctx.ellipse(0, 0, 8, 4, seed, 0, 6.28); ctx.fill();
+          }
+          ctx.restore();
+        }
+
         const wv = 0.5 + 0.5 * Math.sin(clock * 1.3 + gx * 0.7 + gy * 0.5);
         ctx.globalAlpha = 0.45 * wv;
         diamond(p.x, p.y, palette.waterB, null);
@@ -3504,11 +3543,27 @@ if (state.musicOn) {
     // mid-water fish drift between floor and sprites
     drawFish();
 
-    // depth-sorted sprites: stations + hero, back-to-front
+    // depth-sorted sprites: stations + hero + deco, back-to-front
     const sprites = STATIONS.map((s) => ({ kind: 'station', s, depth: s.gx + s.gy }));
     sprites.push({ kind: 'hero', depth: hero.gx + hero.gy });
+    DECO.forEach((d) => sprites.push({ kind: 'deco', d, depth: d.gx + d.gy }));
     sprites.sort((a, b) => a.depth - b.depth);
-    sprites.forEach((sp) => (sp.kind === 'hero' ? drawHero() : drawStation(sp.s)));
+    sprites.forEach((sp) => {
+      if (sp.kind === 'hero') drawHero();
+      else if (sp.kind === 'station') drawStation(sp.s);
+      else drawDeco(sp.d);
+    });
+
+    // Particles on top for maximum juice
+    if (game.particles.length) {
+      ctx.save();
+      game.particles.forEach(p => {
+        ctx.globalAlpha = Math.min(1.0, p.life * 2);
+        ctx.fillStyle = p.col;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, 6.28); ctx.fill();
+      });
+      ctx.restore();
+    }
 
     // minigame actors draw above the floor
     if (game.on) { if (game.mode === 'raid') drawBoss(); else drawItems(); }
@@ -3597,6 +3652,17 @@ if (state.musicOn) {
     ctx.strokeStyle = col; ctx.lineWidth = 1; roundRect(p.x - lw / 2, p.y + 4, lw, 16, 4); ctx.stroke();
     ctx.fillStyle = active ? col : palette.ink;
     ctx.fillText(s.label, p.x, p.y + 13);
+  }
+
+  function drawDeco(d) {
+    const p = toScreen(d.gx, d.gy);
+    const bob = Math.sin(clock * 2 + (d.gx * 7)) * 2;
+    ctx.save();
+    ctx.translate(p.x, p.y - 12 + (d.ico === '🌿' || d.ico === '🪸' ? bob : 0));
+    ctx.font = (24 * (d.scale || 1) | 0) + 'px serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(d.ico, 0, 0);
+    ctx.restore();
   }
 
   function drawHero() {
@@ -3743,6 +3809,12 @@ if (state.musicOn) {
       for (let i = game.items.length - 1; i >= 0; i--) {
         const it = game.items[i];
         if (Math.hypot(it.gx - hero.gx, it.gy - hero.gy) < 0.55) {
+          const pS = toScreen(it.gx, it.gy);
+          for (let i = 0; i < 6; i++) {
+            const a = Math.random() * 6.28;
+            const s = 30 + Math.random() * 40;
+            game.particles.push({ x: pS.x, y: pS.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.5, sz: 2 + Math.random() * 2, col: palette.gold });
+          }
           game.items.splice(i, 1); game.score++;
           if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin();
         }
@@ -3768,7 +3840,13 @@ if (state.musicOn) {
         if (b.gy < 2 || b.gy > MAP - 3) { b.vy *= -1; b.gy = clamp(b.gy, 2, MAP - 3); }
         if (game.cd > 0) game.cd -= dt;
         if (game.cd <= 0 && Math.hypot(b.gx - hero.gx, b.gy - hero.gy) < 0.95) {
-          b.hp--; game.score++; game.cd = 0.5; game.flash = 0.18;
+          b.hp--; game.score++; game.cd = 0.5; game.flash = 0.18; game.shake = 0.4;
+          const pS = toScreen(b.gx, b.gy);
+          for (let i = 0; i < 8; i++) {
+            const a = Math.random() * 6.28;
+            const s = 40 + Math.random() * 60;
+            game.particles.push({ x: pS.x, y: pS.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.6, sz: 2 + Math.random() * 3, col: '#fff' });
+          }
           if (typeof sfx !== 'undefined' && sfx.spend) sfx.spend();
         }
         if (b.hp <= 0) { endGame(true); return; }
@@ -3843,18 +3921,39 @@ if (state.musicOn) {
 
   function drawBoss() {
     const b = game.boss; if (!b) return;
-    const p = toScreen(b.gx, b.gy);
+    let p = toScreen(b.gx, b.gy);
     const bob = Math.sin(clock * 2) * 4;
+
+    // flinch shake
+    if (game.flash > 0) {
+      p.x += (Math.random() - 0.5) * 8;
+      p.y += (Math.random() - 0.5) * 8;
+    }
+
     // shadow
     ctx.fillStyle = 'rgba(0,20,35,0.4)';
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 4, 30, 12, 0, 0, 6.283); ctx.fill();
     // body (a pulse when freshly hit reads as a flinch)
-    const s = 1 + (game.flash > 0 ? 0.14 : 0);
+    const s = 1.1 + (game.flash > 0 ? 0.2 : 0);
     ctx.save();
-    ctx.translate(p.x, p.y - 28 + bob);
-    if (game.flash > 0) { ctx.shadowColor = '#fff'; ctx.shadowBlur = 18; }
-    ctx.font = (52 * s | 0) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.translate(p.x, p.y - 32 + bob);
+
+    // menace aura
+    ctx.globalAlpha = 0.15 + 0.1 * Math.sin(clock * 4);
+    ctx.fillStyle = palette.red;
+    ctx.beginPath(); ctx.arc(0, 0, 40 * s, 0, 6.28); ctx.fill();
+    ctx.globalAlpha = 1.0;
+
+    if (game.flash > 0) {
+        ctx.shadowColor = '#fff'; ctx.shadowBlur = 25;
+        ctx.filter = 'brightness(2) contrast(1.5)';
+    }
+    else { ctx.shadowColor = palette.red; ctx.shadowBlur = 12; }
+
+    ctx.font = (64 * s | 0) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.scale(b.vx > 0 ? -1 : 1, 1); // face movement direction
     ctx.fillText('🦈', 0, 0);
+    ctx.filter = 'none';
     ctx.restore();
     // HP bar
     const w = 76, h = 8, x = p.x - w / 2, y = p.y - 28 - 46;
