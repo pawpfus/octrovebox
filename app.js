@@ -2659,6 +2659,30 @@ function setFxLabel() {
 }
 
 /* ============================================================
+   LOW-END PERFORMANCE BUDGET — sniff weak hardware once, then let
+   the canvas loops dial themselves down (fewer particles, capped
+   frame rate, lighter pixel ratio) so cheap phones / old laptops
+   stay smooth. Desktops with unknown specs stay full-power.
+============================================================ */
+const lowEnd = (() => {
+  const mem = navigator.deviceMemory || 8;            // GiB, Chrome/Android only
+  const cores = navigator.hardwareConcurrency || 8;
+  const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  return mem <= 4 || cores <= 4 || (coarse && cores <= 6);
+})();
+// Build a frame gate: returns a fn(ts)->bool that is true only when enough
+// time has passed to paint again. `lowFps` applies on weak devices, `hiFps`
+// otherwise (0 = uncapped). Only use on loops whose motion is time-based (dt),
+// never on frame-counter animations — capping those would slow them down.
+function makeFrameGate(lowFps, hiFps) {
+  const fps = lowEnd ? lowFps : hiFps;
+  if (!fps) return () => true;
+  const interval = 1000 / fps;
+  let prev = -1e9;
+  return (now) => (now - prev < interval ? false : (prev = now, true));
+}
+
+/* ============================================================
    THEMED AMBIENT FLOATS — particles that match the active zone:
    city rain, frozen-peak snow, undersea fish, and twinkling motes
    tinted to each other biome. Replaces the old roaming buddies.
@@ -2686,8 +2710,10 @@ function setFxLabel() {
   // density scales with viewport AREA; phones get fewer (but bolder — see paint)
   // particles so the effect reads clearly without cluttering a small screen
   const dens = (div, min) => {
-    const n = Math.max(min, Math.round((w * h) / div));
-    return w <= 600 ? Math.max(10, Math.round(n * 0.5)) : n;
+    let n = Math.max(min, Math.round((w * h) / div));
+    if (w <= 600) n = Math.max(10, Math.round(n * 0.5));
+    if (lowEnd) n = Math.max(8, Math.round(n * 0.55));   // thin out on weak hardware
+    return n;
   };
   function build() {
     parts = [];
@@ -2938,13 +2964,15 @@ if (state.musicOn) {
   if (!cv) return;
   const ctx = cv.getContext('2d');
   const COLORS = ['#ffffff', '#ffffff', '#ffd23f', '#4fa9ff', '#b06bff'];
-  let w, h, stars;
+  let w, h, stars, needPaint = true;
   function resize() {
     const W = window.innerWidth, H = window.innerHeight;
     if (!W || !H) { setTimeout(resize, 250); return; } // mobile viewport not ready yet — retry
     w = cv.width = W;
     h = cv.height = H;
-    const count = Math.max(28, Math.round((w * h) / 14000));
+    needPaint = true;
+    let count = Math.max(28, Math.round((w * h) / 14000));
+    if (lowEnd) count = Math.max(18, Math.round(count * 0.55));
     stars = [];
     for (let i = 0; i < count; i++) {
       stars.push({
@@ -3016,7 +3044,13 @@ if (state.musicOn) {
     // self-heal: mobile browsers can settle the viewport after load without a
     // usable resize event, leaving the canvas 0x0 or stale — fix it every frame
     if (cv.width !== window.innerWidth || cv.height !== window.innerHeight) resize();
-    paint(fxAnimate());   // animate (twinkle/drift) only when effects are on; else static stars
+    if (fxAnimate()) {
+      paint(true);        // effects on → live twinkle/drift every frame
+    } else {
+      // static stars: the scene only changes when the day/night phase flips or
+      // on resize, so redraw then instead of burning a full repaint each frame
+      if (needPaint || phaseInfo().name !== lastPhase) { paint(false); needPaint = false; }
+    }
     requestAnimationFrame(loop);
   }
   resize();
@@ -3037,7 +3071,8 @@ if (state.musicOn) {
     return { x: Math.random() * w, y: Math.random() * -h, len: (mode === 'storm' ? 14 : 9) + Math.random() * 8, sp: (mode === 'storm' ? 10 : 6) + Math.random() * 5 };
   }
   function build() {
-    const rain = mode === 'rain' ? Math.round(w / 14) : mode === 'storm' ? Math.round(w / 7) : 0;
+    let rain = mode === 'rain' ? Math.round(w / 14) : mode === 'storm' ? Math.round(w / 7) : 0;
+    if (lowEnd) rain = Math.round(rain * 0.6);
     drops = []; for (let i = 0; i < rain; i++) { const d = newDrop(); d.y = Math.random() * h; drops.push(d); }
     const cloud = mode === 'cloud' ? 3 : mode === 'storm' ? 5 : 0;
     clouds = []; for (let i = 0; i < cloud; i++) clouds.push({ x: Math.random() * w, y: 20 + Math.random() * h * 0.28, sp: 0.08 + Math.random() * 0.18, s: 46 + Math.random() * 70 });
@@ -3154,6 +3189,42 @@ if (state.musicOn) {
     deep:   '#06283d',
   };
   const tintColor = (t) => palette[t] || palette.gold;
+
+  /* ---- gradient cache ----
+     Building a CanvasGradient is expensive, and the old draw() minted ten-plus
+     of them EVERY frame (backdrop, god-rays, every station glow, every pearl).
+     Gradients live in user space, so we make each one once and just translate
+     the context to wherever it's needed. Size-dependent ones (backdrop, rays)
+     rebuild on resize; the rest are positionless and cached forever. */
+  const grad = { bg: null, ray: null, station: {}, pearl: null, fishHalo: null };
+  function buildSizeGrads() {
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, palette.deep); bg.addColorStop(0.55, '#0a4d68'); bg.addColorStop(1, '#0e6c86');
+    grad.bg = bg;
+    const ray = ctx.createLinearGradient(0, 0, 90, H);
+    ray.addColorStop(0, 'rgba(150,235,255,0.10)'); ray.addColorStop(1, 'rgba(150,235,255,0)');
+    grad.ray = ray;
+  }
+  function stationGrad(tint, active) {
+    const key = tint + (active ? '1' : '0');
+    if (grad.station[key]) return grad.station[key];
+    const col = tintColor(tint);
+    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, TW * 0.75);
+    g.addColorStop(0, col + (active ? 'cc' : '77')); g.addColorStop(1, col + '00');
+    return (grad.station[key] = g);
+  }
+  function pearlGrad() {
+    if (grad.pearl) return grad.pearl;
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 14);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.4, palette.gold); g.addColorStop(1, palette.gold + '00');
+    return (grad.pearl = g);
+  }
+  function fishHaloGrad() {
+    if (grad.fishHalo) return grad.fishHalo;
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 18);
+    g.addColorStop(0, 'rgba(170,240,255,0.5)'); g.addColorStop(1, 'rgba(170,240,255,0)');
+    return (grad.fishHalo = g);
+  }
 
   /* ---- build the overlay DOM once, on first entry ---- */
   function build() {
@@ -3294,12 +3365,16 @@ if (state.musicOn) {
   }
 
   /* ---- update + render loop ---- */
+  // movement here is all dt-scaled, so capping the frame rate on weak devices
+  // only thins the redraws — it never changes how fast anything moves
+  const drawGate = makeFrameGate(32, 0);
   function step(ts) {
     if (!running) return;
+    raf = requestAnimationFrame(step);
+    if (!drawGate(ts)) return;
     const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts;
     update(dt);
     draw();
-    raf = requestAnimationFrame(step);
   }
 
   function update(dt) {
@@ -3383,23 +3458,20 @@ if (state.musicOn) {
   const isEdge = (gx, gy) => gx === 0 || gy === 0 || gx === MAP - 1 || gy === MAP - 1;
 
   function draw() {
+    if (!grad.bg) buildSizeGrads();
     // deep-sea backdrop: dark up top, lit turquoise toward the floor
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, palette.deep);
-    bg.addColorStop(0.55, '#0a4d68');
-    bg.addColorStop(1, '#0e6c86');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = grad.bg; ctx.fillRect(0, 0, W, H);
 
-    // god-rays slanting down from the surface
+    // god-rays slanting down from the surface (fewer on weak devices)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = grad.ray;
+    const rays = lowEnd ? 2 : 4;
+    for (let i = 0; i < rays; i++) {
       const rx = W * (0.2 + i * 0.22) + Math.sin(clock * 0.2 + i) * 30;
-      const g = ctx.createLinearGradient(rx, 0, rx + 90, H);
-      g.addColorStop(0, 'rgba(150,235,255,0.10)');
-      g.addColorStop(1, 'rgba(150,235,255,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.moveTo(rx, 0); ctx.lineTo(rx + 60, 0); ctx.lineTo(rx + 150, H); ctx.lineTo(rx + 30, H); ctx.closePath(); ctx.fill();
+      ctx.save(); ctx.translate(rx, 0);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(60, 0); ctx.lineTo(150, H); ctx.lineTo(30, H); ctx.closePath(); ctx.fill();
+      ctx.restore();
     }
     ctx.restore();
 
@@ -3419,9 +3491,12 @@ if (state.musicOn) {
         const wv = 0.5 + 0.5 * Math.sin(clock * 1.3 + gx * 0.7 + gy * 0.5);
         ctx.globalAlpha = 0.45 * wv;
         diamond(p.x, p.y, palette.waterB, null);
-        const a = 0.06 + 0.10 * (0.5 + 0.5 * Math.sin(clock * 2.1 + gx * 1.1 - gy * 0.6));
-        ctx.globalAlpha = a;
-        diamond(p.x, p.y - 1, palette.causticTop, null);
+        // bright caustic crest — a third fill per tile, skipped on weak devices
+        if (!lowEnd) {
+          const a = 0.06 + 0.10 * (0.5 + 0.5 * Math.sin(clock * 2.1 + gx * 1.1 - gy * 0.6));
+          ctx.globalAlpha = a;
+          diamond(p.x, p.y - 1, palette.causticTop, null);
+        }
         ctx.globalAlpha = 1;
       }
     }
@@ -3482,12 +3557,11 @@ if (state.musicOn) {
     const active = near === s;
     const LIFT = 15; // pedestal height
 
-    // soft glow pad on the floor
-    const r = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, TW * 0.75);
-    r.addColorStop(0, col + (active ? 'cc' : '77'));
-    r.addColorStop(1, col + '00');
-    ctx.fillStyle = r;
-    ctx.beginPath(); ctx.ellipse(p.x, p.y, TW * 0.72, TH * 0.72, 0, 0, 6.283); ctx.fill();
+    // soft glow pad on the floor (cached gradient, translated into place)
+    ctx.save(); ctx.translate(p.x, p.y);
+    ctx.fillStyle = stationGrad(s.tint, active);
+    ctx.beginPath(); ctx.ellipse(0, 0, TW * 0.72, TH * 0.72, 0, 0, 6.283); ctx.fill();
+    ctx.restore();
 
     // SOLID raised stone pedestal — side walls give it real height
     ctx.fillStyle = palette.stoneSh;
@@ -3751,22 +3825,18 @@ if (state.musicOn) {
         const bob = Math.sin(clock * 4 + it.ph) * 2;
         ctx.save();
         ctx.translate(p.x, p.y - 14 + bob);
-        // catch-glow halo so targets pop against the water
-        const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 18);
-        g.addColorStop(0, 'rgba(170,240,255,0.5)'); g.addColorStop(1, 'rgba(170,240,255,0)');
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 18, 0, 6.283); ctx.fill();
+        // catch-glow halo so targets pop against the water (cached gradient)
+        ctx.fillStyle = fishHaloGrad(); ctx.beginPath(); ctx.arc(0, 0, 18, 0, 6.283); ctx.fill();
         ctx.scale(it.vx < 0 ? -1 : 1, 1);
         ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(it.ico, 0, 0);
         ctx.restore();
-      } else { // glowing gold pearl
+      } else { // glowing gold pearl (cached gradient, translated into place)
         const bob = Math.sin(clock * 3 + it.ph) * 3, y = p.y - 16 + bob;
-        const g = ctx.createRadialGradient(p.x, y, 1, p.x, y, 14);
-        g.addColorStop(0, 'rgba(255,255,255,0.95)');
-        g.addColorStop(0.4, palette.gold);
-        g.addColorStop(1, palette.gold + '00');
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, 11, 0, 6.283); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x - 3, y - 3, 2.5, 0, 6.283); ctx.fill();
+        ctx.save(); ctx.translate(p.x, y);
+        ctx.fillStyle = pearlGrad(); ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-3, -3, 2.5, 0, 6.283); ctx.fill();
+        ctx.restore();
       }
     }
   }
@@ -3798,11 +3868,13 @@ if (state.musicOn) {
   /* ---- canvas sizing (dpr-aware) ---- */
   function resize() {
     if (!overlay || overlay.hidden) return;
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    // weak devices render at 1x — a full-screen canvas at 2x is 4x the pixels
+    dpr = lowEnd ? 1 : Math.min(2, window.devicePixelRatio || 1);
     W = overlay.clientWidth; H = overlay.clientHeight;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    buildSizeGrads();   // backdrop + god-ray gradients depend on H
     recenter();
     seedBubbles();
     seedFish();
@@ -3811,7 +3883,8 @@ if (state.musicOn) {
   /* ---- ambient sea life ---- */
   const rnd = (a, b) => a + Math.random() * (b - a);
   function seedBubbles() {
-    const n = Math.max(14, Math.round((W * H) / 26000));
+    let n = Math.max(14, Math.round((W * H) / 26000));
+    if (lowEnd) n = Math.max(8, Math.round(n * 0.5));
     bubbles = [];
     for (let i = 0; i < n; i++) {
       bubbles.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(2, 7), sp: rnd(18, 46), ph: rnd(0, 6.28), wob: rnd(0.4, 1.2) });

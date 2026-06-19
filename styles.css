@@ -3385,3 +3385,20 @@ body.palace-open { overflow: hidden; }
   .palace-tip { font-size: 12px; }
   .palace-hint { bottom: 200px; font-size: 9px; }
 }
+
+/* ============================================================
+   REDUCED MOTION / LOW-POWER — when the OS asks for less motion
+   (often set on weak phones to save battery) we drop all the
+   decorative looping animations and snap transitions instant.
+   The JS ambient effects already honour this via fxAnimate(); this
+   keeps the CSS chrome (bobbing icons, blinking, flowing borders)
+   in step so nothing is left spinning in the background.
+============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
