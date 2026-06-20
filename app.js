@@ -64,6 +64,8 @@ let state = {
   // THE GUILD — local 2-player household co-op (one install, no backend).
   // off by default so solo players are untouched; entries carry an `owner`.
   guild: { on: false, active: 'p1', names: { p1: 'PLAYER 1', p2: 'PLAYER 2' } },
+  // BOT LAB — last paper-trading config (real market data, no real orders)
+  bots: { market: 'gold', coin: 'GC=F', strat: 'sma', range: 365 },
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -4205,4 +4207,360 @@ if (state.musicOn) {
   };
 
   enterBtn.addEventListener('click', () => { if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin(); enter(); });
+})();
+
+/* ============================================================
+   BOT LAB — paper-trading bots on REAL market data
+   --------------------------------------------------------------
+   A self-contained module: pick a coin + a bot strategy, pull real
+   price history from CoinGecko (keyless, browser-callable), then run
+   the strategy as a paper trader over the window starting from a
+   virtual $10,000. Shows the bot's simulated track record, what it
+   would do right now, and how it compares to simply buying & holding.
+   Strictly simulated — it never places a real order or moves money.
+============================================================ */
+(function botLab() {
+  const runBtn = document.getElementById('botRun');
+  if (!runBtn) return;
+
+  const elMarket = document.getElementById('botMarket');
+  const elCoin = document.getElementById('botCoin');
+  const elStrat = document.getElementById('botStrat');
+  const elRange = document.getElementById('botRange');
+  const elParams = document.getElementById('botParams');
+  const elStatus = document.getElementById('botStatus');
+  const elResult = document.getElementById('botResult');
+  const elPrice = document.getElementById('botPrice');
+  const elSignal = document.getElementById('botSignal');
+  const elChart = document.getElementById('botChart');
+  const elStats = document.getElementById('botStats');
+  const elLog = document.getElementById('botLog');
+
+  const START_CASH = 10000;     // virtual paper capital
+  const FEE = 0.001;            // 0.1% per simulated trade
+  let runToken = 0;             // guards against a stale fetch overwriting a newer run
+
+  // two markets: gold & precious metals (USD) and Indonesia / IHSG (IDR).
+  // both pull real candles from Yahoo Finance via a CORS proxy (Yahoo blocks
+  // direct browser calls); keyless on our side.
+  const MARKETS = {
+    gold: { label: '🪙 GOLD & METALS', ccy: 'USD', items: [
+      { id: 'GC=F', sym: 'GOLD',  name: 'Gold / oz' },
+      { id: 'SI=F', sym: 'SILVER', name: 'Silver / oz' },
+      { id: 'PL=F', sym: 'PLATINUM', name: 'Platinum / oz' },
+      { id: 'PA=F', sym: 'PALLADIUM', name: 'Palladium / oz' },
+      { id: 'HG=F', sym: 'COPPER', name: 'Copper / lb' },
+    ] },
+    id: { label: '🇮🇩 INDONESIA', ccy: 'IDR', items: [
+      { id: '^JKSE',   sym: 'IHSG', name: 'Jakarta Composite', index: true },
+      { id: 'BBCA.JK', sym: 'BBCA', name: 'Bank Central Asia' },
+      { id: 'BBRI.JK', sym: 'BBRI', name: 'Bank Rakyat Indonesia' },
+      { id: 'BMRI.JK', sym: 'BMRI', name: 'Bank Mandiri' },
+      { id: 'TLKM.JK', sym: 'TLKM', name: 'Telkom Indonesia' },
+      { id: 'ASII.JK', sym: 'ASII', name: 'Astra International' },
+      { id: 'GOTO.JK', sym: 'GOTO', name: 'GoTo Gojek Tokopedia' },
+      { id: 'ANTM.JK', sym: 'ANTM', name: 'Aneka Tambang' },
+    ] },
+  };
+  const findItem = (mkt, id) => (MARKETS[mkt] ? MARKETS[mkt].items : []).find((i) => i.id === id);
+  const RANGES = [
+    { v: 30,  label: '30 DAYS' },
+    { v: 90,  label: '90 DAYS' },
+    { v: 365, label: '1 YEAR' },
+  ];
+  // each strategy declares its tunable params (label + default + min/max)
+  const STRATS = {
+    sma:      { name: 'SMA CROSSOVER', params: [
+      { k: 'fast', label: 'FAST', def: 10, min: 2, max: 60 },
+      { k: 'slow', label: 'SLOW', def: 30, min: 5, max: 200 } ] },
+    rsi:      { name: 'RSI REVERSION', params: [
+      { k: 'low',  label: 'BUY <',  def: 30, min: 5,  max: 49 },
+      { k: 'high', label: 'SELL >', def: 70, min: 51, max: 95 } ] },
+    breakout: { name: 'BREAKOUT', params: [
+      { k: 'look', label: 'LOOKBACK', def: 20, min: 3, max: 90 } ] },
+    dip:      { name: 'BUY THE DIP', params: [
+      { k: 'dip', label: 'DIP %', def: 5, min: 1, max: 30 },
+      { k: 'rip', label: 'TAKE %', def: 8, min: 1, max: 40 } ] },
+  };
+
+  /* ---- price formatting by market currency (app currency is separate) ---- */
+  function money(v, ccy, isIndex) {
+    if (ccy === 'IDR') {
+      if (isIndex) return v.toLocaleString('id-ID', { maximumFractionDigits: 0 });   // index points
+      return 'Rp' + v.toLocaleString('id-ID', { maximumFractionDigits: v < 100 ? 2 : 0 });
+    }
+    if (v >= 1000) return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    if (v >= 1)    return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  }
+  const pct = (v) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+  const dstr = (t) => { const d = new Date(t); return (d.getMonth() + 1) + '/' + d.getDate(); };
+
+  /* ---- indicators ---- */
+  function smaAt(p, i, n) { if (i + 1 < n) return null; let s = 0; for (let k = i - n + 1; k <= i; k++) s += p[k]; return s / n; }
+  function rsiSeries(p, period) {
+    const out = new Array(p.length).fill(null);
+    let gain = 0, loss = 0;
+    for (let i = 1; i < p.length; i++) {
+      const ch = p[i] - p[i - 1], g = Math.max(0, ch), l = Math.max(0, -ch);
+      if (i <= period) {
+        gain += g; loss += l;
+        if (i === period) { gain /= period; loss /= period; out[i] = 100 - 100 / (1 + (loss === 0 ? 100 : gain / loss)); }
+      } else {
+        gain = (gain * (period - 1) + g) / period; loss = (loss * (period - 1) + l) / period;
+        out[i] = 100 - 100 / (1 + (loss === 0 ? 100 : gain / loss));
+      }
+    }
+    return out;
+  }
+
+  /* ---- strategies: price[] -> desired position[] (0 flat, 1 long) ---- */
+  function signals(strat, prices, prm) {
+    const pos = new Array(prices.length).fill(0);
+    let cur = 0;
+    if (strat === 'sma') {
+      for (let i = 0; i < prices.length; i++) {
+        const f = smaAt(prices, i, prm.fast), s = smaAt(prices, i, prm.slow);
+        if (f != null && s != null) cur = f > s ? 1 : 0;
+        pos[i] = cur;
+      }
+    } else if (strat === 'rsi') {
+      const r = rsiSeries(prices, 14);
+      for (let i = 0; i < prices.length; i++) {
+        if (r[i] != null) { if (r[i] < prm.low) cur = 1; else if (r[i] > prm.high) cur = 0; }
+        pos[i] = cur;
+      }
+    } else if (strat === 'breakout') {
+      for (let i = 0; i < prices.length; i++) {
+        if (i >= prm.look) {
+          let hi = -Infinity, lo = Infinity;
+          for (let k = i - prm.look; k < i; k++) { if (prices[k] > hi) hi = prices[k]; if (prices[k] < lo) lo = prices[k]; }
+          if (prices[i] > hi) cur = 1; else if (prices[i] < lo) cur = 0;
+        }
+        pos[i] = cur;
+      }
+    } else if (strat === 'dip') {
+      for (let i = 0; i < prices.length; i++) {
+        const m = smaAt(prices, i, 20);
+        if (m != null) { if (prices[i] < m * (1 - prm.dip / 100)) cur = 1; else if (prices[i] > m * (1 + prm.rip / 100)) cur = 0; }
+        pos[i] = cur;
+      }
+    }
+    return pos;
+  }
+
+  /* ---- paper-trading backtest over the price series ---- */
+  function backtest(series, pos) {
+    const prices = series.map((d) => d.p);
+    let cash = START_CASH, units = 0, entry = null, wins = 0, rt = 0;
+    const trades = [], equity = [], hold = [];
+    const startUnits = START_CASH / prices[0];
+    for (let i = 0; i < series.length; i++) {
+      const price = prices[i];
+      if (pos[i] === 1 && units === 0) {
+        units = (cash * (1 - FEE)) / price; cash = 0; entry = price;
+        trades.push({ t: series[i].t, side: 'BUY', price });
+      } else if (pos[i] === 0 && units > 0) {
+        cash = units * price * (1 - FEE); rt++; if (price > entry) wins++;
+        trades.push({ t: series[i].t, side: 'SELL', price, pnl: (price / entry - 1) * 100 });
+        units = 0; entry = null;
+      }
+      equity.push(cash + units * price);
+      hold.push(startUnits * price);
+    }
+    let peak = -Infinity, mdd = 0;
+    for (const e of equity) { if (e > peak) peak = e; const dd = (peak - e) / peak; if (dd > mdd) mdd = dd; }
+    const finalEq = equity[equity.length - 1];
+    return {
+      equity, hold, trades,
+      ret: (finalEq / START_CASH - 1) * 100,
+      holdRet: (hold[hold.length - 1] / START_CASH - 1) * 100,
+      finalEq, nTrades: trades.length, winRate: rt ? (wins / rt) * 100 : 0, rt,
+      mdd: mdd * 100, inPosition: units > 0,
+    };
+  }
+
+  /* ---- data: real history per market, synthetic fallback when unreachable ---- */
+  async function timedFetch(url, opts) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 11000);
+    try { return await fetch(url, Object.assign({ signal: ctrl.signal }, opts || {})); }
+    finally { clearTimeout(timer); }
+  }
+  async function fetchHistory(market, id, days) {
+    // Yahoo Finance daily candles for both metals and IDX, routed through a CORS
+    // proxy (Yahoo blocks direct browser calls). Falls back to synthetic on error.
+    const range = days <= 30 ? '1mo' : days <= 90 ? '3mo' : '1y';
+    const yahoo = 'https://query1.finance.yahoo.com/v8/finance/chart/' + id + '?range=' + range + '&interval=1d';
+    const r = await timedFetch('https://corsproxy.io/?url=' + encodeURIComponent(yahoo));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const res = j && j.chart && j.chart.result && j.chart.result[0];
+    if (!res || !res.timestamp) throw new Error('no data');
+    const close = res.indicators.quote[0].close || [];
+    const series = res.timestamp.map((t, i) => ({ t: t * 1000, p: close[i] })).filter((d) => d.p != null);
+    if (series.length < 5) throw new Error('no data');
+    return { live: true, series };
+  }
+  // deterministic-ish random walk so the lab still works with no network
+  function syntheticHistory(market, id, days) {
+    const n = days <= 30 ? 60 : days <= 90 ? 90 : 250;
+    const bases = { 'GC=F': 2300, 'SI=F': 30, 'PL=F': 1000, 'PA=F': 1100, 'HG=F': 4.5,
+      '^JKSE': 7000, 'BBCA.JK': 9000, 'BBRI.JK': 4200, 'BMRI.JK': 6000, 'TLKM.JK': 2800, 'ASII.JK': 4800, 'GOTO.JK': 70, 'ANTM.JK': 1600 };
+    const base = bases[id] || 100;
+    const series = []; let price = base * 0.85; const now = Date.now(); const stepMs = (days * 864e5) / n;
+    for (let i = 0; i < n; i++) {
+      price *= 1 + (Math.random() - 0.485) * 0.04;
+      series.push({ t: now - (n - i) * stepMs, p: Math.max(price, base * 0.01) });
+    }
+    return { live: false, series };
+  }
+
+  /* ---- chart: bot equity vs buy & hold ---- */
+  function drawChart(eq, hold) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = elChart.clientWidth || 600, Hh = 170;
+    elChart.width = W * dpr; elChart.height = Hh * dpr;
+    const c = elChart.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, W, Hh);
+    const all = eq.concat(hold);
+    let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    if (hi === lo) hi = lo + 1;
+    const pad = 8, plotH = Hh - pad * 2;
+    const xy = (arr, i) => ({ x: (i / (arr.length - 1)) * W, y: pad + plotH - ((arr[i] - lo) / (hi - lo)) * plotH });
+    // baseline (starting capital)
+    const y0 = pad + plotH - ((START_CASH - lo) / (hi - lo)) * plotH;
+    c.strokeStyle = 'rgba(255,255,255,0.18)'; c.setLineDash([4, 4]); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(0, y0); c.lineTo(W, y0); c.stroke(); c.setLineDash([]);
+    const line = (arr, col, w) => {
+      c.strokeStyle = col; c.lineWidth = w; c.beginPath();
+      for (let i = 0; i < arr.length; i++) { const p = xy(arr, i); i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y); }
+      c.stroke();
+    };
+    line(hold, 'rgba(95,208,255,0.55)', 1.5);
+    line(eq, '#ffd23f', 2.2);
+  }
+
+  /* ---- UI wiring ---- */
+  function buildSelects() {
+    elMarket.innerHTML = Object.entries(MARKETS).map(([k, m]) => `<option value="${k}">${m.label}</option>`).join('');
+    elStrat.innerHTML = Object.entries(STRATS).map(([k, s]) => `<option value="${k}">${s.name}</option>`).join('');
+    elRange.innerHTML = RANGES.map((r) => `<option value="${r.v}">${r.label}</option>`).join('');
+    buildInstruments();
+  }
+  function buildInstruments() {
+    const m = MARKETS[elMarket.value] || MARKETS.crypto;
+    elCoin.innerHTML = m.items.map((c) => `<option value="${c.id}">${c.sym} · ${c.name}</option>`).join('');
+  }
+  function buildParams() {
+    const s = STRATS[elStrat.value];
+    elParams.innerHTML = s.params.map((p) =>
+      `<label class="bot-param"><span>${p.label}</span>` +
+      `<input type="number" id="bp_${p.k}" value="${p.def}" min="${p.min}" max="${p.max}" step="1"></label>`).join('');
+  }
+  function readParams() {
+    const s = STRATS[elStrat.value], prm = {};
+    for (const p of s.params) {
+      const el = document.getElementById('bp_' + p.k);
+      let v = parseFloat(el && el.value);
+      if (!isFinite(v)) v = p.def;
+      prm[p.k] = clamp(v, p.min, p.max);
+    }
+    // guard: SMA fast must be < slow
+    if (elStrat.value === 'sma' && prm.fast >= prm.slow) prm.slow = prm.fast + 5;
+    return prm;
+  }
+  function statCard(label, val, cls) {
+    return `<div class="bot-stat ${cls || ''}"><span class="bs-val">${val}</span><span class="bs-k">${label}</span></div>`;
+  }
+
+  async function run() {
+    if (typeof sfx !== 'undefined' && sfx.click) sfx.click();
+    const market = elMarket.value, id = elCoin.value, strat = elStrat.value, days = parseInt(elRange.value, 10);
+    const mkt = MARKETS[market] || MARKETS.crypto;
+    const item = findItem(market, id) || mkt.items[0];
+    const ccy = mkt.ccy, fmtP = (v) => money(v, ccy, item.index);
+    const prm = readParams();
+    // persist config
+    state.bots = { market, coin: id, strat, range: days };
+    if (typeof save === 'function') save();
+
+    runBtn.disabled = true;
+    elResult.hidden = true;
+    elStatus.hidden = false;
+    elStatus.className = 'bot-status';
+    elStatus.textContent = '📡 FETCHING ' + item.sym + ' MARKET DATA…';
+
+    const myRun = ++runToken;
+    let data;
+    try {
+      data = await fetchHistory(market, id, days);
+    } catch (e) {
+      data = syntheticHistory(market, id, days);
+    }
+    if (myRun !== runToken) return;   // a newer run started — drop this stale result
+    runBtn.disabled = false;
+
+    const series = data.series;
+    const prices = series.map((d) => d.p);
+    const pos = signals(strat, prices, prm);
+    const res = backtest(series, pos);
+    const last = prices[prices.length - 1];
+
+    // header: live price + current bot stance
+    const dayPts = Math.max(1, Math.round(series.length / days));
+    const prev = prices[Math.max(0, prices.length - 1 - dayPts)];
+    const chg = (last / prev - 1) * 100;
+    elPrice.innerHTML = `<b>${item.sym}</b> ${fmtP(last)} <span class="${chg >= 0 ? 'up' : 'down'}">${pct(chg)}</span>`;
+    const holding = res.inPosition;
+    elSignal.className = 'bot-signal ' + (holding ? 'long' : 'flat');
+    elSignal.textContent = holding ? '🟢 BOT IS HOLDING (LONG)' : '⚪ BOT IS FLAT (WAITING)';
+
+    // stat grid
+    elStats.innerHTML =
+      statCard('BOT RETURN', pct(res.ret), res.ret >= 0 ? 'good' : 'bad') +
+      statCard('BUY &amp; HOLD', pct(res.holdRet), res.holdRet >= 0 ? 'good' : 'bad') +
+      statCard('VS HODL', pct(res.ret - res.holdRet), (res.ret - res.holdRet) >= 0 ? 'good' : 'bad') +
+      statCard('TRADES', String(res.nTrades)) +
+      statCard('WIN RATE', res.rt ? Math.round(res.winRate) + '%' : '—') +
+      statCard('MAX DROP', '-' + res.mdd.toFixed(0) + '%', 'bad');
+
+    // recent trade log (latest first)
+    const recent = res.trades.slice(-6).reverse();
+    elLog.innerHTML = recent.length
+      ? '<div class="bl-title">RECENT PAPER TRADES</div>' + recent.map((t) =>
+          `<div class="bl-row"><span class="bl-side ${t.side === 'BUY' ? 'buy' : 'sell'}">${t.side}</span>` +
+          `<span class="bl-d">${dstr(t.t)}</span><span class="bl-p">${fmtP(t.price)}</span>` +
+          `<span class="bl-pnl ${t.pnl == null ? '' : t.pnl >= 0 ? 'good' : 'bad'}">${t.pnl == null ? '' : pct(t.pnl)}</span></div>`).join('')
+      : '<div class="bl-title">NO TRADES — strategy never triggered in this window</div>';
+
+    elStatus.hidden = true;
+    elResult.hidden = false;
+    drawChart(res.equity, res.hold);
+    if (!data.live) {
+      elStatus.hidden = false;
+      elStatus.className = 'bot-status warn';
+      elStatus.textContent = '⚠ OFFLINE — showing SAMPLE data (live feed unreachable)';
+    }
+    if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin();
+  }
+
+  function restore() {
+    const b = state.bots || {};
+    // use the saved market if it still exists, else default to gold
+    let mkt = (b.market && MARKETS[b.market]) ? b.market : 'gold';
+    elMarket.value = mkt;
+    buildInstruments();
+    if (b.coin && findItem(mkt, b.coin)) elCoin.value = b.coin;
+    if (b.strat && STRATS[b.strat]) elStrat.value = b.strat;
+    if (b.range) elRange.value = String(b.range);
+  }
+
+  buildSelects();
+  restore();
+  buildParams();
+  elMarket.addEventListener('change', buildInstruments);
+  elStrat.addEventListener('change', buildParams);
+  runBtn.addEventListener('click', () => run());
 })();
