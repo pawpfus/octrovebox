@@ -3146,15 +3146,18 @@ if (state.musicOn) {
   const SPEED = 5.2;         // hero movement, tiles per second
 
   // ---- stations: the Deep is now a minigame arcade — three games + the way up ----
+  // one station per corner of the floor (hero spawns at the centre), so the
+  // arena reads tidy and symmetric — back, left, right, front
   const STATIONS = [
-    { id: 'pearl', gx: 4, gy: 6, ico: '🎮', label: 'PEARL RUSH', tint: 'gold'  },
-    { id: 'fish',  gx: 6, gy: 4, ico: '🎣', label: 'FISHING',    tint: 'blue'  },
-    { id: 'raid',  gx: 8, gy: 8, ico: '⚔️', label: 'RAID BOSS',  tint: 'red'   },
-    { id: 'exit',  gx: 5, gy: 1, ico: '🌊', label: 'SURFACE',    tint: 'plain' },
+    { id: 'exit',  gx: 2, gy: 2, ico: '🌊', label: 'SURFACE',    tint: 'plain' }, // back corner
+    { id: 'fish',  gx: 8, gy: 2, ico: '🎣', label: 'FISHING',    tint: 'blue'  }, // right corner
+    { id: 'pearl', gx: 2, gy: 8, ico: '🎮', label: 'PEARL RUSH', tint: 'gold'  }, // left corner
+    { id: 'raid',  gx: 8, gy: 8, ico: '⚔️', label: 'RAID BOSS',  tint: 'red'   }, // front corner
   ];
 
   // ---- runtime state ----
   let overlay, canvas, ctx, dialog, hintEl, hud, gameHud, pgScore, pgTime, musicBtn;
+  let pgCombo, pgComboN, pgHearts;
   let W = 0, H = 0, dpr = 1, originX = 0, originY = 0;
   let raf = 0, running = false, last = 0;
   let built = false;
@@ -3165,8 +3168,18 @@ if (state.musicOn) {
   let clock = 0;              // animation time (seconds) for shimmer / drift
   let bubbles = [];           // rising bubble particles
   let fish = [];              // drifting background fish
+  let decor = [];             // coral / shells / seaweed framing the arena
+  let floorTex = [];          // per-tile procedural shade + speckle (stable until resize)
   // minigame state — mode is 'pearl' | 'fish' | 'raid'
-  const game = { on: false, mode: null, score: 0, time: 0, items: [], spawn: 0, boss: null, cd: 0, flash: 0 };
+  //  combo/mult   PEARL RUSH multiplier chain
+  //  hp/iframe    RAID BOSS player hearts + post-hit invulnerability
+  //  globs        RAID BOSS ink-glob projectiles
+  //  pops         floating score/combo popups
+  //  shake/hurt   screen-shake magnitude + red damage-flash timer
+  const game = {
+    on: false, mode: null, score: 0, time: 0, items: [], spawn: 0, boss: null, cd: 0, flash: 0,
+    combo: 0, mult: 1, hp: 3, iframe: 0, globs: [], pops: [], shake: 0, hurt: 0, defeated: false,
+  };
   let jukeWasOn = false;      // was the dashboard music playing before we dived?
   const deepBgm = { timer: null, step: 0 };
 
@@ -3196,7 +3209,7 @@ if (state.musicOn) {
      Gradients live in user space, so we make each one once and just translate
      the context to wherever it's needed. Size-dependent ones (backdrop, rays)
      rebuild on resize; the rest are positionless and cached forever. */
-  const grad = { bg: null, ray: null, station: {}, pearl: null, fishHalo: null };
+  const grad = { bg: null, ray: null, station: {}, pearl: null, fishHalo: null, ink: null, urchin: null, vig: null };
   function buildSizeGrads() {
     const bg = ctx.createLinearGradient(0, 0, 0, H);
     bg.addColorStop(0, palette.deep); bg.addColorStop(0.55, '#0a4d68'); bg.addColorStop(1, '#0e6c86');
@@ -3204,6 +3217,10 @@ if (state.musicOn) {
     const ray = ctx.createLinearGradient(0, 0, 90, H);
     ray.addColorStop(0, 'rgba(150,235,255,0.10)'); ray.addColorStop(1, 'rgba(150,235,255,0)');
     grad.ray = ray;
+    // depth vignette — clear at the centre, dark toward the edges
+    const vig = ctx.createRadialGradient(W / 2, H * 0.46, Math.min(W, H) * 0.28, W / 2, H * 0.5, Math.max(W, H) * 0.72);
+    vig.addColorStop(0, 'rgba(2,12,22,0)'); vig.addColorStop(1, 'rgba(2,12,22,0.55)');
+    grad.vig = vig;
   }
   function stationGrad(tint, active) {
     const key = tint + (active ? '1' : '0');
@@ -3225,6 +3242,22 @@ if (state.musicOn) {
     g.addColorStop(0, 'rgba(170,240,255,0.5)'); g.addColorStop(1, 'rgba(170,240,255,0)');
     return (grad.fishHalo = g);
   }
+  function inkGrad() {
+    if (grad.ink) return grad.ink;
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 11);
+    g.addColorStop(0, 'rgba(150,90,210,0.95)'); g.addColorStop(0.55, 'rgba(74,32,120,0.9)'); g.addColorStop(1, 'rgba(40,12,70,0)');
+    return (grad.ink = g);
+  }
+  function urchinGrad() {
+    if (grad.urchin) return grad.urchin;
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 13);
+    g.addColorStop(0, 'rgba(60,16,30,0.95)'); g.addColorStop(0.6, 'rgba(34,8,18,0.9)'); g.addColorStop(1, 'rgba(34,8,18,0)');
+    return (grad.urchin = g);
+  }
+
+  // procedural floor: a small spread of blue shades, picked per-tile at seed time
+  // so the water reads textured rather than a flat slab (free — just a colour pick)
+  const FLOOR_SHADES = ['#125888', '#14598a', '#15618f', '#176895', '#0f5180', '#1b6c9a'];
 
   /* ---- build the overlay DOM once, on first entry ---- */
   function build() {
@@ -3245,6 +3278,8 @@ if (state.musicOn) {
       </div>
       <div class="palace-game" id="palaceGame" hidden>
         <span class="pg-score">🪙 <b id="pgScore">0</b></span>
+        <span class="pg-combo" id="pgCombo" hidden>COMBO ×<b id="pgComboN">1</b></span>
+        <span class="pg-hearts" id="pgHearts" hidden></span>
         <span class="pg-time">⏱ <b id="pgTime">30</b>s</span>
       </div>
       <div class="palace-hint" id="palaceHint" hidden></div>
@@ -3269,6 +3304,9 @@ if (state.musicOn) {
     gameHud = overlay.querySelector('#palaceGame');
     pgScore = overlay.querySelector('#pgScore');
     pgTime = overlay.querySelector('#pgTime');
+    pgCombo = overlay.querySelector('#pgCombo');
+    pgComboN = overlay.querySelector('#pgComboN');
+    pgHearts = overlay.querySelector('#pgHearts');
     musicBtn = overlay.querySelector('#palaceMusic');
 
     overlay.querySelector('#palaceExit').addEventListener('click', () => exit());
@@ -3478,24 +3516,30 @@ if (state.musicOn) {
     // background bubbles (the deepest, faintest ones drift behind everything)
     drawBubbles(false);
 
-    // clean all-blue floor: every tile is animated water (no reef rim, no border)
+    // ---- world layer: jiggles together when the screen shakes ----
+    ctx.save();
+    if (game.shake > 0) ctx.translate((Math.random() * 2 - 1) * game.shake, (Math.random() * 2 - 1) * game.shake);
+
+    // textured seabed: per-tile shade + animated swell + caustic crest + speckles
     for (let sum = 0; sum <= (MAP - 1) * 2; sum++) {
       for (let gx = 0; gx < MAP; gx++) {
         const gy = sum - gx;
         if (gy < 0 || gy >= MAP) continue;
         const p = toScreen(gx, gy);
         if (p.x < -TW || p.x > W + TW || p.y < -TH || p.y > H + TH) continue;
-        // a slow diagonal swell brightens each tile like light rippling across a
-        // pool, with a faster bright caustic crest layered on top
-        diamond(p.x, p.y, palette.waterA, 'rgba(0,30,50,0.25)');
+        const tx = floorTex[gx * MAP + gy];
+        diamond(p.x, p.y, tx ? tx.base : palette.waterA, 'rgba(0,30,50,0.22)');
         const wv = 0.5 + 0.5 * Math.sin(clock * 1.3 + gx * 0.7 + gy * 0.5);
-        ctx.globalAlpha = 0.45 * wv;
+        ctx.globalAlpha = 0.4 * wv;
         diamond(p.x, p.y, palette.waterB, null);
-        // bright caustic crest — a third fill per tile, skipped on weak devices
         if (!lowEnd) {
           const a = 0.06 + 0.10 * (0.5 + 0.5 * Math.sin(clock * 2.1 + gx * 1.1 - gy * 0.6));
           ctx.globalAlpha = a;
           diamond(p.x, p.y - 1, palette.causticTop, null);
+          if (tx && tx.spk) {   // a glinting fleck of sand
+            ctx.globalAlpha = 0.5; ctx.fillStyle = 'rgba(195,238,255,0.5)';
+            ctx.beginPath(); ctx.arc(p.x + tx.sx, p.y + tx.sy, tx.sr, 0, 6.283); ctx.fill();
+          }
         }
         ctx.globalAlpha = 1;
       }
@@ -3505,19 +3549,33 @@ if (state.musicOn) {
     // FISHING so the ambient drifters aren't mistaken for the catchable targets
     if (!(game.on && game.mode === 'fish')) drawFish();
 
-    // depth-sorted sprites: stations + hero, back-to-front. While a minigame is
-    // running the kiosks are inert, so we clear them off the floor entirely to
-    // give a clean, unobstructed play field.
-    const sprites = game.on ? [] : STATIONS.map((s) => ({ kind: 'station', s, depth: s.gx + s.gy }));
+    // depth-sorted sprites: decor + stations + hero, back-to-front. While a
+    // minigame runs the kiosks are inert so we clear them off the floor, but the
+    // edge decor stays to keep the arena framed without crowding the action.
+    const sprites = [];
+    if (!game.on) for (const s of STATIONS) sprites.push({ kind: 'station', s, depth: s.gx + s.gy });
+    for (const d of decor) sprites.push({ kind: 'decor', d, depth: d.gx + d.gy });
     sprites.push({ kind: 'hero', depth: hero.gx + hero.gy });
     sprites.sort((a, b) => a.depth - b.depth);
-    sprites.forEach((sp) => (sp.kind === 'hero' ? drawHero() : drawStation(sp.s)));
+    sprites.forEach((sp) => sp.kind === 'hero' ? drawHero() : sp.kind === 'decor' ? drawDecor(sp.d) : drawStation(sp.s));
 
     // minigame actors draw above the floor
-    if (game.on) { if (game.mode === 'raid') drawBoss(); else drawItems(); }
+    if (game.on) {
+      if (game.mode === 'raid') { drawBoss(); drawGlobs(); } else drawItems();
+    }
+    drawPops();
+    ctx.restore();
+    // ---- end world layer ----
 
     // foreground bubbles float over the scene
     drawBubbles(true);
+
+    // soft depth vignette darkens the screen edges (cached)
+    if (grad.vig) { ctx.fillStyle = grad.vig; ctx.fillRect(0, 0, W, H); }
+
+    // damage feedback: red wash when the player is struck, white pop on a hit
+    if (game.hurt > 0) { ctx.fillStyle = 'rgba(255,40,60,' + (0.4 * game.hurt).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
+    if (game.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (0.18 * game.flash).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
   }
 
   // two passes: small bubbles sit behind the reef (front=false), bigger, brighter
@@ -3552,6 +3610,54 @@ if (state.musicOn) {
     }
     ctx.restore();
     ctx.globalAlpha = 1;
+  }
+
+  // coral / shell / seaweed prop on the seabed; seaweed gently sways
+  function drawDecor(d) {
+    const p = toScreen(d.gx, d.gy);
+    const sway = d.sway ? Math.sin(clock * 1.6 + d.ph) * 0.16 : 0;
+    ctx.fillStyle = 'rgba(0,20,35,0.28)';   // contact shadow
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 2, d.sz * 0.32, d.sz * 0.16, 0, 0, 6.283); ctx.fill();
+    ctx.save();
+    ctx.translate(p.x, p.y - d.sz * 0.34);
+    ctx.rotate(sway);
+    ctx.scale(d.flip, 1);
+    ctx.font = d.sz + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(d.ico, 0, 0);
+    ctx.restore();
+  }
+
+  // boss ink-glob projectiles
+  function drawGlobs() {
+    for (const g of game.globs) {
+      const p = toScreen(g.gx, g.gy);
+      ctx.save(); ctx.translate(p.x, p.y - 14);
+      ctx.fillStyle = inkGrad();
+      ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.283); ctx.fill();
+      const w = 5 + Math.sin(clock * 10 + g.ph) * 1.2;   // wobbling ink core
+      ctx.fillStyle = 'rgba(22,6,42,0.95)';
+      ctx.beginPath(); ctx.arc(0, 0, w, 0, 6.283); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // floating "+N" / combo / damage popups that rise and fade
+  function drawPops() {
+    if (!game.pops.length) return;
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const o of game.pops) {
+      ctx.globalAlpha = clamp(o.t / 0.7, 0, 1);
+      ctx.font = '900 ' + (o.big ? 13 : 10) + 'px "Press Start 2P", monospace';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(3,10,20,0.85)';
+      ctx.strokeText(o.txt, o.x, o.y);
+      ctx.fillStyle = o.col || palette.gold;
+      ctx.fillText(o.txt, o.x, o.y);
+    }
+    ctx.restore(); ctx.globalAlpha = 1;
+  }
+  function addPop(gx, gy, txt, col, big) {
+    const p = toScreen(gx, gy);
+    game.pops.push({ x: p.x, y: p.y - 26, t: 0.9, txt, col, big: !!big });
   }
 
   function drawStation(s) {
@@ -3697,29 +3803,53 @@ if (state.musicOn) {
        raid   ram the roaming Leviathan to drain its HP before time
   ============================================================ */
   const GAME_INFO = {
-    pearl: { ico: '🎮', title: 'PEARL RUSH', unit: 'PEARLS', best: () => state.deepBest || 0,
-      desc: 'Swim over glowing pearls to scoop them up.<br>Grab as many as you can in <b>30 seconds!</b>' },
+    pearl: { ico: '🎮', title: 'PEARL RUSH', unit: 'PTS', best: () => state.deepBest || 0,
+      desc: 'Scoop glowing pearls to build a <b>combo multiplier</b>!<br>But dodge the 🦔 sea urchins — a sting resets your chain.' },
     fish:  { ico: '🎣', title: 'FISHING', unit: 'FISH', best: () => state.deepBestFish || 0,
       desc: 'Chase the darting fish and swim into them to net them.<br>Catch as many as you can in <b>30 seconds!</b>' },
     raid:  { ico: '⚔️', title: 'RAID BOSS', unit: 'HITS', best: () => state.deepBestRaid || 0,
-      desc: 'A Leviathan prowls the deep — <b>swim into it</b> to strike!<br>Land 24 hits before <b>45 seconds</b> run out.' },
+      desc: 'Ram the Leviathan to strike — but it spits <b>ink globs</b>!<br>You have <b>3 ❤</b>. Land 24 hits before they run dry.' },
   };
 
   function startGame(mode) {
     game.on = true; game.mode = mode; game.score = 0; game.items = []; game.spawn = 0;
     game.boss = null; game.cd = 0; game.flash = 0;
+    game.combo = 0; game.mult = 1; game.hp = 3; game.iframe = 0;
+    game.globs = []; game.pops = []; game.shake = 0; game.hurt = 0; game.defeated = false;
     gameHud.hidden = false;
-    if (mode === 'pearl') { game.time = 30; for (let i = 0; i < 3; i++) spawnPearl(); }
-    else if (mode === 'fish') { game.time = 30; for (let i = 0; i < 4; i++) spawnFish(); }
-    else if (mode === 'raid') { game.time = 45; game.boss = { hp: 24, max: 24, gx: 5, gy: 3, vx: rnd(-1.4, 1.4), vy: rnd(-1.4, 1.4) }; }
+    // mode-specific HUD chips
+    pgCombo.hidden = mode !== 'pearl';
+    pgHearts.hidden = mode !== 'raid';
+    if (mode === 'pearl') {
+      game.time = 30;
+      for (let i = 0; i < 3; i++) spawnPearl();
+      for (let i = 0; i < 2; i++) spawnUrchin();
+    } else if (mode === 'fish') {
+      game.time = 30;
+      for (let i = 0; i < 4; i++) spawnFish();
+    } else if (mode === 'raid') {
+      game.time = 45;
+      game.boss = { hp: 24, max: 24, gx: 5, gy: 3, vx: rnd(-1.4, 1.4), vy: rnd(-1.4, 1.4), fire: 1.4 };
+    }
     updateHudScore();
   }
+  function pearlCount() { return game.items.reduce((n, it) => n + (it.kind === 'pearl' ? 1 : 0), 0); }
   function spawnPearl() {
-    if (game.items.length >= 6) return;
+    if (pearlCount() >= 6) return;
     for (let t = 0; t < 12; t++) {
       const gx = 1 + (Math.random() * (MAP - 2) | 0), gy = 1 + (Math.random() * (MAP - 2) | 0);
       if (isEdge(gx, gy) || Math.hypot(gx - hero.gx, gy - hero.gy) < 1.2) continue;
       game.items.push({ kind: 'pearl', gx: gx + rnd(-0.25, 0.25), gy: gy + rnd(-0.25, 0.25), ph: rnd(0, 6.28) });
+      return;
+    }
+  }
+  // sea urchins: static spiky hazards that reset the combo chain on contact
+  function spawnUrchin() {
+    for (let t = 0; t < 14; t++) {
+      const gx = 1.4 + Math.random() * (MAP - 2.8), gy = 1.4 + Math.random() * (MAP - 2.8);
+      if (Math.hypot(gx - hero.gx, gy - hero.gy) < 1.8) continue;
+      if (game.items.some((it) => Math.hypot(it.gx - gx, it.gy - gy) < 1.1)) continue;
+      game.items.push({ kind: 'urchin', gx, gy, ph: rnd(0, 6.28) });
       return;
     }
   }
@@ -3735,19 +3865,56 @@ if (state.musicOn) {
   function updateHudScore() {
     pgScore.textContent = game.score;
     pgTime.textContent = Math.max(0, Math.ceil(game.time));
+    if (game.mode === 'pearl' && pgComboN) pgComboN.textContent = game.mult;
+    if (game.mode === 'raid' && pgHearts) {
+      const hp = Math.max(0, game.hp);
+      pgHearts.textContent = '❤'.repeat(hp) + '🖤'.repeat(Math.max(0, 3 - hp));
+    }
+  }
+  // boss spits an ink glob aimed at the diver (with optional angular spread)
+  function fireGlob(b, spread) {
+    const a = Math.atan2(hero.gy - b.gy, hero.gx - b.gx) + (spread || 0);
+    const sp = 3.6;
+    game.globs.push({ gx: b.gx, gy: b.gy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 4, ph: rnd(0, 6.28) });
+  }
+  // the diver takes a hit: lose a heart, flash red, shake, brief invulnerability
+  function hurtPlayer() {
+    game.hp--; game.iframe = 1.1; game.hurt = 1; game.shake = 7;
+    addPop(hero.gx, hero.gy, '-1 ❤', palette.red, true);
+    if (typeof sfx !== 'undefined' && sfx.spend) sfx.spend();
   }
   function updateGame(dt) {
     game.time -= dt;
     if (game.flash > 0) game.flash -= dt;
+    if (game.hurt > 0) game.hurt -= dt * 1.6;
+    if (game.shake > 0) game.shake = Math.max(0, game.shake - dt * 22);
+    if (game.iframe > 0) game.iframe -= dt;
+    for (let i = game.pops.length - 1; i >= 0; i--) {
+      const o = game.pops[i]; o.t -= dt; o.y -= 26 * dt;
+      if (o.t <= 0) game.pops.splice(i, 1);
+    }
 
     if (game.mode === 'pearl') {
       game.spawn -= dt;
       if (game.spawn <= 0) { spawnPearl(); game.spawn = rnd(0.8, 1.6); }
+      const urchins = game.items.reduce((n, it) => n + (it.kind === 'urchin' ? 1 : 0), 0);
+      if (urchins < 3 && Math.random() < dt * 0.35) spawnUrchin();
       for (let i = game.items.length - 1; i >= 0; i--) {
         const it = game.items[i];
-        if (Math.hypot(it.gx - hero.gx, it.gy - hero.gy) < 0.55) {
-          game.items.splice(i, 1); game.score++;
-          if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin();
+        const d = Math.hypot(it.gx - hero.gx, it.gy - hero.gy);
+        if (it.kind === 'pearl') {
+          if (d < 0.55) {
+            game.combo++;
+            game.mult = Math.min(5, 1 + ((game.combo - 1) / 3 | 0));
+            game.score += game.mult;
+            addPop(it.gx, it.gy, '+' + game.mult, palette.gold, game.mult >= 3);
+            game.items.splice(i, 1);
+            if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin();
+          }
+        } else if (d < 0.62 && game.iframe <= 0) {   // urchin sting
+          if (game.combo > 0) addPop(hero.gx, hero.gy, 'COMBO LOST', palette.red, true);
+          game.combo = 0; game.mult = 1; game.iframe = 1.0; game.hurt = 1; game.shake = 6;
+          if (typeof sfx !== 'undefined' && sfx.spend) sfx.spend();
         }
       }
     } else if (game.mode === 'fish') {
@@ -3766,15 +3933,37 @@ if (state.musicOn) {
     } else if (game.mode === 'raid') {
       const b = game.boss;
       if (b) {
-        b.gx += b.vx * dt; b.gy += b.vy * dt;
+        const enraged = b.hp <= b.max * 0.34;
+        const spd = enraged ? 1.35 : 1;
+        b.gx += b.vx * spd * dt; b.gy += b.vy * spd * dt;
         if (b.gx < 2 || b.gx > MAP - 3) { b.vx *= -1; b.gx = clamp(b.gx, 2, MAP - 3); }
         if (b.gy < 2 || b.gy > MAP - 3) { b.vy *= -1; b.gy = clamp(b.gy, 2, MAP - 3); }
+        // ram the boss to strike it
         if (game.cd > 0) game.cd -= dt;
         if (game.cd <= 0 && Math.hypot(b.gx - hero.gx, b.gy - hero.gy) < 0.95) {
-          b.hp--; game.score++; game.cd = 0.5; game.flash = 0.18;
+          b.hp--; game.score++; game.cd = 0.5; game.flash = 0.18; game.shake = Math.max(game.shake, 3);
+          addPop(b.gx, b.gy, 'HIT!', palette.ink);
           if (typeof sfx !== 'undefined' && sfx.spend) sfx.spend();
         }
         if (b.hp <= 0) { endGame(true); return; }
+        // the Leviathan spits ink globs — more, and in spreads, when enraged
+        b.fire -= dt;
+        if (b.fire <= 0) {
+          fireGlob(b);
+          if (enraged) { fireGlob(b, 0.32); fireGlob(b, -0.32); }
+          b.fire = enraged ? rnd(0.9, 1.4) : rnd(1.5, 2.3);
+        }
+      }
+      for (let i = game.globs.length - 1; i >= 0; i--) {
+        const g = game.globs[i];
+        g.gx += g.vx * dt; g.gy += g.vy * dt; g.life -= dt;
+        if (game.iframe <= 0 && Math.hypot(g.gx - hero.gx, g.gy - hero.gy) < 0.55) {
+          game.globs.splice(i, 1);
+          hurtPlayer();
+          if (game.hp <= 0) { game.defeated = true; endGame(false); return; }
+          continue;
+        }
+        if (g.gx < 0.2 || g.gx > MAP - 1.2 || g.gy < 0.2 || g.gy > MAP - 1.2 || g.life <= 0) game.globs.splice(i, 1);
       }
     }
     updateHudScore();
@@ -3784,12 +3973,14 @@ if (state.musicOn) {
   function endGame(win) {
     const mode = game.mode;
     game.on = false; gameHud.hidden = true;
+    game.shake = 0; game.hurt = 0; game.flash = 0; game.globs = []; game.pops = [];
+    pgCombo.hidden = true; pgHearts.hidden = true;
     const info = GAME_INFO[mode];
     let record = false, metric = '', bestLine = '', headline = 'TIME!';
 
     if (mode === 'pearl') {
       record = game.score > (state.deepBest || 0); state.deepBest = Math.max(state.deepBest || 0, game.score);
-      metric = '🪙 ' + game.score; bestLine = 'BEST: ' + state.deepBest + ' PEARLS';
+      metric = '🪙 ' + game.score; bestLine = 'BEST: ' + state.deepBest + ' PTS';
     } else if (mode === 'fish') {
       record = game.score > (state.deepBestFish || 0); state.deepBestFish = Math.max(state.deepBestFish || 0, game.score);
       metric = '🐟 ' + game.score; bestLine = 'BEST: ' + state.deepBestFish + ' FISH';
@@ -3800,7 +3991,8 @@ if (state.musicOn) {
         record = !prev || t < prev; state.deepBestRaid = record ? t : prev;
         headline = '★ LEVIATHAN SLAIN! ★'; metric = '🏆 ' + t + 's'; bestLine = 'BEST: ' + state.deepBestRaid + 's';
       } else {
-        headline = '💀 IT SURVIVED'; metric = game.score + ' / 24'; bestLine = 'LAND 24 HITS TO WIN';
+        headline = game.defeated ? '💀 YOU WERE DOWNED' : '💀 IT SURVIVED';
+        metric = game.score + ' / 24'; bestLine = 'LAND 24 HITS TO WIN';
       }
     }
     if (typeof save === 'function') save();
@@ -3834,6 +4026,16 @@ if (state.musicOn) {
         ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(it.ico, 0, 0);
         ctx.restore();
+      } else if (it.kind === 'urchin') {   // spiky hazard
+        ctx.save(); ctx.translate(p.x, p.y - 12);
+        ctx.fillStyle = urchinGrad(); ctx.beginPath(); ctx.arc(0, 0, 13, 0, 6.283); ctx.fill();   // danger halo
+        const rot = it.ph + clock * 0.6;
+        ctx.strokeStyle = '#160812'; ctx.lineWidth = 2; ctx.beginPath();
+        for (let k = 0; k < 10; k++) { const a = rot + k * (6.283 / 10); ctx.moveTo(Math.cos(a) * 4, Math.sin(a) * 4); ctx.lineTo(Math.cos(a) * 11, Math.sin(a) * 11); }
+        ctx.stroke();
+        ctx.fillStyle = '#2a0e1c'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, 6.283); ctx.fill();
+        ctx.fillStyle = 'rgba(255,95,125,0.95)'; ctx.beginPath(); ctx.arc(-1.6, -1.6, 1.7, 0, 6.283); ctx.fill();
+        ctx.restore();
       } else { // glowing gold pearl (cached gradient, translated into place)
         const bob = Math.sin(clock * 3 + it.ph) * 3, y = p.y - 16 + bob;
         ctx.save(); ctx.translate(p.x, y);
@@ -3848,9 +4050,17 @@ if (state.musicOn) {
     const b = game.boss; if (!b) return;
     const p = toScreen(b.gx, b.gy);
     const bob = Math.sin(clock * 2) * 4;
+    const enraged = b.hp <= b.max * 0.34;
     // shadow
     ctx.fillStyle = 'rgba(0,20,35,0.4)';
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 4, 30, 12, 0, 0, 6.283); ctx.fill();
+    // enrage aura — a throbbing red menace once it's wounded
+    if (enraged) {
+      ctx.save(); ctx.globalAlpha = 0.3 + 0.18 * (0.5 + 0.5 * Math.sin(clock * 6));
+      ctx.fillStyle = 'rgba(255,55,80,0.55)';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y - 22 + bob, 36, 28, 0, 0, 6.283); ctx.fill();
+      ctx.restore();
+    }
     // body (a pulse when freshly hit reads as a flinch)
     const s = 1 + (game.flash > 0 ? 0.14 : 0);
     ctx.save();
@@ -3881,6 +4091,8 @@ if (state.musicOn) {
     recenter();
     seedBubbles();
     seedFish();
+    seedFloor();
+    seedDecor();
   }
 
   /* ---- ambient sea life ---- */
@@ -3900,6 +4112,48 @@ if (state.musicOn) {
     for (let i = 0; i < n; i++) {
       const dir = Math.random() < 0.5 ? 1 : -1;
       fish.push({ x: rnd(0, W), y: rnd(H * 0.18, H * 0.8), sp: dir * rnd(14, 34), sz: rnd(18, 28) | 0, ico: kinds[i % kinds.length], ph: rnd(0, 6.28) });
+    }
+  }
+  // procedural floor texture — a stable per-tile shade plus the odd sand speckle,
+  // generated once per resize so the seabed reads varied instead of a flat slab
+  function seedFloor() {
+    floorTex = [];
+    for (let gx = 0; gx < MAP; gx++) {
+      for (let gy = 0; gy < MAP; gy++) {
+        const speckle = !lowEnd && Math.random() < 0.34;
+        floorTex[gx * MAP + gy] = {
+          base: pick(FLOOR_SHADES),
+          sx: rnd(-12, 12), sy: rnd(-5, 5), sr: rnd(0.8, 1.7),
+          spk: speckle,
+        };
+      }
+    }
+  }
+  // decorate the outer rings with coral, shells and swaying seaweed so the arena
+  // is framed without cluttering the central play field
+  const DECOR_KINDS = [
+    { ico: '🪸', sz: 28, sway: 0 }, { ico: '🪸', sz: 24, sway: 0 },
+    { ico: '🌿', sz: 28, sway: 1 }, { ico: '🌿', sz: 24, sway: 1 },
+    { ico: '🐚', sz: 19, sway: 0 }, { ico: '⭐', sz: 18, sway: 0 },
+    { ico: '🪨', sz: 22, sway: 0 }, { ico: '🦀', sz: 20, sway: 0 },
+  ];
+  function seedDecor() {
+    decor = [];
+    const taken = (gx, gy) => STATIONS.some((s) => s.gx === gx && s.gy === gy);
+    const ring = (gx, gy) => gx === 0 || gy === 0 || gx === MAP - 1 || gy === MAP - 1
+      || gx === 1 || gy === 1 || gx === MAP - 2 || gy === MAP - 2;
+    let budget = lowEnd ? 9 : 16;
+    for (let gx = 0; gx < MAP && budget > 0; gx++) {
+      for (let gy = 0; gy < MAP && budget > 0; gy++) {
+        if (!ring(gx, gy) || taken(gx, gy)) continue;
+        // denser on the very edge, sparse on the inner ring
+        const edge = gx === 0 || gy === 0 || gx === MAP - 1 || gy === MAP - 1;
+        if (Math.random() > (edge ? 0.5 : 0.16)) continue;
+        const k = pick(DECOR_KINDS);
+        decor.push({ gx: gx + rnd(-0.18, 0.18), gy: gy + rnd(-0.18, 0.18),
+          ico: k.ico, sz: k.sz, sway: k.sway, ph: rnd(0, 6.28), flip: Math.random() < 0.5 ? -1 : 1 });
+        budget--;
+      }
     }
   }
   const pick = (a) => a[Math.random() * a.length | 0];

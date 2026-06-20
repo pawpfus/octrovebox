@@ -3282,6 +3282,11 @@ body.palace-open { overflow: hidden; }
 .palace-game[hidden] { display: none; }
 .palace-game b { color: var(--gold); font-size: 15px; }
 .palace-game .pg-time b { color: #ff9; }
+.palace-game .pg-combo, .palace-game .pg-hearts { display: inline-flex; align-items: center; gap: 2px; }
+.palace-game .pg-combo[hidden], .palace-game .pg-hearts[hidden] { display: none; }
+.palace-game .pg-combo { color: #ffd23f; text-shadow: 0 0 8px rgba(255,210,63,0.6); }
+.palace-game .pg-combo b { color: #fff; }
+.palace-game .pg-hearts { font-size: 14px; letter-spacing: 1px; filter: drop-shadow(0 0 4px rgba(255,80,110,0.5)); }
 .pg-final { font-size: 34px; color: var(--gold); margin: 6px 0 2px; text-shadow: 0 3px 0 #05050f; }
 
 /* proximity prompt */
