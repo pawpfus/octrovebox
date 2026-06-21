@@ -2128,13 +2128,17 @@ function hitBoss(amount) {
   setTimeout(() => pop.remove(), 900);
 }
 function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  // coerce first: an imported/corrupt backup could carry a non-string name/desc,
+  // and calling .replace on a number/object would throw and break rendering.
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
 /* ============================================================
-   PIN LOCK — a fully-offline privacy gate. We store only a salted
-   hash of the 4-digit PIN (never the PIN itself). This blocks the
-   UI; it is NOT encryption (localStorage stays plaintext).
+   PIN LOCK — a fully-offline privacy gate. The PIN itself is never
+   stored; with WebCrypto available the save is AES-GCM encrypted with
+   a PBKDF2 key derived from the PIN (a cyrb53 hash is kept only as a
+   fast in-session re-lock marker). Without WebCrypto it degrades to a
+   hash-only UI gate over a plaintext save.
 ============================================================ */
 const PIN_LEN = 4;
 const AUTO_LOCK_MS = 90000;             // re-lock after this long in the background
@@ -3327,7 +3331,9 @@ if (state.musicOn) {
   async function timedFetch(url, opts) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 11000);
-    try { return await fetch(url, Object.assign({ signal: ctrl.signal }, opts || {})); }
+    // never attach cookies/credentials or a referrer to the relay calls
+    const base = { signal: ctrl.signal, credentials: 'omit', referrerPolicy: 'no-referrer', mode: 'cors' };
+    try { return await fetch(url, Object.assign(base, opts || {})); }
     finally { clearTimeout(timer); }
   }
   async function fetchHistory(market, id, days) {

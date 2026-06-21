@@ -2,7 +2,7 @@
    Network-first means the latest deployed version always wins when online,
    while the cached app shell keeps it working offline.
    Bump CACHE when you change any shell asset. */
-const CACHE = 'octrovebox-v142';
+const CACHE = 'octrovebox-v143';
 const ASSETS = [
   './',
   './index.html',
@@ -41,11 +41,16 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // only handle http(s); ignore chrome-extension:, data:, etc. (Cache API rejects them)
+  const url = new URL(req.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
   e.respondWith((async () => {
     // network-first: always try the live version when online
     try {
       const res = await fetch(req);
-      if (res.ok && new URL(req.url).origin === self.location.origin) {
+      // cache only our OWN successful, complete (200) responses — never the
+      // cross-origin market-data relays, opaque, error, or 206 partial responses
+      if (res.status === 200 && res.type === 'basic' && url.origin === self.location.origin) {
         const c = await caches.open(CACHE);
         c.put(req, res.clone());
       }
