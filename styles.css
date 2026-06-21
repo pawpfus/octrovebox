@@ -3384,6 +3384,44 @@ body.palace-open { overflow: hidden; }
 .pd-go:hover { filter: brightness(1.1); }
 
 /* ============================================================
+   THE DEEP — full-screen trading-terminal overlay
+============================================================ */
+body.deep-open { overflow: hidden; }
+.deep-overlay {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(95,208,255,0.10), transparent 60%),
+    linear-gradient(180deg, #06283d 0%, #0a4d68 55%, #0e6c86 100%);
+  animation: deepFade 0.22s ease;
+}
+.deep-overlay[hidden] { display: none; }
+@keyframes deepFade { from { opacity: 0; } to { opacity: 1; } }
+.deep-hud {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 14px 16px; border-bottom: 2px solid rgba(95,208,255,0.25);
+  background: rgba(5,12,22,0.55);
+}
+.dh-title { font-size: 11px; letter-spacing: 1px; color: var(--gold); text-shadow: 0 2px 0 #05131f; }
+.dh-exit {
+  font-family: inherit; font-size: 10px; letter-spacing: 1px; color: var(--ink);
+  background: rgba(255,111,145,0.16); border: 2px solid #ff6f8c; border-radius: 8px;
+  padding: 8px 12px; cursor: pointer; transition: filter .15s, transform .05s;
+}
+.dh-exit:hover { filter: brightness(1.12); }
+.dh-exit:active { transform: translateY(2px); }
+.deep-body { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; }
+.deep-body .bot-panel {
+  max-width: 560px; margin: 0 auto; background: rgba(5,12,22,0.45);
+  border: 2px solid rgba(95,208,255,0.18); border-radius: 14px; padding: 16px;
+  box-shadow: 0 0 24px rgba(0,0,0,0.35);
+}
+
+@media (min-width: 720px) {
+  .dh-title { font-size: 13px; }
+  .deep-body { padding: 24px; }
+}
+
+/* ============================================================
    BOT LAB — paper-trading panel
 ============================================================ */
 .bot-sub { font-size: 11px; opacity: .85; margin: 2px 0 10px; line-height: 1.5; }

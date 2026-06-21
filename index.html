@@ -19,7 +19,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=122" />
+  <link rel="stylesheet" href="styles.css?v=123" />
 </head>
 
 <body>
@@ -300,36 +300,10 @@
         </span>
         <span class="pe-text">
           <span class="pe-title">≈ ENTER THE DEEP ≈</span>
-          <span class="pe-sub">SWIM SIMULATOR · DIVE YOUR MONEY REEF</span>
+          <span class="pe-sub">TRADING FLOOR · PAPER BOTS ON REAL DATA</span>
         </span>
         <span class="pe-arrow" aria-hidden="true">⤢</span>
       </button>
-    </section>
-
-    <!-- ===== BOT LAB — paper-trading bots on real market data ===== -->
-    <section class="panel bot-panel">
-      <h2 class="panel-title">🤖 BOT LAB</h2>
-      <p class="bot-sub">Backtest trading bots on <b>real</b> market data. Paper only — no real money, no orders.</p>
-      <div class="bot-controls">
-        <div class="select-wrap"><select id="botMarket" aria-label="Market"></select></div>
-        <div class="select-wrap"><select id="botCoin" aria-label="Instrument"></select></div>
-        <div class="select-wrap"><select id="botStrat" aria-label="Strategy"></select></div>
-        <div class="select-wrap"><select id="botRange" aria-label="Range"></select></div>
-      </div>
-      <div class="bot-params" id="botParams"></div>
-      <button type="button" class="bot-run" id="botRun">▶ RUN BOT</button>
-      <div class="bot-status" id="botStatus" hidden></div>
-      <div class="bot-result" id="botResult" hidden>
-        <div class="bot-head">
-          <span class="bot-price" id="botPrice"></span>
-          <span class="bot-signal" id="botSignal"></span>
-        </div>
-        <canvas class="bot-chart" id="botChart" width="600" height="170"></canvas>
-        <div class="bot-legend"><span class="bl-bot">▬ BOT</span><span class="bl-hold">▬ BUY &amp; HOLD</span></div>
-        <div class="bot-stats" id="botStats"></div>
-        <div class="bot-log" id="botLog"></div>
-      </div>
-      <p class="bot-foot">🪙 Gold/metals &amp; 🇮🇩 IHSG: Yahoo Finance (via proxy) · Educational simulation, not financial advice.</p>
     </section>
 
     <!-- ===== SIDE QUESTS — RPG quest board ===== -->
@@ -542,7 +516,40 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="app.js?v=128"></script>
+  <!-- ===== THE DEEP — full-screen paper-trading terminal ===== -->
+  <div class="deep-overlay" id="deepOverlay" hidden role="dialog" aria-label="The Deep — trading floor">
+    <div class="deep-hud">
+      <span class="dh-title">≈ THE DEEP · TRADING FLOOR ≈</span>
+      <button type="button" class="dh-exit" id="deepExit" title="Surface — leave the deep">✕ SURFACE</button>
+    </div>
+    <div class="deep-body">
+      <div class="bot-panel">
+        <p class="bot-sub">Backtest trading bots on <b>real</b> market data. Paper only — no real money, no orders.</p>
+        <div class="bot-controls">
+          <div class="select-wrap"><select id="botMarket" aria-label="Market"></select></div>
+          <div class="select-wrap"><select id="botCoin" aria-label="Instrument"></select></div>
+          <div class="select-wrap"><select id="botStrat" aria-label="Strategy"></select></div>
+          <div class="select-wrap"><select id="botRange" aria-label="Range"></select></div>
+        </div>
+        <div class="bot-params" id="botParams"></div>
+        <button type="button" class="bot-run" id="botRun">▶ RUN BOT</button>
+        <div class="bot-status" id="botStatus" hidden></div>
+        <div class="bot-result" id="botResult" hidden>
+          <div class="bot-head">
+            <span class="bot-price" id="botPrice"></span>
+            <span class="bot-signal" id="botSignal"></span>
+          </div>
+          <canvas class="bot-chart" id="botChart" width="600" height="170"></canvas>
+          <div class="bot-legend"><span class="bl-bot">▬ BOT</span><span class="bl-hold">▬ BUY &amp; HOLD</span></div>
+          <div class="bot-stats" id="botStats"></div>
+          <div class="bot-log" id="botLog"></div>
+        </div>
+        <p class="bot-foot">🪙 Gold/metals &amp; 🇮🇩 IHSG: Yahoo Finance (via proxy) · Educational simulation, not financial advice.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=129"></script>
 </body>
 
 </html>
