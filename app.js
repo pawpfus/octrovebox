@@ -32,6 +32,70 @@ const CAT_COLORS = {
   shop: '#ffd23f', health: '#ff5d5d', bills: '#ff9f1c', other: '#9a9ad0',
 };
 
+/* ============================================================
+   SMART AUTO-CATEGORIZATION — guess a category from the entry's
+   description. Built-in keyword dictionary (English + Indonesian)
+   plus a learned word→category memory that adapts to your habits.
+============================================================ */
+const CAT_KEYWORDS = {
+  expense: {
+    food: ['food', 'makan', 'makanan', 'lunch', 'dinner', 'breakfast', 'sarapan', 'eat', 'resto', 'restaurant', 'cafe', 'coffee', 'kopi', 'snack', 'jajan', 'grocery', 'groceries', 'supermarket', 'warung', 'gofood', 'grabfood', 'mcd', 'kfc', 'pizza', 'burger', 'nasi', 'ayam', 'bakso', 'mie', 'minum', 'starbucks', 'teh', 'dessert'],
+    home: ['home', 'rumah', 'rent', 'sewa', 'kontrakan', 'kost', 'kos', 'mortgage', 'cicilan rumah', 'furniture', 'perabot', 'ikea', 'kitchen', 'dapur', 'laundry', 'deterjen', 'cleaning'],
+    transit: ['transit', 'transport', 'transportasi', 'gojek', 'grab', 'gocar', 'taxi', 'taksi', 'ojek', 'ojol', 'bus', 'train', 'kereta', 'krl', 'mrt', 'fuel', 'bensin', 'pertamax', 'parking', 'parkir', 'toll', 'tol', 'flight', 'pesawat', 'tiket', 'angkot', 'commute'],
+    fun: ['fun', 'game', 'gaming', 'steam', 'movie', 'bioskop', 'cinema', 'netflix', 'spotify', 'disney', 'concert', 'konser', 'hobby', 'hobi', 'vacation', 'liburan', 'travel', 'holiday', 'hiburan', 'club', 'karaoke', 'nonton'],
+    shop: ['shop', 'shopping', 'belanja', 'beli', 'tokopedia', 'shopee', 'lazada', 'amazon', 'clothes', 'baju', 'pakaian', 'sepatu', 'shoes', 'fashion', 'gadget', 'electronics', 'elektronik', 'mall', 'toko', 'tas'],
+    health: ['health', 'kesehatan', 'doctor', 'dokter', 'hospital', 'rumah sakit', 'clinic', 'klinik', 'medicine', 'obat', 'pharmacy', 'apotek', 'apotik', 'gym', 'fitness', 'dental', 'gigi', 'vitamin', 'bpjs'],
+    bills: ['bill', 'bills', 'tagihan', 'electric', 'listrik', 'pln', 'water', 'pdam', 'internet', 'wifi', 'indihome', 'phone', 'pulsa', 'telkom', 'subscription', 'langganan', 'tax', 'pajak', 'token', 'premi'],
+  },
+  income: {
+    salary: ['salary', 'gaji', 'payroll', 'wage', 'upah', 'payday'],
+    bonus: ['bonus', 'thr', 'incentive', 'insentif', 'commission', 'komisi', 'reward'],
+    gift: ['gift', 'hadiah', 'present', 'angpao', 'angpau', 'kado'],
+    side: ['side', 'freelance', 'project', 'proyek', 'sampingan', 'jualan', 'jual', 'sell', 'honor', 'fee', 'side quest'],
+    invest: ['invest', 'investment', 'investasi', 'dividend', 'dividen', 'interest', 'bunga', 'profit', 'saham', 'crypto', 'stock', 'reksadana', 'return', 'deposito'],
+  },
+};
+// guess a category id from a free-text description (null when nothing matches)
+function guessCategory(desc, type) {
+  const raw = (desc || '').toLowerCase().trim();
+  if (!raw) return null;
+  const text = ' ' + raw + ' ';
+  const tokens = raw.split(/[^a-z0-9]+/i).filter(Boolean);
+  // 1) learned corrections win — a distinctive word you've categorised before
+  const mem = (state.catMemory && state.catMemory[type]) || {};
+  for (const w of tokens) { if (w.length >= 3 && mem[w]) return mem[w]; }
+  // 2) built-in dictionary, scored (longer/more specific keywords weigh more)
+  const dict = CAT_KEYWORDS[type] || {};
+  let best = null, bestScore = 0;
+  for (const cat in dict) {
+    let score = 0;
+    for (const kw of dict[cat]) {
+      if (kw.indexOf(' ') >= 0) { if (text.indexOf(' ' + kw + ' ') >= 0 || raw.indexOf(kw) >= 0) score += kw.length; }
+      else if (tokens.some((t) => t === kw || (kw.length >= 4 && t.startsWith(kw)))) score += kw.length;
+    }
+    if (score > bestScore) { bestScore = score; best = cat; }
+  }
+  return best;
+}
+// generic words that make poor memory keys (they don't identify a category)
+const CAT_STOPWORDS = new Set([
+  'bayar', 'beli', 'untuk', 'dari', 'bulan', 'bulanan', 'harian', 'mingguan', 'tahunan',
+  'online', 'delivery', 'langganan', 'lagi', 'malam', 'pagi', 'siang', 'sore', 'hari',
+  'biaya', 'uang', 'total', 'order', 'pesan', 'kirim', 'cicilan', 'angsuran',
+  'payment', 'monthly', 'weekly', 'daily', 'yearly', 'subscription', 'this', 'that', 'with', 'from',
+]);
+// remember the user's choice so future similar entries auto-fill correctly
+function learnCategory(desc, type, cat) {
+  if (!cat || cat === 'other') return;
+  const tokens = (desc || '').toLowerCase().split(/[^a-z0-9]+/i)
+    .filter((w) => w.length >= 4 && !CAT_STOPWORDS.has(w));
+  if (!tokens.length) return;
+  const key = tokens.sort((a, b) => b.length - a.length)[0];   // most distinctive word
+  if (!state.catMemory) state.catMemory = { expense: {}, income: {} };
+  if (!state.catMemory[type]) state.catMemory[type] = {};
+  state.catMemory[type][key] = cat;
+}
+
 /* ---------------- state ---------------- */
 let state = {
   transactions: [],
@@ -44,6 +108,7 @@ let state = {
   budgetBreached: false,// fired the "over budget" warning already?
   goalCelebrated: false,// fired the "quest complete" jingle already?
   catBudgets: {},       // { categoryId: monthlyLimit } — mini-bosses
+  catMemory: { expense: {}, income: {} }, // learned word→category map for smart auto-categorization
   questsDone: [],       // ids of completed side quests
   theme: 'default',     // unlockable skin
   themesSeen: [],       // skins already announced as unlocked
@@ -79,6 +144,7 @@ let catFilterVal = 'all';       // quest-log category filter
 let monthFilterVal = 'all';     // quest-log month filter (y*12+m, or 'all')
 let playerFilterVal = 'all';    // quest-log player filter (all / p1 / p2) — Guild mode
 let editingId = null; // id of the transaction being edited (null = adding new)
+let catTouched = false; // did the user manually pick a category? (stops auto-categorization fighting them)
 
 /* ---------------- elements ---------------- */
 const $ = (id) => document.getElementById(id);
@@ -87,6 +153,7 @@ const els = {
   balanceFoot: $('balanceFoot'), balanceCard: document.querySelector('.balance'),
   streak: $('streakDisplay'),
   form: $('txForm'), desc: $('descInput'), amount: $('amountInput'), category: $('categoryInput'),
+  catAutoHint: $('catAutoHint'),
   dateField: $('dateField'), dateLabel: $('dateLabel'),
   calOverlay: $('calOverlay'), calPrev: $('calPrev'), calNext: $('calNext'), calTitle: $('calTitle'), calGrid: $('calGrid'), calToday: $('calToday'),
   btnExpense: $('btnExpense'), btnIncome: $('btnIncome'), submit: $('submitBtn'),
@@ -119,6 +186,7 @@ const els = {
   xpFill: $('xpFill'), xpNext: $('xpNext'),
   // oracle
   oracleText: $('oracleText'), oracleStage: $('oracleStage'), oracleMore: $('oracleMore'),
+  oracleForecast: $('oracleForecast'), ofHeadline: $('ofHeadline'), ofOmens: $('ofOmens'),
   // side quests
   questList: $('questList'),
   questToggle: $('questToggle'), questScroll: $('questScroll'), questProgress: $('questProgress'),
@@ -1008,6 +1076,116 @@ function oracleTips() {
   return tips.concat(EDU_TIPS);
 }
 
+/* ============================================================
+   THE ORACLE'S FORESIGHT — a forward-looking forecast of your
+   actual balance, not just a recap. Projects your run-rate ahead,
+   flags a run-dry date, dates your savings goal, and surfaces the
+   single biggest anomaly. Pure on-device math over logged data.
+============================================================ */
+function forecast() {
+  const txs = state.transactions || [];
+  if (txs.length < 6) return null;                  // too little to trend honestly
+  const now = Date.now(), day = 86400000;
+  const earliest = Math.min.apply(null, txs.map(txDate));
+  const span = (now - earliest) / day;
+  if (span < 14) return null;                        // need ~2 weeks of history
+
+  // run-rate: average daily net flow over the trailing window (≤90d)
+  const windowDays = Math.min(90, Math.max(14, Math.round(span)));
+  const since = now - windowDays * day;
+  let net = 0;
+  txs.forEach((t) => { if (txDate(t) >= since) net += (t.type === 'income' ? t.amount : -t.amount); });
+  const perDay = net / windowDays;
+  const balance = totals().balance;
+  const proj30 = balance + perDay * 30;
+
+  // run-dry date if the balance is bleeding down
+  let dryDate = null, dryDays = null;
+  if (perDay < 0 && balance > 0) {
+    dryDays = balance / -perDay;
+    if (dryDays <= 540) dryDate = new Date(now + dryDays * day);
+  }
+
+  // upcoming recurring obligations in the next 30 days (informational)
+  let billsOut = 0, billsIn = 0;
+  (state.recurring || []).forEach((r) => {
+    let due = r.nextDue, guard = 0;
+    const cap = now + 30 * day;
+    while (due && due <= cap && guard < 60) {
+      if (due >= now) { if (r.type === 'expense') billsOut += r.amount; else billsIn += r.amount; }
+      due = addPeriod(due, r.freq); guard += 1;
+    }
+  });
+
+  // anomaly: this month's spend vs the average of the prior 3 months
+  const d = new Date();
+  const curM = monthTotals(d.getFullYear(), d.getMonth()).expense;
+  let prior = 0, pc = 0;
+  for (let k = 1; k <= 3; k++) {
+    const m = new Date(d.getFullYear(), d.getMonth() - k, 1);
+    const e = monthTotals(m.getFullYear(), m.getMonth()).expense;
+    if (e > 0) { prior += e; pc += 1; }
+  }
+  const avgPrior = pc ? prior / pc : 0;
+  let spendDiff = null;
+  if (avgPrior > 0 && curM > 0 && d.getDate() >= 8) spendDiff = Math.round((curM / avgPrior - 1) * 100);
+
+  // savings-goal ETA at the real pace
+  let goalEta = null, goalReachable = null;
+  if (state.goal && balance < state.goal.target) {
+    goalReachable = perDay > 0;
+    if (goalReachable) {
+      const gd = (state.goal.target - Math.max(0, balance)) / perDay;
+      if (gd <= 3650) goalEta = new Date(now + gd * day);
+    }
+  }
+  return { perDay, balance, proj30, dryDate, dryDays, billsOut, billsIn, spendDiff, goalEta, goalReachable, windowDays };
+}
+const dShort = (dt) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const dMonth = (dt) => dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+function renderForecast() {
+  const host = els.oracleForecast;
+  if (!host) return;
+  const f = forecast();
+  if (!f) { host.hidden = true; return; }
+  host.hidden = false;
+
+  // headline — the forward balance trajectory
+  let tone, ico, txt;
+  if (f.dryDate) {
+    tone = 'bad'; ico = '⚠';
+    txt = `At your current pace, your gold runs dry around <b>${dShort(f.dryDate)}</b> — about ${Math.round(f.dryDays)} days out.`;
+  } else if (f.perDay < 0) {
+    tone = 'warn'; ico = '📉';
+    txt = `At your current pace, your balance slips to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
+  } else {
+    tone = 'good'; ico = '📈';
+    txt = `At your current pace, your balance grows to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
+  }
+  els.ofHeadline.className = 'of-headline ' + tone;
+  els.ofHeadline.innerHTML = `<span class="ofh-ico">${ico}</span><span class="ofh-txt">${txt}</span>`;
+
+  // up to three "omens" — the most actionable reads
+  const omens = [];
+  if (f.billsOut > 0) {
+    omens.push(['🗓️', 'warn', `<b>${fmt(f.billsOut)}</b> in recurring bills fall due within 30 days` +
+      (f.billsIn > 0 ? ` (with ${fmt(f.billsIn)} income incoming).` : '.')]);
+  }
+  if (f.goalEta) {
+    omens.push(['🎯', 'good', `On track to reach “${escapeHtml(state.goal.name)}” around <b>${dMonth(f.goalEta)}</b>.`]);
+  } else if (f.goalReachable === false) {
+    omens.push(['🎯', 'warn', `“${escapeHtml(state.goal.name)}” is out of reach at your current pace — you aren't net-saving yet.`]);
+  }
+  if (f.spendDiff != null) {
+    if (f.spendDiff >= 15) omens.push(['📊', 'bad', `This month's spending is <b>${f.spendDiff}% above</b> your 3-month average.`]);
+    else if (f.spendDiff <= -15) omens.push(['📊', 'good', `This month's spending is <b>${Math.abs(f.spendDiff)}% below</b> your 3-month average — well held.`]);
+  }
+  if (!omens.length) omens.push(['✨', '', 'Your finances read steady. Keep logging and I\'ll foresee more.']);
+
+  els.ofOmens.innerHTML = omens.slice(0, 3).map(([i, c, t]) =>
+    `<li class="of-omen ${c}"><span class="ofo-ico">${i}</span><span class="ofo-txt">${t}</span></li>`).join('');
+}
+
 /* ---------------- SIDE QUESTS (challenges) ---------------- */
 const CHALLENGES = [
   { id: 'first',    icon: '🐣', name: 'FIRST STEPS',     desc: 'Log your first entry',     check: () => ({ cur: Math.min(state.transactions.length, 1), goal: 1 }) },
@@ -1628,6 +1806,7 @@ function renderAll(prevLevel) {
   renderChart();
   renderQuests();
   renderBounties();
+  renderForecast();
   renderOracle();
   renderThemes();
   renderChest();
@@ -1659,7 +1838,19 @@ function setType(type) {
   els.btnIncome.classList.toggle('active', type === 'income');
   els.submit.textContent = type === 'income' ? '⮞ COLLECT GOLD' : '⮞ ADD ENTRY';
   fillCategories();
+  catTouched = false;       // fresh type → let auto-categorization take over again
+  applyAutoCat();
   sfx.click();
+}
+
+// auto-pick a category from the current description, unless the user picked one
+// themselves or we're editing an existing entry. Shows a small ✨ AUTO hint.
+function applyAutoCat() {
+  if (editingId != null || catTouched) return;
+  const g = guessCategory(els.desc.value, currentType);
+  const hit = g && CATEGORIES[currentType].some((c) => c.id === g);
+  if (hit && els.category.value !== g) els.category.value = g;
+  if (els.catAutoHint) els.catAutoHint.hidden = !hit;
 }
 
 function submitLabel() { return currentType === 'income' ? '⮞ COLLECT GOLD' : '⮞ ADD ENTRY'; }
@@ -1724,10 +1915,12 @@ function addTx(e) {
   if (editingId != null) {
     const tx = state.transactions.find((t) => t.id === editingId);
     if (tx) { tx.type = currentType; tx.desc = desc; tx.amount = amount; tx.category = els.category.value; tx.date = pickerDate; }
+    learnCategory(desc, currentType, els.category.value);
     editingId = null;
     save(); sfx.click();
     renderAll();
     els.form.reset(); setDateToday();
+    catTouched = false; if (els.catAutoHint) els.catAutoHint.hidden = true;
     els.submit.textContent = submitLabel();
     showToast('✓ ENTRY UPDATED');
     return;
@@ -1736,6 +1929,7 @@ function addTx(e) {
   const prevLevel = levelFor(totals().income);
 
   const category = els.category.value;
+  learnCategory(desc, currentType, category);   // adapt future guesses to your wording
   const owner = activePlayer();
   state.transactions.push({
     id: newId(),
@@ -1768,6 +1962,7 @@ function addTx(e) {
 
   els.form.reset();
   setDateToday();
+  catTouched = false; if (els.catAutoHint) els.catAutoHint.hidden = true;
   els.desc.focus();
 }
 
@@ -2279,6 +2474,9 @@ function renderPinButtons() {
 els.form.addEventListener('submit', addTx);
 els.btnExpense.addEventListener('click', () => setType('expense'));
 els.btnIncome.addEventListener('click', () => setType('income'));
+// smart auto-categorization: guess from the description as you type
+els.desc.addEventListener('input', applyAutoCat);
+els.category.addEventListener('change', () => { catTouched = true; if (els.catAutoHint) els.catAutoHint.hidden = true; });
 els.reset.addEventListener('click', resetAll);
 els.exportBtn.addEventListener('click', exportPDF);
 els.backupBtn.addEventListener('click', exportBackup);

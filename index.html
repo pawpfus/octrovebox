@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=135" />
+  <link rel="stylesheet" href="styles.css?v=137" />
 </head>
 
 <body>
@@ -80,6 +80,11 @@
     <section class="panel oracle-panel">
       <div class="log-head">
         <h2 class="panel-title">THE ORACLE</h2>
+      </div>
+      <!-- forward-looking forecast banner (filled by renderForecast) -->
+      <div class="oracle-forecast" id="oracleForecast" hidden>
+        <div class="of-headline" id="ofHeadline"></div>
+        <ul class="of-omens" id="ofOmens" aria-live="polite"></ul>
       </div>
       <div class="oracle-stage" id="oracleStage">
         <div class="oracle-orb">
@@ -147,7 +152,7 @@
           </label>
 
           <label class="field">
-            <span class="field-label">CATEGORY</span>
+            <span class="field-label">CATEGORY <span class="cat-auto-hint" id="catAutoHint" hidden>✨ AUTO</span></span>
             <div class="select-wrap">
               <select id="categoryInput"></select>
             </div>
@@ -630,7 +635,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=140"></script>
+  <script src="app.js?v=142"></script>
 </body>
 
 </html>
