@@ -3488,17 +3488,19 @@ body.deep-open { overflow: hidden; }
 /* ============================================================
    STATUS AILMENTS — RPG debuffs from your finances
 ============================================================ */
-.ailments-panel { margin-bottom: 18px; }
-.ailments-panel[hidden] { display: none; }
-.status-ailments { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
+/* status ailments — merged in as a sub-section of the Category Bosses panel */
+.ailments-block { margin-top: 14px; padding-top: 12px; border-top: 2px dashed rgba(255,255,255,0.12); }
+.ailments-block[hidden] { display: none; }
+.ailments-divider { font-size: 8px; letter-spacing: 1px; color: var(--gold); opacity: .85; text-align: center; margin-bottom: 10px; }
+.status-ailments { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .status-ailments[hidden] { display: none; }
-.ailments-hint { font-size: 8px; opacity: .6; text-align: center; margin-top: 10px; line-height: 1.6; }
+.ailments-hint { font-size: 7px; opacity: .55; text-align: center; margin-top: 9px; line-height: 1.6; }
 .ailment-badge {
-  display: inline-flex; align-items: center; gap: 5px; font-size: 8px; letter-spacing: .5px;
-  padding: 6px 10px; border-radius: 999px; border: 2px solid currentColor; cursor: help;
+  display: inline-flex; align-items: center; gap: 4px; font-size: 6px; letter-spacing: .5px;
+  padding: 4px 7px; border-radius: 999px; border: 2px solid currentColor; cursor: help;
   background: rgba(0,0,0,0.3);
 }
-.ailment-badge .ab-ico { font-size: 13px; }
+.ailment-badge .ab-ico { font-size: 10px; }
 .ailment-badge.poisoned { color: #7fe06a; }
 .ailment-badge.frozen { color: #7fd0ff; }
 .ailment-badge.overburdened { color: #ffb04f; }
@@ -3538,21 +3540,19 @@ body.ail-frozen .ail-fx::after {
 body.ail-frozen .screen { filter: saturate(.55) brightness(.95) hue-rotate(-12deg); }
 
 /* OVERBURDENED — the dashboard glitches: periodic skew/jitter + scanline tear */
-body.ail-overburdened .screen { animation: glitchSkew 6s steps(1, end) infinite; }
+body.ail-overburdened .screen { animation: glitchSkew 8s steps(1, end) infinite; }
 @keyframes glitchSkew {
-  0%, 85%, 100% { transform: none; }
-  86% { transform: translate(-3px, 1px) skewX(-7deg); }
-  88% { transform: translate(3px, -1px) skewX(5deg); }
-  90% { transform: translate(-2px, 0); }
-  92% { transform: translate(2px, 1px) skewX(-4deg); }
-  94% { transform: none; }
+  0%, 92%, 100% { transform: none; }
+  93% { transform: translate(-1px, 0) skewX(-2deg); }
+  95% { transform: translate(1px, 0) skewX(1.5deg); }
+  97% { transform: none; }
 }
 body.ail-overburdened .ail-fx {
-  background: repeating-linear-gradient(0deg, rgba(255,60,120,0.06) 0 2px, rgba(0,200,255,0.06) 2px 4px);
+  background: repeating-linear-gradient(0deg, rgba(255,60,120,0.04) 0 2px, rgba(0,200,255,0.04) 2px 4px);
   mix-blend-mode: screen;
-  animation: glitchBands 6s steps(1, end) infinite;
+  animation: glitchBands 8s steps(1, end) infinite;
 }
-@keyframes glitchBands { 0%, 85%, 100% { opacity: 0; } 86% { opacity: .7; } 90% { opacity: .4; } 93% { opacity: .6; } }
+@keyframes glitchBands { 0%, 92%, 100% { opacity: 0; } 93% { opacity: .35; } 96% { opacity: .25; } }
 /* overburdened also weighs the logo down (slower bob) */
 body.ail-overburdened .logo-octo { animation-duration: 6s !important; filter: brightness(0.85) saturate(0.8); }
 

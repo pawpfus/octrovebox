@@ -19,7 +19,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=129" />
+  <link rel="stylesheet" href="styles.css?v=130" />
 </head>
 
 <body>
@@ -291,13 +291,13 @@
         <input type="number" id="catBudgetInput" min="1" step="1" placeholder="LIMIT" />
         <button type="button" class="mini-save" id="catBudgetSave">SET</button>
       </div>
-    </section>
 
-    <!-- ===== STATUS AILMENTS — live debuffs from your finances ===== -->
-    <section class="panel ailments-panel" id="ailmentsPanel" hidden>
-      <h2 class="panel-title">⚠ STATUS AILMENTS</h2>
-      <div class="status-ailments" id="statusAilments" aria-live="polite"></div>
-      <p class="ailments-hint">Negative money habits inflict RPG debuffs. Clear the cause to cure them.</p>
+      <!-- status ailments — live debuffs, merged into the boss panel -->
+      <div class="ailments-block" id="ailmentsPanel" hidden>
+        <div class="ailments-divider">⚠ STATUS AILMENTS</div>
+        <div class="status-ailments" id="statusAilments" aria-live="polite"></div>
+        <p class="ailments-hint">Bad money habits inflict RPG debuffs. Clear the cause to cure them.</p>
+      </div>
     </section>
 
     <!-- ===== THE PALACE — walkable isometric mode ===== -->
