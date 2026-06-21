@@ -3185,12 +3185,14 @@ if (state.musicOn) {
   // both pull real candles from Yahoo Finance via a CORS proxy (Yahoo blocks
   // direct browser calls); keyless on our side.
   const MARKETS = {
+    // Yahoo quotes precious metals per troy ounce and copper per pound; `g` is
+    // the grams in that native unit so we can show a per-gram price (divide).
     gold: { label: '🪙 GOLD & METALS', ccy: 'USD', items: [
-      { id: 'GC=F', sym: 'GOLD',  name: 'Gold / oz' },
-      { id: 'SI=F', sym: 'SILVER', name: 'Silver / oz' },
-      { id: 'PL=F', sym: 'PLATINUM', name: 'Platinum / oz' },
-      { id: 'PA=F', sym: 'PALLADIUM', name: 'Palladium / oz' },
-      { id: 'HG=F', sym: 'COPPER', name: 'Copper / lb' },
+      { id: 'GC=F', sym: 'GOLD',  name: 'Gold / g', g: 31.1035 },
+      { id: 'SI=F', sym: 'SILVER', name: 'Silver / g', g: 31.1035 },
+      { id: 'PL=F', sym: 'PLATINUM', name: 'Platinum / g', g: 31.1035 },
+      { id: 'PA=F', sym: 'PALLADIUM', name: 'Palladium / g', g: 31.1035 },
+      { id: 'HG=F', sym: 'COPPER', name: 'Copper / g', g: 453.592 },
     ] },
     id: { label: '🇮🇩 INDONESIA', ccy: 'IDR', items: [
       { id: '^JKSE',   sym: 'IHSG', name: 'Jakarta Composite', index: true },
@@ -3486,6 +3488,8 @@ if (state.musicOn) {
     } catch (e) {
       data = syntheticHistory(market, id, days);
     }
+    // metals quote per troy ounce (copper per lb) — show a per-gram price
+    if (item.g) data = { live: data.live, series: data.series.map((d) => ({ t: d.t, p: d.p / item.g })) };
     // price metals in rupiah on request, converting each candle by that day's FX
     if (useIdr) {
       let fx = null;
