@@ -3158,6 +3158,8 @@ if (state.musicOn) {
   const elCoin = document.getElementById('botCoin');
   const elStrat = document.getElementById('botStrat');
   const elRange = document.getElementById('botRange');
+  const elCcy = document.getElementById('botCcy');
+  const elCcyWrap = document.getElementById('botCcyWrap');
   const elParams = document.getElementById('botParams');
   const elStatus = document.getElementById('botStatus');
   const elResult = document.getElementById('botResult');
@@ -3169,6 +3171,7 @@ if (state.musicOn) {
 
   const START_CASH = 10000;     // virtual paper capital
   const FEE = 0.001;            // 0.1% per simulated trade
+  const FALLBACK_IDR = 16000;   // approx USD→IDR used only if the FX feed is unreachable
   let runToken = 0;             // guards against a stale fetch overwriting a newer run
 
   // Yahoo blocks direct browser calls, so requests go through a relay. Our own
@@ -3347,6 +3350,41 @@ if (state.musicOn) {
     }
     throw lastErr || new Error('no relay');
   }
+  // USD→IDR daily candles (Yahoo "IDR=X"), used to price metals in rupiah.
+  // Returns a date→rate map (+ first/latest) or null if the feed is unreachable.
+  async function fetchFx(days) {
+    const range = days <= 30 ? '1mo' : days <= 90 ? '3mo' : '1y';
+    const yahoo = 'https://query1.finance.yahoo.com/v8/finance/chart/IDR=X?range=' + range + '&interval=1d';
+    for (const prox of PROXIES) {
+      try {
+        const r = await timedFetch(prox + encodeURIComponent(yahoo));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        const res = j && j.chart && j.chart.result && j.chart.result[0];
+        if (!res || !res.timestamp) throw new Error('no data');
+        const close = res.indicators.quote[0].close || [];
+        const map = new Map(); let first = null, latest = null;
+        res.timestamp.forEach((t, i) => {
+          const v = close[i];
+          if (v == null) return;
+          map.set(new Date(t * 1000).toISOString().slice(0, 10), v);
+          if (first == null) first = v;
+          latest = v;
+        });
+        if (map.size) return { map, first, latest };
+      } catch (e) { /* try next relay */ }
+    }
+    return null;
+  }
+  // convert a USD price series to IDR, carrying the last known rate forward over gaps
+  function toIdr(series, fx) {
+    let rate = (fx && fx.first) || FALLBACK_IDR;
+    return series.map((d) => {
+      const r = fx && fx.map.get(new Date(d.t).toISOString().slice(0, 10));
+      if (r != null) rate = r;
+      return { t: d.t, p: d.p * rate };
+    });
+  }
   // deterministic-ish random walk so the lab still works with no network
   function syntheticHistory(market, id, days) {
     const n = days <= 30 ? 60 : days <= 90 ? 90 : 250;
@@ -3398,6 +3436,10 @@ if (state.musicOn) {
     const m = MARKETS[elMarket.value] || MARKETS.crypto;
     elCoin.innerHTML = m.items.map((c) => `<option value="${c.id}">${c.sym} · ${c.name}</option>`).join('');
   }
+  // the price-currency toggle only makes sense for the USD-priced gold market
+  function syncCcyVis() {
+    if (elCcyWrap) elCcyWrap.hidden = (elMarket.value !== 'gold');
+  }
   function buildParams() {
     const s = STRATS[elStrat.value];
     elParams.innerHTML = s.params.map((p) =>
@@ -3425,10 +3467,10 @@ if (state.musicOn) {
     const market = elMarket.value, id = elCoin.value, strat = elStrat.value, days = parseInt(elRange.value, 10);
     const mkt = MARKETS[market] || MARKETS.crypto;
     const item = findItem(market, id) || mkt.items[0];
-    const ccy = mkt.ccy, fmtP = (v) => money(v, ccy, item.index);
+    const useIdr = (market === 'gold' && elCcy && elCcy.value === 'idr');
     const prm = readParams();
     // persist config
-    state.bots = { market, coin: id, strat, range: days };
+    state.bots = { market, coin: id, strat, range: days, ccy: elCcy ? elCcy.value : 'usd' };
     if (typeof save === 'function') save();
 
     runBtn.disabled = true;
@@ -3444,9 +3486,18 @@ if (state.musicOn) {
     } catch (e) {
       data = syntheticHistory(market, id, days);
     }
+    // price metals in rupiah on request, converting each candle by that day's FX
+    if (useIdr) {
+      let fx = null;
+      try { fx = await fetchFx(days); } catch (e) { /* flat fallback below */ }
+      if (myRun !== runToken) return;
+      data = { live: data.live, series: toIdr(data.series, fx) };
+    }
     if (myRun !== runToken) return;   // a newer run started — drop this stale result
     runBtn.disabled = false;
 
+    const ccy = useIdr ? 'IDR' : mkt.ccy;
+    const fmtP = (v) => money(v, ccy, item.index);
     const series = data.series;
     const prices = series.map((d) => d.p);
     const pos = signals(strat, prices, prm);
@@ -3500,12 +3551,14 @@ if (state.musicOn) {
     if (b.coin && findItem(mkt, b.coin)) elCoin.value = b.coin;
     if (b.strat && STRATS[b.strat]) elStrat.value = b.strat;
     if (b.range) elRange.value = String(b.range);
+    if (b.ccy && elCcy) elCcy.value = b.ccy;
+    syncCcyVis();
   }
 
   buildSelects();
   restore();
   buildParams();
-  elMarket.addEventListener('change', buildInstruments);
+  elMarket.addEventListener('change', () => { buildInstruments(); syncCcyVis(); });
   elStrat.addEventListener('change', buildParams);
   runBtn.addEventListener('click', () => run());
 })();

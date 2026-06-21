@@ -550,6 +550,10 @@
             <div class="select-wrap"><select id="botCoin" aria-label="Instrument"></select></div>
             <div class="select-wrap"><select id="botStrat" aria-label="Strategy"></select></div>
             <div class="select-wrap"><select id="botRange" aria-label="Range"></select></div>
+            <div class="select-wrap" id="botCcyWrap" hidden><select id="botCcy" aria-label="Price currency">
+              <option value="usd">$ USD</option>
+              <option value="idr">Rp IDR</option>
+            </select></div>
           </div>
           <div class="bot-params" id="botParams"></div>
           <button type="button" class="bot-run" id="botRun">▶ RUN BOT</button>
@@ -618,7 +622,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=135"></script>
+  <script src="app.js?v=136"></script>
 </body>
 
 </html>
