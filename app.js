@@ -3164,7 +3164,7 @@ if (state.musicOn) {
   // OWN_PROXY can also point at a dedicated Worker URL if you prefer.
   const noFunc = /(^localhost$)|(^127\.)|(\.github\.io$)/.test(location.hostname);
   const PAGES_PROXY = noFunc ? '' : '/api/yf?url=';
-  const OWN_PROXY = '';   // optional: 'https://octrovebox-proxy.you.workers.dev/?url='
+  const OWN_PROXY = 'https://octrovebox-proxy.nightshifter.workers.dev/?url=';  // private Cloudflare Worker
   const PROXIES = [PAGES_PROXY, OWN_PROXY, 'https://corsproxy.io/?url='].filter(Boolean);
 
   // two markets: gold & precious metals (USD) and Indonesia / IHSG (IDR).
