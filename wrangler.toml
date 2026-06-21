@@ -1,0 +1,14 @@
+# Deploy config for the market-data proxy Worker ONLY.
+#
+# Without this file, Cloudflare's "Connect to Git" wizard treats the whole repo
+# as a static-assets project — it uploads every file (including the .git folder)
+# and ships a no-op Worker under the wrong name. This pins the deploy to the
+# single proxy script with NO asset upload.
+#
+# There is deliberately no [assets] / [site] block: the static site
+# (index.html, app.js, styles.css, …) is hosted on GitHub Pages, not here.
+#
+# Deploy: `wrangler deploy` (or let the git-connected build run it).
+name = "octrovebox-proxy"
+main = "cloudflare-worker.js"
+compatibility_date = "2024-01-01"
