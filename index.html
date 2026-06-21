@@ -19,7 +19,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=124" />
+  <link rel="stylesheet" href="styles.css?v=125" />
 </head>
 
 <body>
@@ -516,48 +516,35 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <!-- ===== THE DEEP — paper-trading control center ===== -->
-  <div class="deep-overlay" id="deepOverlay" hidden role="dialog" aria-label="The Deep — trading control center">
+  <!-- ===== THE DEEP — full-screen paper-trading terminal ===== -->
+  <div class="deep-overlay" id="deepOverlay" hidden role="dialog" aria-label="The Deep — trading floor">
     <div class="deep-hud">
-      <span class="dh-brand"><span class="dh-led"></span> THE DEEP · CONTROL CENTER</span>
-      <span class="dh-mode">PAPER MODE</span>
+      <span class="dh-title">≈ THE DEEP · TRADING FLOOR ≈</span>
       <button type="button" class="dh-exit" id="deepExit" title="Surface — leave the deep">✕ SURFACE</button>
     </div>
     <div class="deep-body">
-      <div class="cc">
-        <!-- CONSOLE: mission config -->
-        <section class="cc-panel cc-console">
-          <header class="cc-head"><span class="cc-led"></span> MISSION CONFIG</header>
-          <div class="cc-pad">
-            <div class="bot-controls">
-              <label class="cc-field"><span>MARKET</span><div class="select-wrap"><select id="botMarket" aria-label="Market"></select></div></label>
-              <label class="cc-field"><span>INSTRUMENT</span><div class="select-wrap"><select id="botCoin" aria-label="Instrument"></select></div></label>
-              <label class="cc-field"><span>STRATEGY</span><div class="select-wrap"><select id="botStrat" aria-label="Strategy"></select></div></label>
-              <label class="cc-field"><span>WINDOW</span><div class="select-wrap"><select id="botRange" aria-label="Range"></select></div></label>
-            </div>
-            <div class="bot-params" id="botParams"></div>
-            <button type="button" class="bot-run" id="botRun">▶ DEPLOY BOT</button>
-            <div class="bot-status" id="botStatus" hidden></div>
+      <div class="bot-panel">
+        <p class="bot-sub">Backtest trading bots on <b>real</b> market data. Paper only — no real money, no orders.</p>
+        <div class="bot-controls">
+          <div class="select-wrap"><select id="botMarket" aria-label="Market"></select></div>
+          <div class="select-wrap"><select id="botCoin" aria-label="Instrument"></select></div>
+          <div class="select-wrap"><select id="botStrat" aria-label="Strategy"></select></div>
+          <div class="select-wrap"><select id="botRange" aria-label="Range"></select></div>
+        </div>
+        <div class="bot-params" id="botParams"></div>
+        <button type="button" class="bot-run" id="botRun">▶ RUN BOT</button>
+        <div class="bot-status" id="botStatus" hidden></div>
+        <div class="bot-result" id="botResult" hidden>
+          <div class="bot-head">
+            <span class="bot-price" id="botPrice"></span>
+            <span class="bot-signal" id="botSignal"></span>
           </div>
-          <p class="bot-foot">🪙 Gold/metals &amp; 🇮🇩 IHSG · Yahoo Finance (via proxy)<br>Educational simulation — not financial advice.</p>
-        </section>
-        <!-- DISPLAY: telemetry -->
-        <section class="cc-panel cc-display">
-          <header class="cc-head"><span class="cc-led live"></span> TELEMETRY</header>
-          <div class="cc-pad">
-            <div class="bot-result" id="botResult" hidden>
-              <div class="bot-head">
-                <span class="bot-price" id="botPrice"></span>
-                <span class="bot-signal" id="botSignal"></span>
-              </div>
-              <canvas class="bot-chart" id="botChart" width="600" height="170"></canvas>
-              <div class="bot-legend"><span class="bl-bot">▬ BOT</span><span class="bl-hold">▬ BUY &amp; HOLD</span></div>
-              <div class="bot-stats" id="botStats"></div>
-              <div class="bot-log" id="botLog"></div>
-            </div>
-            <div class="cc-idle" id="ccIdle">◌ STANDING BY<br><small>configure a bot and hit DEPLOY</small></div>
-          </div>
-        </section>
+          <canvas class="bot-chart" id="botChart" width="600" height="170"></canvas>
+          <div class="bot-legend"><span class="bl-bot">▬ BOT</span><span class="bl-hold">▬ BUY &amp; HOLD</span></div>
+          <div class="bot-stats" id="botStats"></div>
+          <div class="bot-log" id="botLog"></div>
+        </div>
+        <p class="bot-foot">🪙 Gold/metals &amp; 🇮🇩 IHSG: Yahoo Finance (via proxy) · Educational simulation, not financial advice.</p>
       </div>
     </div>
   </div>
