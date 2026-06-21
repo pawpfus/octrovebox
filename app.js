@@ -3179,6 +3179,7 @@ if (state.musicOn) {
   const elSignal = document.getElementById('botSignal');
   const elChart = document.getElementById('botChart');
   const elStats = document.getElementById('botStats');
+  const elOutlook = document.getElementById('botOutlook');
   const elLog = document.getElementById('botLog');
 
   const START_CASH = 10000;     // virtual paper capital
@@ -3333,6 +3334,118 @@ if (state.musicOn) {
       finalEq, nTrades: trades.length, winRate: rt ? (wins / rt) * 100 : 0, rt,
       mdd: mdd * 100, inPosition: units > 0,
     };
+  }
+
+  /* ---- on-device trend analysis: a plain-language read of PAST price action.
+     Not a forecast — it just summarises trend, momentum, volatility and the
+     nearest support/resistance into a bullish/neutral/bearish bias. ---- */
+  function stdev(arr) {
+    const n = arr.length;
+    if (n < 2) return 0;
+    const m = arr.reduce((s, v) => s + v, 0) / n;
+    return Math.sqrt(arr.reduce((s, v) => s + (v - m) * (v - m), 0) / (n - 1));
+  }
+  function analyze(series) {
+    const prices = series.map((d) => d.p);
+    const n = prices.length;
+    const last = prices[n - 1];
+    // shrink the MA windows for short histories so they always resolve
+    const wS = Math.min(20, Math.max(5, Math.floor(n / 3)));
+    const wL = Math.min(50, Math.max(wS + 5, Math.floor(n / 1.5)));
+    const smaS = smaAt(prices, n - 1, wS);
+    const smaL = smaAt(prices, n - 1, wL);
+    // trend slope: % change of the short MA over its recent half
+    const back = Math.min(n - 1, Math.max(3, Math.round(wS / 2)));
+    const smaSPrev = smaAt(prices, n - 1 - back, wS);
+    const slopePct = (smaS != null && smaSPrev) ? (smaS / smaSPrev - 1) * 100 : 0;
+    // momentum: latest RSI(14) + last-week push
+    const rsiArr = rsiSeries(prices, 14);
+    let rsi = null;
+    for (let i = rsiArr.length - 1; i >= 0; i--) { if (rsiArr[i] != null) { rsi = rsiArr[i]; break; } }
+    const wk = Math.min(n - 1, 5);
+    const recRet = (last / prices[n - 1 - wk] - 1) * 100;
+    // volatility: stdev of daily returns over the last ~30 bars
+    const rets = [];
+    for (let i = Math.max(1, n - 30); i < n; i++) rets.push(prices[i] / prices[i - 1] - 1);
+    const volPct = stdev(rets) * 100;
+    // support / resistance from the fetched window
+    let hi = -Infinity, lo = Infinity;
+    for (const p of prices) { if (p > hi) hi = p; if (p < lo) lo = p; }
+    const toHi = (hi / last - 1) * 100;   // upside room to resistance
+    const toLo = (1 - lo / last) * 100;   // downside room to support
+
+    // combine the signals into a -100..100 bias score
+    let score = 0;
+    if (smaS != null) score += last > smaS ? 18 : -18;
+    if (smaL != null) score += last > smaL ? 16 : -16;
+    if (smaS != null && smaL != null) score += smaS > smaL ? 14 : -14;  // golden / death alignment
+    score += clamp(slopePct * 6, -22, 22);                              // trend steepness
+    score += clamp(recRet * 1.5, -16, 16);                             // recent push
+    if (rsi != null) {
+      if (rsi >= 70) score -= 8;          // overbought — chasing risk
+      else if (rsi >= 55) score += 10;    // healthy momentum
+      else if (rsi <= 30) score += 4;     // oversold — possible bounce
+      else if (rsi < 45) score -= 10;     // weak
+    }
+    score = clamp(score, -100, 100);
+    const bias = score > 22 ? 'BULLISH' : score < -22 ? 'BEARISH' : 'NEUTRAL';
+    const conf = Math.min(95, 35 + Math.abs(score) * 0.6);
+    return { last, smaS, smaL, wS, wL, slopePct, rsi, recRet, volPct, hi, lo, toHi, toLo, score, bias, conf };
+  }
+  function trendWord(a) {
+    if (a.slopePct > 0.4) return ['UPTREND', 'good', '📈'];
+    if (a.slopePct < -0.4) return ['DOWNTREND', 'bad', '📉'];
+    return ['SIDEWAYS', 'warn', '➡️'];
+  }
+  function rsiWord(r) {
+    if (r == null) return ['—', ''];
+    if (r >= 70) return ['OVERBOUGHT', 'warn'];
+    if (r >= 55) return ['STRONG', 'good'];
+    if (r <= 30) return ['OVERSOLD', 'warn'];
+    if (r < 45) return ['WEAK', 'bad'];
+    return ['NEUTRAL', ''];
+  }
+  function volWord(v) {
+    if (v >= 3) return ['HIGH', 'bad'];
+    if (v >= 1.5) return ['MEDIUM', 'warn'];
+    return ['LOW', 'good'];
+  }
+  function renderOutlook(a, fmtP, sym) {
+    const [tw, ttone, tico] = trendWord(a);
+    const [rw, rtone] = rsiWord(a.rsi);
+    const [vw, vtone] = volWord(a.volPct);
+    const biasTone = a.bias === 'BULLISH' ? 'good' : a.bias === 'BEARISH' ? 'bad' : 'warn';
+    const aboveBoth = a.smaS != null && a.smaL != null && a.last > a.smaS && a.last > a.smaL;
+    const belowBoth = a.smaS != null && a.smaL != null && a.last < a.smaS && a.last < a.smaL;
+    const maPhrase = aboveBoth ? `trading above both its ${a.wS}- and ${a.wL}-day averages`
+      : belowBoth ? `trading below both its ${a.wS}- and ${a.wL}-day averages`
+      : 'hovering around its moving averages';
+    let guidance;
+    if (a.bias === 'BULLISH') guidance = (a.rsi != null && a.rsi >= 70)
+      ? 'Trend is up but momentum looks stretched — pullbacks toward support are common after overbought readings.'
+      : 'Trend and momentum lean positive; the resistance above is the level to clear for follow-through.';
+    else if (a.bias === 'BEARISH') guidance = (a.rsi != null && a.rsi <= 30)
+      ? 'Trend is down though selling looks exhausted — oversold bounces can happen near support.'
+      : 'Trend and momentum lean negative; the support below is the level to watch.';
+    else guidance = 'No clear edge either way — price is ranging. A breakout from this range usually sets the next direction.';
+    const summary =
+      `${sym} is in a ${tw.toLowerCase()}, ${maPhrase}. ` +
+      `Momentum is ${rw.toLowerCase()}${a.rsi != null ? ` (RSI ${a.rsi.toFixed(0)})` : ''} and ${a.recRet >= 0 ? 'up' : 'down'} ${Math.abs(a.recRet).toFixed(1)}% over the last week. ` +
+      `Volatility is ${vw.toLowerCase()} (~${a.volPct.toFixed(1)}%/day). ` +
+      `Resistance near ${fmtP(a.hi)} (+${a.toHi.toFixed(1)}%), support near ${fmtP(a.lo)} (−${a.toLo.toFixed(1)}%). ` +
+      guidance;
+    elOutlook.innerHTML =
+      `<div class="bo-head"><span class="bo-title">🤖 AI MARKET OUTLOOK</span>` +
+      `<span class="bo-bias ${biasTone}">${a.bias}</span></div>` +
+      `<div class="bo-conf"><span class="bo-conf-bar"><i style="width:${a.conf.toFixed(0)}%"></i></span>` +
+      `<span class="bo-conf-n">${a.conf.toFixed(0)}% conviction</span></div>` +
+      `<div class="bo-factors">` +
+        `<span class="bo-f ${ttone}">${tico} ${tw}</span>` +
+        `<span class="bo-f ${rtone}">RSI ${a.rsi == null ? '—' : a.rsi.toFixed(0)} · ${rw}</span>` +
+        `<span class="bo-f ${vtone}">VOL ${vw}</span>` +
+      `</div>` +
+      `<p class="bo-read">${escapeHtml(summary)}</p>` +
+      `<p class="bo-note">📚 A read of past price action only — not a prediction or financial advice.</p>`;
   }
 
   /* ---- data: real history per market, synthetic fallback when unreachable ---- */
@@ -3539,6 +3652,9 @@ if (state.musicOn) {
       statCard('TRADES', String(res.nTrades)) +
       statCard('WIN RATE', res.rt ? Math.round(res.winRate) + '%' : '—') +
       statCard('MAX DROP', '-' + res.mdd.toFixed(0) + '%', 'bad');
+
+    // AI market outlook — a plain-language read of the current trend
+    renderOutlook(analyze(series), fmtP, item.sym);
 
     // recent trade log (latest first)
     const recent = res.trades.slice(-6).reverse();

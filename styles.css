@@ -3393,6 +3393,26 @@ body.deep-open { overflow: hidden; }
 .bot-log .bl-side.sell { background: rgba(255,111,145,.2); color: #ff6f8c; }
 .bot-log .bl-pnl.good { color: #5fe6a8; }
 .bot-log .bl-pnl.bad { color: #ff6f8c; }
+/* AI MARKET OUTLOOK — plain-language trend read */
+.bot-outlook { background: rgba(0,0,0,.28); border: 2px solid rgba(255,210,63,.22); border-radius: 8px; padding: 10px; margin: 4px 0 10px; }
+.bot-outlook .bo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bot-outlook .bo-title { font-size: 9px; letter-spacing: .5px; color: var(--gold); }
+.bot-outlook .bo-bias { font-size: 9px; padding: 3px 7px; border-radius: 5px; border: 2px solid currentColor; }
+.bot-outlook .bo-bias.good { color: #5fe6a8; }
+.bot-outlook .bo-bias.bad { color: #ff6f8c; }
+.bot-outlook .bo-bias.warn { color: #ffd23f; }
+.bot-outlook .bo-conf { display: flex; align-items: center; gap: 7px; margin: 8px 0; }
+.bot-outlook .bo-conf-bar { flex: 1; height: 7px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; }
+.bot-outlook .bo-conf-bar i { display: block; height: 100%; background: var(--gold); }
+.bot-outlook .bo-conf-n { font-size: 7px; letter-spacing: .3px; opacity: .75; white-space: nowrap; }
+.bot-outlook .bo-factors { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.bot-outlook .bo-f { font-size: 8px; padding: 3px 6px; border-radius: 5px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); }
+.bot-outlook .bo-f.good { color: #5fe6a8; border-color: rgba(95,230,168,.35); }
+.bot-outlook .bo-f.bad { color: #ff6f8c; border-color: rgba(255,111,145,.35); }
+.bot-outlook .bo-f.warn { color: #ffd23f; border-color: rgba(255,210,63,.35); }
+.bot-outlook .bo-read { font-family: 'VT323', monospace; font-size: 14px; line-height: 1.5; letter-spacing: .3px; margin: 8px 0 6px; }
+.bot-outlook .bo-note { font-size: 7px; opacity: .55; letter-spacing: .3px; margin: 0; }
+
 .bot-foot { font-size: 8px; opacity: .55; margin-top: 10px; text-align: center; letter-spacing: .3px; }
 
 /* ============================================================
