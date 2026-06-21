@@ -66,6 +66,11 @@ let state = {
   guild: { on: false, active: 'p1', names: { p1: 'PLAYER 1', p2: 'PLAYER 2' } },
   // BOT LAB — last paper-trading config (real market data, no real orders)
   bots: { market: 'gold', coin: 'GC=F', strat: 'sma', range: 365 },
+  // INVESTMENT FLOOR — manual portfolio (Harvest-Moon farm): { id, name, kind, invested, value }
+  invest: [],
+  // DEBT DUNGEON — debts as monsters: { id, name, kind, total, paid }
+  debts: [],
+  deepFloor: 'trading',   // last-opened floor in The Deep
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
 let currentType = 'expense';
@@ -311,6 +316,9 @@ function migrate() {
     state.transactions.forEach((t) => { if (t.owner !== 'p1' && t.owner !== 'p2') t.owner = 'p1'; });
     (state.recurring || []).forEach((r) => { if (r.owner !== 'p1' && r.owner !== 'p2') r.owner = 'p1'; });
   }
+  // guard the Deep's new ledgers against malformed restores
+  if (!Array.isArray(state.invest)) state.invest = [];
+  if (!Array.isArray(state.debts)) state.debts = [];
   state.schema = SCHEMA;
 }
 // per-player income/expense/net split
@@ -1618,6 +1626,7 @@ function renderAll(prevLevel) {
   renderRecurring();
   renderZone();
   renderWeather();
+  renderAilments();
 }
 
 /* ============================================================
@@ -2002,6 +2011,8 @@ function importBackup(file) {
     state.bountyClaimed = data.bountyClaimed || '';
     state.currency = (data.currency && CURRENCIES[data.currency]) ? data.currency : 'IDR';
     state.recurring = Array.isArray(data.recurring) ? data.recurring : [];
+    state.invest = Array.isArray(data.invest) ? data.invest : [];
+    state.debts = Array.isArray(data.debts) ? data.debts : [];
     state.lastBackup = Number(data.lastBackup) || 0;
     state.schema = Number(data.schema) || 1;
     state.onboarded = true; // an imported save means an existing player — skip the tour
@@ -2937,8 +2948,9 @@ document.addEventListener('visibilitychange', () => {
     if (state.pinHash && els.lockOverlay.hidden && lock.hiddenAt && Date.now() - lock.hiddenAt > AUTO_LOCK_MS) {
       showLock('unlock');
     }
-    // stay silent if we came back to a (re)locked screen — resumes after unlock
-    if (state.musicOn && !lockOpen()) {
+    // stay silent if we came back to a (re)locked screen — resumes after unlock.
+    // also stay silent while diving: The Deep runs its own BGM (see deepBgm).
+    if (state.musicOn && !lockOpen() && !document.body.classList.contains('deep-open')) {
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
       startMusic();
     }
@@ -3157,15 +3169,12 @@ if (state.musicOn) {
   const FEE = 0.001;            // 0.1% per simulated trade
   let runToken = 0;             // guards against a stale fetch overwriting a newer run
 
-  // Yahoo blocks direct browser calls, so requests go through a relay. When the
-  // site is served from Cloudflare Pages, a same-origin Pages Function at
-  // /api/yf handles it privately (functions/api/yf.js). We skip that on
-  // github.io / localhost — where it would 404 — and use the public proxy.
-  // OWN_PROXY can also point at a dedicated Worker URL if you prefer.
-  const noFunc = /(^localhost$)|(^127\.)|(\.github\.io$)/.test(location.hostname);
-  const PAGES_PROXY = noFunc ? '' : '/api/yf?url=';
+  // Yahoo blocks direct browser calls, so requests go through a relay. Our own
+  // private Cloudflare Worker (cloudflare-worker.js) handles it first — locked to
+  // this site's origin and to Yahoo only. A public proxy is the offline-safe
+  // fallback; if both fail the lab shows labelled synthetic data.
   const OWN_PROXY = 'https://octrovebox-proxy.nightshifter.workers.dev/?url=';  // private Cloudflare Worker
-  const PROXIES = [PAGES_PROXY, OWN_PROXY, 'https://corsproxy.io/?url='].filter(Boolean);
+  const PROXIES = [OWN_PROXY, 'https://corsproxy.io/?url='];
 
   // two markets: gold & precious metals (USD) and Indonesia / IHSG (IDR).
   // both pull real candles from Yahoo Finance via a CORS proxy (Yahoo blocks
@@ -3500,25 +3509,296 @@ if (state.musicOn) {
 })();
 
 /* ============================================================
-   THE DEEP — entry portal for the full-screen trading terminal.
-   The old isometric mini-game is gone; diving now opens the Bot Lab.
+   STATUS AILMENTS — classic RPG debuffs mirrored from real finances.
+   Poisoned   : too many recurring subscriptions (screen flickers green)
+   Frozen     : no income toward savings in 7 days (icy tint)
+   Overburdened: heavy debt vs. income (the world drags / slows)
 ============================================================ */
-(function deepPortal() {
+function ailStatus() {
+  const now = Date.now();
+  const subCount = (state.recurring || []).filter((r) => r.type === 'expense').length;
+  const poisoned = subCount >= 4;
+  const recentIncome = state.transactions.some((t) => t.type === 'income' && t.date >= now - 7 * 86400000);
+  const frozen = !!state.goal && !recentIncome;
+  const outstanding = (state.debts || []).reduce((s, d) => s + Math.max(0, (Number(d.total) || 0) - (Number(d.paid) || 0)), 0);
+  const income30 = state.transactions
+    .filter((t) => t.type === 'income' && t.date >= now - 30 * 86400000)
+    .reduce((s, t) => s + t.amount, 0);
+  const overburdened = outstanding > 0 && (income30 <= 0 || outstanding > income30 * 3);
+  return { poisoned, frozen, overburdened, subCount, outstanding };
+}
+function renderAilments() {
+  const host = document.getElementById('statusAilments');
+  if (!host) return;
+  const a = ailStatus();
+  document.body.classList.toggle('ail-poisoned', a.poisoned);
+  document.body.classList.toggle('ail-frozen', a.frozen);
+  document.body.classList.toggle('ail-overburdened', a.overburdened);
+  const badges = [];
+  if (a.poisoned) badges.push(['poisoned', '🤢', 'POISONED', a.subCount + ' recurring expenses are draining you. Stop a subscription to cure it.']);
+  if (a.frozen) badges.push(['frozen', '❄️', 'FROZEN', 'No income toward your savings quest in 7 days. Log some gold to thaw out.']);
+  if (a.overburdened) badges.push(['overburdened', '⛓️', 'OVERBURDENED', 'Your debt load is heavy vs. income. Clear a Debt Dungeon monster to lighten it.']);
+  const panel = document.getElementById('ailmentsPanel');
+  if (panel) panel.hidden = badges.length === 0;
+  host.innerHTML = badges
+    .map(([cls, ico, name, desc]) => `<span class="ailment-badge ${cls}" title="${escapeHtml(desc)}"><span class="ab-ico">${ico}</span>${name}</span>`)
+    .join('');
+}
+
+/* ============================================================
+   THE DEEP — three descending floors (Trading / Investment / Debt).
+   Floor renderers are assigned by their modules below.
+============================================================ */
+let renderFarm = () => {};
+let renderDungeon = () => {};
+
+// floor-aware ambient BGM — a tiny generative loop layered on the audio engine.
+// Ducks the main music track while diving, restores it on surfacing.
+const deepBgm = (function () {
+  let timer = null, step = 0, floor = 'trading', resumeMain = false, active = false;
+  const P = {
+    trading: { ms: 380, bass: [36, 0, 43, 0, 38, 0, 45, 0], lead: [60, 64, 67, 72, 0, 67, 64, 60], type: 'sine', vol: 0.03 },
+    invest:  { ms: 420, bass: [40, 0, 47, 0, 45, 0, 52, 0], lead: [64, 67, 71, 74, 72, 71, 67, 64], type: 'triangle', vol: 0.028 },
+    debt:    { ms: 470, bass: [31, 0, 0, 32, 0, 0, 30, 0], lead: [55, 0, 58, 0, 54, 0, 51, 0], type: 'sawtooth', vol: 0.022 },
+  };
+  function tick() {
+    const p = P[floor] || P.trading;
+    const i = step % p.bass.length;
+    if (p.bass[i]) mNote(N2F(p.bass[i]), (p.ms / 1000) * 1.4, p.type, p.vol);
+    if (p.lead[i]) mNote(N2F(p.lead[i]), (p.ms / 1000) * 0.9, 'sine', p.vol * 0.8);
+    step += 1;
+  }
+  function startLoop() { if (timer) return; tick(); timer = setInterval(tick, (P[floor] || P.trading).ms); }
+  function stopLoop() { if (timer) { clearInterval(timer); timer = null; } }
+  function start() {
+    if (!state.soundOn) return;
+    try { getAudio(); } catch (e) { return; }
+    active = true; step = 0;
+    if (state.musicOn && music.timer) { stopMusic(); resumeMain = true; }
+    startLoop();
+  }
+  function stop() {
+    active = false; stopLoop();
+    if (resumeMain && state.musicOn && !document.hidden) startMusic();
+    resumeMain = false;
+  }
+  function setFloor(f) { floor = P[f] ? f : 'trading'; if (active && !document.hidden) { stopLoop(); step = 0; startLoop(); } }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopLoop();
+    else if (active) { try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) { /* noop */ } startLoop(); }
+  });
+  return { start, stop, setFloor };
+})();
+
+/* ---------------- FLOOR 2 — Investment Floor (Harvest-Moon farm) ---------------- */
+(function investmentFloor() {
+  const form = document.getElementById('farmForm');
+  const field = document.getElementById('farmField');
+  if (!form || !field) return;
+  const sumEl = document.getElementById('farmSummary');
+  const listEl = document.getElementById('farmList');
+  const KIND_ICON = { fund: '🌾', stock: '🌽', crypto: '🍄', gold: '🌻', other: '🌿' };
+  // plant sprite by performance: wilting → blooming the better it does
+  function plantFor(perf) {
+    if (perf <= -0.2) return '🥀';
+    if (perf < -0.05) return '🌱';
+    if (perf <= 0.05) return '🌿';
+    if (perf <= 0.2) return '🌾';
+    return '🌻';
+  }
+  const sign = (n) => (n >= 0 ? '+' : '');
+
+  renderFarm = function () {
+    const list = state.invest || [];
+    const sym = cur().symbol;
+    const a = document.getElementById('farmCcyA'); if (a) a.textContent = sym;
+    const b = document.getElementById('farmCcyB'); if (b) b.textContent = sym;
+    let totInv = 0, totVal = 0;
+    field.innerHTML = '';
+    if (!list.length) {
+      field.innerHTML = '<span class="farm-empty-note">🌱 Empty plot. Plant your first holding below.</span>';
+    } else {
+      list.forEach((h) => {
+        const inv = Number(h.invested) || 0, val = Number(h.value) || 0;
+        totInv += inv; totVal += val;
+        const perf = inv > 0 ? (val - inv) / inv : 0;
+        const plot = document.createElement('div');
+        plot.className = 'farm-plot';
+        plot.innerHTML = `<span class="farm-plant">${plantFor(perf)}</span>
+          <span class="farm-plot-name">${escapeHtml(h.name)}</span>
+          <span class="farm-plot-pct ${perf >= 0 ? 'up' : 'down'}">${sign(perf) + (perf * 100).toFixed(0)}%</span>`;
+        field.appendChild(plot);
+      });
+    }
+    const totPerf = totInv > 0 ? (totVal - totInv) / totInv : 0;
+    field.classList.toggle('lush', totPerf > 0.05);
+    field.classList.toggle('wilt', totPerf < -0.05);
+    const pl = totVal - totInv, plCls = pl >= 0 ? 'up' : 'down';
+    if (sumEl) sumEl.innerHTML = `
+      <div class="farm-sum-card"><span class="fs-val">${fmt(totInv)}</span><span class="fs-k">INVESTED</span></div>
+      <div class="farm-sum-card"><span class="fs-val ${plCls}">${fmt(totVal)}</span><span class="fs-k">VALUE</span></div>
+      <div class="farm-sum-card"><span class="fs-val ${plCls}">${sign(pl) + fmt(Math.abs(pl)).replace('-', '')}</span><span class="fs-k">${totInv > 0 ? sign(totPerf) + (totPerf * 100).toFixed(1) + '%' : 'P / L'}</span></div>`;
+    if (listEl) {
+      listEl.innerHTML = '';
+      list.forEach((h) => {
+        const inv = Number(h.invested) || 0, val = Number(h.value) || 0;
+        const perf = inv > 0 ? (val - inv) / inv : 0;
+        const row = document.createElement('div');
+        row.className = 'farm-row';
+        row.innerHTML = `<span class="fr-ico">${KIND_ICON[h.kind] || '🌿'}</span>
+          <span><span class="fr-name">${escapeHtml(h.name)}</span><span class="fr-meta">${fmt(inv)} → ${fmt(val)}</span></span>
+          <span class="fr-pl ${perf >= 0 ? 'up' : 'down'}">${sign(perf) + (perf * 100).toFixed(1)}%</span>
+          <button class="fr-del" data-id="${h.id}" title="Remove">✕</button>`;
+        listEl.appendChild(row);
+      });
+    }
+  };
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('farmName').value.trim();
+    const inv = parseFloat(document.getElementById('farmInvested').value);
+    const val = parseFloat(document.getElementById('farmValue').value);
+    if (!name || !(inv >= 0) || !(val >= 0)) { sfx.error(); return; }
+    state.invest.push({ id: newId(), name, kind: document.getElementById('farmKind').value, invested: inv, value: val });
+    save(); sfx.coin(); form.reset();
+    renderFarm();
+    showToast('🌱 PLANTED: ' + name);
+  });
+  if (listEl) listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.fr-del'); if (!btn) return;
+    state.invest = (state.invest || []).filter((h) => h.id !== Number(btn.dataset.id));
+    save(); sfx.delete(); renderFarm();
+  });
+})();
+
+/* ---------------- FLOOR 3 — Debt Dungeon (each debt = a monster) ---------------- */
+(function debtDungeon() {
+  const form = document.getElementById('debtForm');
+  const host = document.getElementById('dungeonFloors');
+  if (!form || !host) return;
+  const empty = document.getElementById('dungeonEmpty');
+  const KIND_ICON = { card: '💳', loan: '🏦', paylater: '📱', other: '📜' };
+  const KIND_MON = { card: '👹', loan: '🐉', paylater: '👾', other: '👻' };
+
+  renderDungeon = function () {
+    const list = state.debts || [];
+    const sym = cur().symbol;
+    const ccy = document.getElementById('debtCcy'); if (ccy) ccy.textContent = sym;
+    if (empty) empty.hidden = list.length > 0;
+    host.innerHTML = '';
+    list.forEach((d) => {
+      const total = Number(d.total) || 0;
+      const paid = Math.min(total, Number(d.paid) || 0);
+      const remain = Math.max(0, total - paid);
+      const cleared = remain <= 0;
+      const hpPct = total > 0 ? (remain / total) * 100 : 0;
+      const card = document.createElement('div');
+      card.className = 'debt-card' + (cleared ? ' cleared' : '');
+      card.dataset.id = d.id;
+      card.innerHTML = `
+        <div class="debt-head">
+          <span class="debt-monster">${cleared ? '☠️' : (KIND_MON[d.kind] || '👻')}</span>
+          <div class="debt-info">
+            <div class="debt-name">${escapeHtml(d.name)}</div>
+            <div class="debt-kind">${KIND_ICON[d.kind] || '📜'} ${cleared ? 'DEFEATED' : fmt(remain) + ' LEFT'}</div>
+          </div>
+          <button class="debt-del" data-id="${d.id}" title="Remove">✕</button>
+        </div>
+        <div class="debt-hpbar"><span class="debt-hpfill" style="width:${hpPct}%"></span><span class="debt-hptext">${fmt(remain)} / ${fmt(total)}</span></div>
+        ${cleared
+          ? '<span class="debt-cleared-tag">★ FLOOR CLEARED ★</span>'
+          : `<div class="debt-strike"><div class="debt-amt"><span class="dollar2">${sym}</span><input type="number" min="0.01" step="0.01" class="debt-pay-input" placeholder="PAYMENT" /></div><button type="button" class="debt-pay" data-id="${d.id}">🗡 STRIKE</button></div>`}`;
+      host.appendChild(card);
+    });
+  };
+
+  host.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('.debt-del');
+    if (delBtn) {
+      state.debts = (state.debts || []).filter((x) => x.id !== Number(delBtn.dataset.id));
+      save(); sfx.delete(); renderDungeon(); renderAilments(); return;
+    }
+    const payBtn = e.target.closest('.debt-pay');
+    if (!payBtn) return;
+    const card = payBtn.closest('.debt-card');
+    const input = card.querySelector('.debt-pay-input');
+    const amt = parseFloat(input.value);
+    const d = (state.debts || []).find((x) => x.id === Number(payBtn.dataset.id));
+    if (!d || !(amt > 0)) { sfx.error(); return; }
+    const total = Number(d.total) || 0;
+    d.paid = Math.min(total, (Number(d.paid) || 0) + amt);
+    save();
+    const remain = Math.max(0, total - d.paid);
+    // strike the monster on the live card, then refresh once the shake settles
+    const fill = card.querySelector('.debt-hpfill');
+    const txt = card.querySelector('.debt-hptext');
+    if (fill) fill.style.width = (total > 0 ? (remain / total) * 100 : 0) + '%';
+    if (txt) txt.textContent = fmt(remain) + ' / ' + fmt(total);
+    card.classList.add('hit');
+    if (remain <= 0) { sfx.victory(); showToast('☠️ ' + d.name + ' DEFEATED — DEBT CLEARED ★'); }
+    else { sfx.spend(); showToast('🗡 HIT ' + d.name + ' FOR ' + fmt(amt)); }
+    setTimeout(() => { renderDungeon(); renderAilments(); }, 360);
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('debtName').value.trim();
+    const total = parseFloat(document.getElementById('debtTotal').value);
+    if (!name || !(total > 0)) { sfx.error(); return; }
+    state.debts.push({ id: newId(), name, kind: document.getElementById('debtKind').value, total, paid: 0 });
+    save(); sfx.roar(); form.reset();
+    renderDungeon(); renderAilments();
+    showToast('👹 ' + name + ' SUMMONED — ' + fmt(total));
+  });
+})();
+
+/* ---------------- THE DEEP — portal, elevator & floor switching ---------------- */
+(function theDeep() {
   const enterBtn = document.getElementById('palaceEnter');
   const overlay = document.getElementById('deepOverlay');
-  const exitBtn = document.getElementById('deepExit');
   if (!enterBtn || !overlay) return;
+  const exitBtn = document.getElementById('deepExit');
+  const nav = document.getElementById('deepFloorsNav');
+  const titleEl = document.getElementById('deepTitle');
+  const FLOORS = {
+    trading: { el: document.getElementById('floorTrading'), title: '≈ THE DEEP · TRADING FLOOR ≈' },
+    invest:  { el: document.getElementById('floorInvest'),  title: '≈ THE DEEP · INVESTMENT FLOOR ≈' },
+    debt:    { el: document.getElementById('floorDebt'),    title: '≈ THE DEEP · DEBT DUNGEON ≈' },
+  };
+
+  function showFloor(f) {
+    if (!FLOORS[f]) f = 'trading';
+    state.deepFloor = f; save();
+    Object.keys(FLOORS).forEach((k) => { if (FLOORS[k].el) FLOORS[k].el.hidden = k !== f; });
+    overlay.classList.remove('floor-trading', 'floor-invest', 'floor-debt');
+    overlay.classList.add('floor-' + f);
+    if (titleEl) titleEl.textContent = FLOORS[f].title;
+    if (nav) nav.querySelectorAll('.df-tab').forEach((b) => b.classList.toggle('active', b.dataset.floor === f));
+    deepBgm.setFloor(f);
+    if (f === 'invest') renderFarm();
+    if (f === 'debt') renderDungeon();
+  }
+
   function open() {
-    if (typeof sfx !== 'undefined' && sfx.coin) sfx.coin();
+    if (sfx.coin) sfx.coin();
     overlay.hidden = false;
     document.body.classList.add('deep-open');
+    showFloor(state.deepFloor || 'trading');
+    deepBgm.start();
   }
   function close() {
-    if (typeof sfx !== 'undefined' && sfx.click) sfx.click();
+    if (sfx.click) sfx.click();
     overlay.hidden = true;
     document.body.classList.remove('deep-open');
+    deepBgm.stop();
   }
   enterBtn.addEventListener('click', open);
   if (exitBtn) exitBtn.addEventListener('click', close);
+  if (nav) nav.addEventListener('click', (e) => {
+    const btn = e.target.closest('.df-tab'); if (!btn) return;
+    if (sfx.click) sfx.click();
+    showFloor(btn.dataset.floor);
+  });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !overlay.hidden) close(); });
 })();

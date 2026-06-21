@@ -12,9 +12,11 @@
    Deploy: see PROXY-SETUP.md (takes ~10 minutes, free tier).
 ============================================================ */
 
-// Lock the proxy to your site once you know its URL (recommended). Leave as
-// ['*'] to allow any origin while testing.
-const ALLOWED_ORIGINS = ['*'];
+// Locked to the live Octrovebox site so the worker only serves your own
+// visitors and can't be reused as a public proxy. Add more origins (e.g. a
+// Pages/preview/custom domain) to this list as needed; use ['*'] only while
+// testing. Requests from other origins fall back to the first allowed origin.
+const ALLOWED_ORIGINS = ['https://pawpfus.github.io'];
 // Only these hosts may be fetched — prevents your worker becoming an open proxy.
 const ALLOWED_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
 

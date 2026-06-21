@@ -3232,7 +3232,7 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 
 
 /* ============================================================
-   THE DEEP — full-screen trading-terminal overlay
+   THE DEEP — full-screen multi-floor overlay
 ============================================================ */
 body.deep-open { overflow: hidden; }
 .deep-overlay {
@@ -3241,14 +3241,28 @@ body.deep-open { overflow: hidden; }
     radial-gradient(120% 80% at 50% -10%, rgba(95,208,255,0.10), transparent 60%),
     linear-gradient(180deg, #06283d 0%, #0a4d68 55%, #0e6c86 100%);
   animation: deepFade 0.22s ease;
+  transition: background 0.5s ease;
 }
 .deep-overlay[hidden] { display: none; }
 @keyframes deepFade { from { opacity: 0; } to { opacity: 1; } }
+/* per-floor atmosphere — deeper floors get darker */
+.deep-overlay.floor-invest {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(120,230,140,0.12), transparent 60%),
+    linear-gradient(180deg, #0a2f1e 0%, #114a2c 55%, #1a5f38 100%);
+}
+.deep-overlay.floor-debt {
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(255,80,80,0.10), transparent 55%),
+    linear-gradient(180deg, #0a0410 0%, #140912 55%, #1c0a12 100%);
+}
 .deep-hud {
   flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
   gap: 10px; padding: 14px 16px; border-bottom: 2px solid rgba(95,208,255,0.25);
   background: rgba(5,12,22,0.55);
 }
+.floor-debt .deep-hud { border-bottom-color: rgba(255,80,80,0.3); background: rgba(12,2,8,0.7); }
+.floor-invest .deep-hud { border-bottom-color: rgba(120,230,140,0.3); }
 .dh-title { font-size: 11px; letter-spacing: 1px; color: var(--gold); text-shadow: 0 2px 0 #05131f; }
 .dh-exit {
   font-family: inherit; font-size: 10px; letter-spacing: 1px; color: var(--ink);
@@ -3257,22 +3271,51 @@ body.deep-open { overflow: hidden; }
 }
 .dh-exit:hover { filter: brightness(1.12); }
 .dh-exit:active { transform: translateY(2px); }
+
+/* elevator: floor tabs */
+.deep-floors-nav {
+  flex: 0 0 auto; display: flex; gap: 6px; padding: 10px 12px;
+  background: rgba(5,12,22,0.4); border-bottom: 2px solid rgba(255,255,255,0.08);
+}
+.df-tab {
+  flex: 1 1 0; min-width: 0; font-family: inherit; font-size: 8px; letter-spacing: .5px;
+  color: var(--ink); background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.14);
+  border-radius: 8px; padding: 9px 4px; cursor: pointer; transition: filter .15s, transform .05s, border-color .2s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.df-tab:hover { filter: brightness(1.15); }
+.df-tab:active { transform: translateY(1px); }
+.df-tab.active { background: rgba(95,208,255,0.18); border-color: #5fd0ff; color: #eaf8ff; }
+.df-tab[data-floor="invest"].active { background: rgba(120,230,140,0.18); border-color: #79e68c; }
+.df-tab[data-floor="debt"].active { background: rgba(255,90,90,0.16); border-color: #ff5a5a; color: #ffd7d7; }
+
 .deep-body { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; }
-.deep-body .bot-panel {
+.deep-floor[hidden] { display: none; }
+/* shared floor-panel chrome */
+.deep-body .bot-panel,
+.deep-body .farm-panel,
+.deep-body .dungeon-panel {
   max-width: 560px; margin: 0 auto; background: rgba(5,12,22,0.45);
   border: 2px solid rgba(95,208,255,0.18); border-radius: 14px; padding: 16px;
   box-shadow: 0 0 24px rgba(0,0,0,0.35);
 }
+.deep-body .farm-panel { border-color: rgba(120,230,140,0.22); background: rgba(8,28,18,0.5); }
+.deep-body .dungeon-panel { border-color: rgba(255,90,90,0.22); background: rgba(14,4,10,0.6); }
 
 @media (min-width: 720px) {
   .dh-title { font-size: 13px; }
   .deep-body { padding: 24px; }
+  .df-tab { font-size: 10px; padding: 10px; }
 }
 
 /* ============================================================
    BOT LAB — paper-trading panel
 ============================================================ */
-.bot-sub { font-size: 11px; opacity: .85; margin: 2px 0 10px; line-height: 1.5; }
+/* intro blurbs use the readable VT323 face so they stay tidy on small screens */
+.bot-sub, .farm-sub, .dungeon-sub {
+  font-family: 'VT323', monospace; font-size: 16px; line-height: 1.3; letter-spacing: .4px;
+}
+.bot-sub { opacity: .85; margin: 2px 0 10px; }
 .bot-sub b { color: var(--gold); }
 .bot-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .bot-controls .select-wrap { flex: 1 1 30%; min-width: 92px; }
@@ -3329,10 +3372,178 @@ body.deep-open { overflow: hidden; }
 .bot-log .bl-pnl.bad { color: #ff6f8c; }
 .bot-foot { font-size: 8px; opacity: .55; margin-top: 10px; text-align: center; letter-spacing: .3px; }
 
-/* tighten the portal on small screens */
+/* ============================================================
+   INVESTMENT FLOOR — Harvest-Moon farm
+============================================================ */
+.farm-sub { opacity: .9; margin: 2px 0 12px; }
+.farm-sub b { color: #8df0a0; }
+.farm-field {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 7px;
+  padding: 12px; border-radius: 12px; min-height: 92px;
+  background:
+    linear-gradient(180deg, rgba(120,230,140,0.10), transparent 70%),
+    repeating-linear-gradient(0deg, #3a2415 0 9px, #432a18 9px 18px);
+  border: 2px solid rgba(120,230,140,0.18);
+  transition: filter .4s ease, box-shadow .4s ease;
+}
+/* overall fertility: greener field + glow the better the portfolio does */
+.farm-field.lush { filter: saturate(1.25) brightness(1.08); box-shadow: inset 0 0 30px rgba(120,230,140,0.25); }
+.farm-field.wilt { filter: saturate(0.6) brightness(0.85); }
+.farm-plot {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 7px 3px 5px; border-radius: 8px;
+  background: radial-gradient(120% 90% at 50% 20%, rgba(0,0,0,0.18), rgba(0,0,0,0.34));
+  border: 1px solid rgba(0,0,0,0.3);
+}
+.farm-plant { font-size: 26px; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.4)); animation: plantSway 3.4s ease-in-out infinite; }
+.farm-plot:nth-child(even) .farm-plant { animation-delay: -1.7s; }
+@keyframes plantSway { 0%,100% { transform: rotate(-3deg) } 50% { transform: rotate(3deg) } }
+.farm-plot-name { font-size: 6px; letter-spacing: .3px; opacity: .8; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.farm-plot-pct { font-size: 7px; }
+.farm-plot-pct.up { color: #8df0a0; }
+.farm-plot-pct.down { color: #ff9d9d; }
+.farm-empty-note { grid-column: 1/-1; text-align: center; font-size: 9px; opacity: .6; padding: 18px 0; }
+.farm-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0; }
+.farm-sum-card { background: rgba(0,0,0,.28); border: 2px solid rgba(120,230,140,.16); border-radius: 7px; padding: 8px 4px; text-align: center; }
+.farm-sum-card .fs-val { display: block; font-size: 12px; }
+.farm-sum-card .fs-val.up { color: #8df0a0; }
+.farm-sum-card .fs-val.down { color: #ff9d9d; }
+.farm-sum-card .fs-k { display: block; font-size: 7px; opacity: .7; margin-top: 3px; letter-spacing: .5px; }
+.farm-form { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px 0 10px; }
+.farm-form input[type="text"], .farm-form .farm-amt { flex: 1 1 46%; min-width: 110px; }
+.farm-form .select-wrap { flex: 1 1 46%; min-width: 110px; }
+.farm-amt { display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,.3); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; padding: 0 8px; }
+.farm-amt .dollar2 { font-size: 9px; opacity: .7; }
+.farm-amt input { flex: 1 1 auto; width: 100%; padding: 8px 0; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 11px; }
+.farm-form input[type="text"] { padding: 8px 10px; background: rgba(0,0,0,.3); color: var(--ink); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; font-family: inherit; font-size: 11px; }
+.farm-add, .debt-add {
+  flex: 1 1 100%; padding: 10px; font-family: inherit; font-size: 10px; letter-spacing: 1px;
+  color: #07131f; background: #79e68c; border: none; border-radius: 8px; cursor: pointer;
+  box-shadow: 0 3px 0 #3f9e57; transition: filter .15s, transform .05s;
+}
+.farm-add:hover, .debt-add:hover { filter: brightness(1.08); }
+.farm-add:active, .debt-add:active { transform: translateY(2px); box-shadow: 0 1px 0 #3f9e57; }
+.farm-list { display: flex; flex-direction: column; gap: 6px; }
+.farm-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; padding: 8px; background: rgba(0,0,0,.24); border: 1px solid rgba(255,255,255,.1); border-radius: 8px; }
+.farm-row .fr-ico { font-size: 16px; }
+.farm-row .fr-name { font-size: 9px; }
+.farm-row .fr-meta { display: block; font-size: 8px; opacity: .7; margin-top: 2px; font-family: 'VT323', monospace; letter-spacing: .5px; }
+.farm-row .fr-pl { font-size: 10px; text-align: right; }
+.farm-row .fr-pl.up { color: #8df0a0; }
+.farm-row .fr-pl.down { color: #ff9d9d; }
+.farm-row .fr-del { background: none; border: none; color: #ff8a8a; font-size: 13px; cursor: pointer; padding: 2px 4px; }
+.farm-foot { font-size: 8px; opacity: .55; margin-top: 12px; text-align: center; letter-spacing: .3px; }
+
+/* ============================================================
+   DEBT DUNGEON — monster-per-debt payoff tracker
+============================================================ */
+.dungeon-sub { opacity: .92; margin: 2px 0 12px; }
+.dungeon-sub b { color: #ff8a8a; }
+.dungeon-floors { display: flex; flex-direction: column; gap: 10px; }
+.debt-card {
+  position: relative; padding: 12px; border-radius: 10px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(40,8,18,0.7), rgba(18,4,10,0.85));
+  border: 2px solid rgba(255,90,90,0.28); box-shadow: inset 0 0 24px rgba(0,0,0,0.5);
+}
+.debt-card.cleared { border-color: rgba(120,230,140,0.4); background: linear-gradient(180deg, rgba(10,40,22,0.6), rgba(6,20,12,0.8)); }
+.debt-card.hit { animation: debtShake 0.32s ease; }
+@keyframes debtShake { 0%,100% { transform: translateX(0) } 20% { transform: translateX(-6px) } 40% { transform: translateX(5px) } 60% { transform: translateX(-3px) } 80% { transform: translateX(2px) } }
+.debt-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.debt-monster { font-size: 30px; line-height: 1; filter: drop-shadow(0 0 6px rgba(255,80,80,0.5)); animation: monFloat 2.8s ease-in-out infinite; }
+.debt-card.cleared .debt-monster { filter: grayscale(1) brightness(0.7); animation: none; }
+@keyframes monFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-4px) } }
+.debt-info { flex: 1 1 auto; min-width: 0; }
+.debt-name { font-size: 10px; color: #ffd7d7; }
+.debt-kind { font-size: 8px; opacity: .65; margin-top: 2px; font-family: 'VT323', monospace; letter-spacing: .5px; }
+.debt-del { background: none; border: none; color: #ff8a8a; font-size: 13px; cursor: pointer; padding: 2px 4px; align-self: flex-start; }
+.debt-hpbar { position: relative; height: 16px; border-radius: 6px; background: rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.12); overflow: hidden; }
+.debt-hpfill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ff5a5a, #ff8a5a); transition: width .5s ease; }
+.debt-card.cleared .debt-hpfill { background: linear-gradient(90deg, #3f9e57, #79e68c); }
+.debt-hptext { position: relative; z-index: 1; font-size: 8px; text-align: center; line-height: 16px; text-shadow: 0 1px 2px #000; }
+.debt-strike { display: flex; gap: 6px; margin-top: 9px; }
+.debt-strike .debt-amt { flex: 1 1 auto; }
+.debt-pay {
+  flex: 0 0 auto; font-family: inherit; font-size: 9px; letter-spacing: .5px; color: #07131f;
+  background: var(--gold); border: none; border-radius: 7px; padding: 0 12px; cursor: pointer;
+  box-shadow: 0 3px 0 #b8860b; transition: filter .15s, transform .05s;
+}
+.debt-pay:hover { filter: brightness(1.08); }
+.debt-pay:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8860b; }
+.debt-cleared-tag { display: block; margin-top: 9px; text-align: center; font-size: 9px; color: #8df0a0; letter-spacing: 1px; }
+.dungeon-empty { text-align: center; padding: 20px 0; opacity: .65; }
+.dungeon-empty[hidden] { display: none; }
+.dungeon-empty .de-art { font-size: 14px; display: block; margin-bottom: 8px; }
+.dungeon-empty p { font-size: 9px; line-height: 1.6; }
+.debt-form { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 10px; }
+.debt-form input[type="text"], .debt-form .debt-amt, .debt-form .select-wrap { flex: 1 1 46%; min-width: 110px; }
+.debt-form input[type="text"] { padding: 8px 10px; background: rgba(0,0,0,.3); color: var(--ink); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; font-family: inherit; font-size: 11px; }
+.debt-amt { display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,.3); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; padding: 0 8px; }
+.debt-amt .dollar2 { font-size: 9px; opacity: .7; }
+.debt-amt input { flex: 1 1 auto; width: 100%; padding: 8px 0; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 11px; }
+.debt-add { background: #ff5a5a; box-shadow: 0 3px 0 #9e2f2f; }
+.debt-add:active { box-shadow: 0 1px 0 #9e2f2f; }
+.dungeon-foot { font-size: 8px; opacity: .55; margin-top: 12px; text-align: center; letter-spacing: .3px; }
+
+/* ============================================================
+   STATUS AILMENTS — RPG debuffs from your finances
+============================================================ */
+.ailments-panel[hidden] { display: none; }
+.status-ailments { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
+.status-ailments[hidden] { display: none; }
+.ailments-hint { font-size: 8px; opacity: .6; text-align: center; margin-top: 10px; line-height: 1.6; }
+.ailment-badge {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 8px; letter-spacing: .5px;
+  padding: 6px 10px; border-radius: 999px; border: 2px solid currentColor; cursor: help;
+  background: rgba(0,0,0,0.3);
+}
+.ailment-badge .ab-ico { font-size: 13px; }
+.ailment-badge.poisoned { color: #7fe06a; }
+.ailment-badge.frozen { color: #7fd0ff; }
+.ailment-badge.overburdened { color: #ffb04f; }
+
+/* full-screen status tints (under the CRT, above the app) */
+.ail-fx { position: fixed; inset: 0; z-index: 45; pointer-events: none; opacity: 0; transition: opacity .6s ease; }
+body.ail-poisoned .ail-fx,
+body.ail-frozen .ail-fx { opacity: 1; }
+.ail-fx::before, .ail-fx::after { content: ''; position: absolute; inset: 0; opacity: 0; }
+body.ail-poisoned .ail-fx::before {
+  background: radial-gradient(130% 100% at 50% 120%, rgba(60,220,80,0.22), transparent 55%);
+  opacity: 0.5;  /* static fallback when motion is reduced */
+  animation: poisonPulse 2.6s ease-in-out infinite;
+}
+body.ail-frozen .ail-fx::after {
+  background:
+    radial-gradient(140% 120% at 50% -20%, rgba(120,200,255,0.18), transparent 55%),
+    linear-gradient(180deg, rgba(150,210,255,0.10), transparent 40%, rgba(150,210,255,0.10));
+  box-shadow: inset 0 0 120px rgba(140,200,255,0.25);
+  opacity: 0.9;
+}
+@keyframes poisonPulse { 0%,100% { opacity: 0.25 } 50% { opacity: 0.85 } }
+/* overburdened: the world drags — slow the bobbing octo + add weight */
+body.ail-overburdened .pe-octo,
+body.ail-overburdened .logo-octo { animation-duration: 6s !important; }
+body.ail-overburdened .logo-octo { filter: brightness(0.85) saturate(0.8); }
+
+/* tighten the portal + The Deep on small screens */
 @media (max-width: 600px) {
   .pe-title { font-size: 9px; }
   .pe-sub { font-size: 13px; }
+  /* The Deep: shrink chrome so floors stay organized on mobile */
+  .deep-hud { padding: 12px 12px; }
+  .dh-title { font-size: 9px; }
+  .dh-exit { font-size: 9px; padding: 7px 9px; }
+  .deep-floors-nav { padding: 8px 8px; gap: 5px; }
+  .df-tab { font-size: 7px; padding: 8px 3px; letter-spacing: 0; }
+  .deep-body { padding: 12px; }
+  .deep-body .bot-panel,
+  .deep-body .farm-panel,
+  .deep-body .dungeon-panel { padding: 13px; }
+  .bot-sub, .farm-sub, .dungeon-sub { font-size: 15px; }
+  .bot-controls .select-wrap { flex: 1 1 46%; min-width: 0; }
+  .farm-form input[type="text"], .farm-form .farm-amt, .farm-form .select-wrap,
+  .debt-form input[type="text"], .debt-form .debt-amt, .debt-form .select-wrap { flex: 1 1 100%; min-width: 0; }
+  .farm-summary { gap: 4px; }
+  .farm-sum-card .fs-val { font-size: 11px; }
 }
 
 /* ============================================================

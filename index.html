@@ -19,7 +19,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=125" />
+  <link rel="stylesheet" href="styles.css?v=128" />
 </head>
 
 <body>
@@ -46,6 +46,9 @@
 
   <!-- scanline + crt overlay -->
   <div class="crt"></div>
+
+  <!-- status-ailment screen tints (poison / frost) — toggled by body classes -->
+  <div class="ail-fx" id="ailFx" aria-hidden="true"></div>
 
   <div class="screen">
     <!-- ===== HEADER ===== -->
@@ -290,6 +293,13 @@
       </div>
     </section>
 
+    <!-- ===== STATUS AILMENTS — live debuffs from your finances ===== -->
+    <section class="panel ailments-panel" id="ailmentsPanel" hidden>
+      <h2 class="panel-title">⚠ STATUS AILMENTS</h2>
+      <div class="status-ailments" id="statusAilments" aria-live="polite"></div>
+      <p class="ailments-hint">Negative money habits inflict RPG debuffs. Clear the cause to cure them.</p>
+    </section>
+
     <!-- ===== THE PALACE — walkable isometric mode ===== -->
     <section class="panel palace-portal">
       <button type="button" class="palace-enter" id="palaceEnter">
@@ -300,7 +310,7 @@
         </span>
         <span class="pe-text">
           <span class="pe-title">≈ ENTER THE DEEP ≈</span>
-          <span class="pe-sub">TRADING FLOOR · PAPER BOTS ON REAL DATA</span>
+          <span class="pe-sub">A REALITY RAINCHECK</span>
         </span>
         <span class="pe-arrow" aria-hidden="true">⤢</span>
       </button>
@@ -516,40 +526,99 @@
   <!-- toast for level-up / coin pickups -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <!-- ===== THE DEEP — full-screen paper-trading terminal ===== -->
-  <div class="deep-overlay" id="deepOverlay" hidden role="dialog" aria-label="The Deep — trading floor">
+  <!-- ===== THE DEEP — three descending floors ===== -->
+  <div class="deep-overlay floor-trading" id="deepOverlay" hidden role="dialog" aria-label="The Deep">
     <div class="deep-hud">
-      <span class="dh-title">≈ THE DEEP · TRADING FLOOR ≈</span>
+      <span class="dh-title" id="deepTitle">≈ THE DEEP ≈</span>
       <button type="button" class="dh-exit" id="deepExit" title="Surface — leave the deep">✕ SURFACE</button>
     </div>
+
+    <!-- elevator: pick a floor to descend to -->
+    <nav class="deep-floors-nav" id="deepFloorsNav" aria-label="Floors">
+      <button type="button" class="df-tab active" data-floor="trading">🪙 TRADING</button>
+      <button type="button" class="df-tab" data-floor="invest">🌱 INVESTMENTS</button>
+      <button type="button" class="df-tab" data-floor="debt">💀 DEBT DUNGEON</button>
+    </nav>
+
     <div class="deep-body">
-      <div class="bot-panel">
-        <p class="bot-sub">Backtest trading bots on <b>real</b> market data. Paper only — no real money, no orders.</p>
-        <div class="bot-controls">
-          <div class="select-wrap"><select id="botMarket" aria-label="Market"></select></div>
-          <div class="select-wrap"><select id="botCoin" aria-label="Instrument"></select></div>
-          <div class="select-wrap"><select id="botStrat" aria-label="Strategy"></select></div>
-          <div class="select-wrap"><select id="botRange" aria-label="Range"></select></div>
-        </div>
-        <div class="bot-params" id="botParams"></div>
-        <button type="button" class="bot-run" id="botRun">▶ RUN BOT</button>
-        <div class="bot-status" id="botStatus" hidden></div>
-        <div class="bot-result" id="botResult" hidden>
-          <div class="bot-head">
-            <span class="bot-price" id="botPrice"></span>
-            <span class="bot-signal" id="botSignal"></span>
+      <!-- FLOOR 1 — Trading Floor (paper-trading bots) -->
+      <section class="deep-floor" id="floorTrading">
+        <div class="bot-panel">
+          <p class="bot-sub">Backtest trading bots on <b>real</b> market data. Paper only — no real money, no orders.</p>
+          <div class="bot-controls">
+            <div class="select-wrap"><select id="botMarket" aria-label="Market"></select></div>
+            <div class="select-wrap"><select id="botCoin" aria-label="Instrument"></select></div>
+            <div class="select-wrap"><select id="botStrat" aria-label="Strategy"></select></div>
+            <div class="select-wrap"><select id="botRange" aria-label="Range"></select></div>
           </div>
-          <canvas class="bot-chart" id="botChart" width="600" height="170"></canvas>
-          <div class="bot-legend"><span class="bl-bot">▬ BOT</span><span class="bl-hold">▬ BUY &amp; HOLD</span></div>
-          <div class="bot-stats" id="botStats"></div>
-          <div class="bot-log" id="botLog"></div>
+          <div class="bot-params" id="botParams"></div>
+          <button type="button" class="bot-run" id="botRun">▶ RUN BOT</button>
+          <div class="bot-status" id="botStatus" hidden></div>
+          <div class="bot-result" id="botResult" hidden>
+            <div class="bot-head">
+              <span class="bot-price" id="botPrice"></span>
+              <span class="bot-signal" id="botSignal"></span>
+            </div>
+            <canvas class="bot-chart" id="botChart" width="600" height="170"></canvas>
+            <div class="bot-legend"><span class="bl-bot">▬ BOT</span><span class="bl-hold">▬ BUY &amp; HOLD</span></div>
+            <div class="bot-stats" id="botStats"></div>
+            <div class="bot-log" id="botLog"></div>
+          </div>
+          <p class="bot-foot">🪙 Gold/metals &amp; 🇮🇩 IHSG: Yahoo Finance (via proxy) · Educational simulation, not financial advice.</p>
         </div>
-        <p class="bot-foot">🪙 Gold/metals &amp; 🇮🇩 IHSG: Yahoo Finance (via proxy) · Educational simulation, not financial advice.</p>
-      </div>
+      </section>
+
+      <!-- FLOOR 2 — Investment Floor (Harvest-Moon farm) -->
+      <section class="deep-floor" id="floorInvest" hidden>
+        <div class="farm-panel">
+          <p class="farm-sub">Plant your <b>real</b> holdings. The greener your gains, the lusher the farm grows. 🌾</p>
+          <div class="farm-field" id="farmField"></div>
+          <div class="farm-summary" id="farmSummary"></div>
+          <form class="farm-form" id="farmForm" autocomplete="off">
+            <input type="text" id="farmName" maxlength="20" placeholder="ASSET NAME" required />
+            <div class="select-wrap"><select id="farmKind" aria-label="Asset type">
+              <option value="fund">🌾 MUTUAL FUND</option>
+              <option value="stock">🌽 STOCKS</option>
+              <option value="crypto">🍄 CRYPTO</option>
+              <option value="gold">🌻 GOLD</option>
+              <option value="other">🌿 OTHER</option>
+            </select></div>
+            <div class="farm-amt"><span class="dollar2" id="farmCcyA">Rp</span><input type="number" id="farmInvested" min="0" step="0.01" placeholder="INVESTED" required /></div>
+            <div class="farm-amt"><span class="dollar2" id="farmCcyB">Rp</span><input type="number" id="farmValue" min="0" step="0.01" placeholder="CURRENT VALUE" required /></div>
+            <button type="submit" class="farm-add" id="farmAdd">🌱 PLANT</button>
+          </form>
+          <div class="farm-list" id="farmList"></div>
+          <p class="farm-foot">🌻 You enter your own asset values — nothing is fetched or traded. Educational only, not financial advice.</p>
+        </div>
+      </section>
+
+      <!-- FLOOR 3 — Debt Dungeon (deepest, darkest) -->
+      <section class="deep-floor" id="floorDebt" hidden>
+        <div class="dungeon-panel">
+          <p class="dungeon-sub">The lowest floor. Each debt is a <b>monster</b> guarding the dark. Send a payment to strike it down — clear the floor when its HP hits zero. ☠</p>
+          <div class="dungeon-floors" id="dungeonFloors"></div>
+          <div class="dungeon-empty" id="dungeonEmpty">
+            <span class="de-art">🕯️ · · · 🕯️</span>
+            <p>NO MONSTERS YET.<br />SUMMON A DEBT TO BATTLE BELOW.</p>
+          </div>
+          <form class="debt-form" id="debtForm" autocomplete="off">
+            <input type="text" id="debtName" maxlength="20" placeholder="DEBT NAME" required />
+            <div class="select-wrap"><select id="debtKind" aria-label="Debt type">
+              <option value="card">💳 CREDIT CARD</option>
+              <option value="loan">🏦 LOAN / CICILAN</option>
+              <option value="paylater">📱 PAYLATER</option>
+              <option value="other">📜 OTHER</option>
+            </select></div>
+            <div class="debt-amt"><span class="dollar2" id="debtCcy">Rp</span><input type="number" id="debtTotal" min="1" step="0.01" placeholder="TOTAL OWED" required /></div>
+            <button type="submit" class="debt-add" id="debtAdd">👹 SUMMON</button>
+          </form>
+          <p class="dungeon-foot">🗡️ A debt tracker, separate from your Quest Log. Educational only, not financial advice.</p>
+        </div>
+      </section>
     </div>
   </div>
 
-  <script src="app.js?v=131"></script>
+  <script src="app.js?v=134"></script>
 </body>
 
 </html>
