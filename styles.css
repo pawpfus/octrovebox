@@ -2606,8 +2606,10 @@ body[data-theme="midas"] {
   inset: 0;
   z-index: -2;            /* behind the starfield canvas (-1), above the html bg */
   pointer-events: none;
-  transition: background .8s ease;
 }
+/* only cross-fade between zones AFTER first paint — otherwise the skyline/trees
+   animate in from their default position on load and appear to "fly" into place */
+html.zones-ready .zone-layer { transition: background .8s ease; }
 /* NEON CITY — a pixel skyline of layered towers (classic NES navy + gold windows) */
 html[data-zone="city"] .zone-layer {
   background-color: transparent;

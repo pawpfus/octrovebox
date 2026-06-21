@@ -1257,6 +1257,14 @@ function renderZone() {
   // biome background + starfield brightness via data-zone (no header UI).
   const z = ZONES.find((zz) => zz.skin === state.theme) || ZONES[0];
   document.documentElement.dataset.zone = z.id;
+  // arm the zone cross-fade only AFTER the first paint, so the initial biome
+  // background snaps into place instead of animating in (the "flying" skyline)
+  if (!renderZone._armed) {
+    renderZone._armed = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.documentElement.classList.add('zones-ready');
+    }));
+  }
 }
 
 /* ============================================================
