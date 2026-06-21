@@ -3320,6 +3320,10 @@ body.deep-open { overflow: hidden; }
 .bot-sub b { color: var(--gold); }
 .bot-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .bot-controls .select-wrap { flex: 1 1 30%; min-width: 92px; }
+/* keep every form control in The Deep one consistent, slightly smaller size */
+.deep-overlay select,
+.deep-overlay input { font-size: 9px; }
+.deep-overlay input::placeholder { font-size: 9px; }
 .bot-params { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
 .bot-param { display: flex; flex-direction: column; gap: 4px; font-size: 9px; letter-spacing: .5px; opacity: .9; }
 .bot-param input {
@@ -3415,8 +3419,8 @@ body.deep-open { overflow: hidden; }
 .farm-form .select-wrap { flex: 1 1 46%; min-width: 110px; }
 .farm-amt { display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,.3); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; padding: 0 8px; }
 .farm-amt .dollar2 { font-size: 9px; opacity: .7; }
-.farm-amt input { flex: 1 1 auto; width: 100%; padding: 8px 0; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 11px; }
-.farm-form input[type="text"] { padding: 8px 10px; background: rgba(0,0,0,.3); color: var(--ink); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; font-family: inherit; font-size: 11px; }
+.farm-amt input { flex: 1 1 auto; width: 100%; padding: 8px 0; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 9px; }
+.farm-form input[type="text"] { padding: 8px 10px; background: rgba(0,0,0,.3); color: var(--ink); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; font-family: inherit; font-size: 9px; }
 .farm-add, .debt-add {
   flex: 1 1 100%; padding: 10px; font-family: inherit; font-size: 10px; letter-spacing: 1px;
   color: #07131f; background: #79e68c; border: none; border-radius: 8px; cursor: pointer;
@@ -3477,10 +3481,10 @@ body.deep-open { overflow: hidden; }
 .dungeon-empty p { font-size: 9px; line-height: 1.6; }
 .debt-form { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 10px; }
 .debt-form input[type="text"], .debt-form .debt-amt, .debt-form .select-wrap { flex: 1 1 46%; min-width: 110px; }
-.debt-form input[type="text"] { padding: 8px 10px; background: rgba(0,0,0,.3); color: var(--ink); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; font-family: inherit; font-size: 11px; }
+.debt-form input[type="text"] { padding: 8px 10px; background: rgba(0,0,0,.3); color: var(--ink); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; font-family: inherit; font-size: 9px; }
 .debt-amt { display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,.3); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; padding: 0 8px; }
 .debt-amt .dollar2 { font-size: 9px; opacity: .7; }
-.debt-amt input { flex: 1 1 auto; width: 100%; padding: 8px 0; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 11px; }
+.debt-amt input { flex: 1 1 auto; width: 100%; padding: 8px 0; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 9px; }
 .debt-add { background: #ff5a5a; box-shadow: 0 3px 0 #9e2f2f; }
 .debt-add:active { box-shadow: 0 1px 0 #9e2f2f; }
 .dungeon-foot { font-size: 8px; opacity: .55; margin-top: 12px; text-align: center; letter-spacing: .3px; }
