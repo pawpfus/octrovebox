@@ -133,8 +133,11 @@ let state = {
   bots: { market: 'gold', coin: 'GC=F', strat: 'sma', range: 365 },
   // INVESTMENT FLOOR — manual portfolio (Harvest-Moon farm): { id, name, kind, invested, value }
   invest: [],
-  // DEBT DUNGEON — debts as monsters: { id, name, kind, total, paid }
+  // DEBT DUNGEON — debts as monsters: { id, name, kind, total, paid, apr, min }
   debts: [],
+  debtBudget: 0,          // monthly amount earmarked for debt payoff (Battle Plan)
+  jars: [],               // SAVINGS JARS — envelopes: { id, name, target, saved }
+  nwHistory: [],          // NET WORTH snapshots over time: { d:'YYYY-MM-DD', v, t }
   deepFloor: 'trading',   // last-opened floor in The Deep
 };
 let appReady = false;   // true after init, so quests don't celebrate on load
@@ -387,6 +390,8 @@ function migrate() {
   // guard the Deep's new ledgers against malformed restores
   if (!Array.isArray(state.invest)) state.invest = [];
   if (!Array.isArray(state.debts)) state.debts = [];
+  if (!Array.isArray(state.jars)) state.jars = [];
+  if (!Array.isArray(state.nwHistory)) state.nwHistory = [];
   state.schema = SCHEMA;
 }
 // per-player income/expense/net split
@@ -1186,6 +1191,222 @@ function renderForecast() {
     `<li class="of-omen ${c}"><span class="ofo-ico">${i}</span><span class="ofo-txt">${t}</span></li>`).join('');
 }
 
+/* ============================================================
+   SAVINGS JARS — envelope budgeting. Split savings into named
+   jars (Emergency, Vacation, …), each with its own target and
+   progress. Manual deposits/withdrawals; nothing is auto-moved.
+============================================================ */
+function renderJars() {
+  const host = document.getElementById('jarsList');
+  if (!host) return;
+  const empty = document.getElementById('jarsEmpty');
+  const totalEl = document.getElementById('jarsTotal');
+  const ccyEl = document.getElementById('jarCcy');
+  const sym = cur().symbol;
+  if (ccyEl) ccyEl.textContent = sym;
+  const jars = state.jars || [];
+  if (empty) empty.hidden = jars.length > 0;
+  const totalSaved = jars.reduce((s, j) => s + (Number(j.saved) || 0), 0);
+  if (totalEl) totalEl.textContent = jars.length ? '🪙 ' + fmt(totalSaved) : '';
+  host.innerHTML = jars.map((j) => {
+    const target = Number(j.target) || 0;
+    const saved = Math.max(0, Number(j.saved) || 0);
+    const pct = target > 0 ? Math.min(100, (saved / target) * 100) : 0;
+    const done = target > 0 && saved >= target;
+    return `<div class="jar-card${done ? ' done' : ''}" data-id="${j.id}">
+      <div class="jar-row-head">
+        <span class="jar-ico">${done ? '✨' : '🏺'}</span>
+        <span class="jar-name">${escapeHtml(j.name)}</span>
+        <span class="jar-pct">${Math.round(pct)}%</span>
+        <button type="button" class="jar-del" data-id="${j.id}" title="Remove">✕</button>
+      </div>
+      <div class="jar-bar"><span class="jar-fill" style="width:${pct}%"></span><span class="jar-txt">${fmt(saved)} / ${fmt(target)}</span></div>
+      <div class="jar-actions">
+        <div class="jar-amt"><span class="dollar2">${sym}</span><input type="number" min="0.01" step="0.01" class="jar-dep-input" placeholder="AMOUNT" /></div>
+        <button type="button" class="jar-dep" data-id="${j.id}">＋ FILL</button>
+        <button type="button" class="jar-wd" data-id="${j.id}" title="Take out">－</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+(function savingsJars() {
+  const form = document.getElementById('jarForm');
+  const host = document.getElementById('jarsList');
+  if (!form || !host) return;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('jarName').value.trim();
+    const target = parseFloat(document.getElementById('jarTarget').value);
+    if (!name || !(target > 0)) { sfx.error(); shake(form); return; }
+    state.jars.push({ id: newId(), name, target, saved: 0 });
+    save(); sfx.coin(); form.reset(); renderJars();
+    showToast('🏺 JAR CREATED: ' + name);
+  });
+  host.addEventListener('click', (e) => {
+    const del = e.target.closest('.jar-del');
+    if (del) { state.jars = (state.jars || []).filter((j) => j.id !== Number(del.dataset.id)); save(); sfx.delete(); renderJars(); return; }
+    const card = e.target.closest('.jar-card'); if (!card) return;
+    const j = (state.jars || []).find((x) => x.id === Number(card.dataset.id)); if (!j) return;
+    const input = card.querySelector('.jar-dep-input');
+    const amt = parseFloat(input && input.value);
+    if (e.target.closest('.jar-dep')) {
+      if (!(amt > 0)) { sfx.error(); return; }
+      const wasDone = (Number(j.saved) || 0) >= (Number(j.target) || 0);
+      j.saved = (Number(j.saved) || 0) + amt; save();
+      if (!wasDone && j.saved >= (Number(j.target) || 0)) { sfx.victory(); showToast('✨ JAR FULL: ' + j.name + ' ★'); }
+      else { sfx.coin(); showToast('🪙 +' + fmt(amt) + ' → ' + j.name); }
+      renderJars();
+    } else if (e.target.closest('.jar-wd')) {
+      if (!(amt > 0)) { sfx.error(); return; }
+      j.saved = Math.max(0, (Number(j.saved) || 0) - amt); save(); sfx.click(); renderJars();
+      showToast('↩ -' + fmt(amt) + ' from ' + j.name);
+    }
+  });
+})();
+
+/* ============================================================
+   NET WORTH — cash + farm assets − debts, snapshotted over time
+   so you can watch the real number trend. Snapshots are taken once
+   per day (the latest each day wins).
+============================================================ */
+function netWorth() {
+  const cash = totals().balance;
+  const assets = (state.invest || []).reduce((s, h) => s + (Number(h.value) || 0), 0);
+  const debts = (state.debts || []).reduce((s, d) => s + Math.max(0, (Number(d.total) || 0) - (Number(d.paid) || 0)), 0);
+  return { cash, assets, debts, total: cash + assets - debts };
+}
+function recordNetWorth() {
+  if (!Array.isArray(state.nwHistory)) state.nwHistory = [];
+  const v = netWorth().total;
+  const key = new Date().toISOString().slice(0, 10);
+  const last = state.nwHistory[state.nwHistory.length - 1];
+  if (last && last.d === key) {
+    if (last.v !== v) last.v = v;           // keep today's point current (no save needed; persists on next save)
+  } else {
+    state.nwHistory.push({ d: key, v, t: Date.now() });
+    if (state.nwHistory.length > 400) state.nwHistory = state.nwHistory.slice(-400);
+    save();                                  // a brand-new day's point is worth persisting
+  }
+}
+function drawNetWorthSpark(hist) {
+  const cv = document.getElementById('nwSpark');
+  if (!cv) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = cv.clientWidth || 600, H = 38;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const c = cv.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, W, H);
+  const pts = hist.map((p) => p.v);
+  if (pts.length < 2) return;
+  let lo = Math.min.apply(null, pts), hi = Math.max.apply(null, pts);
+  if (hi === lo) { hi += 1; lo -= 1; }
+  const pad = 6, plotH = H - pad * 2;
+  const xy = (i) => ({ x: (i / (pts.length - 1)) * W, y: pad + plotH - ((pts[i] - lo) / (hi - lo)) * plotH });
+  // zero baseline if it falls inside the range
+  if (lo < 0 && hi > 0) {
+    const yz = pad + plotH - ((0 - lo) / (hi - lo)) * plotH;
+    c.strokeStyle = 'rgba(255,255,255,.15)'; c.setLineDash([3, 3]); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(0, yz); c.lineTo(W, yz); c.stroke(); c.setLineDash([]);
+  }
+  const up = pts[pts.length - 1] >= pts[0];
+  // area fill
+  c.beginPath();
+  for (let i = 0; i < pts.length; i++) { const p = xy(i); i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y); }
+  const lastP = xy(pts.length - 1), firstP = xy(0);
+  c.lineTo(lastP.x, H); c.lineTo(firstP.x, H); c.closePath();
+  c.fillStyle = up ? 'rgba(95,230,168,.14)' : 'rgba(255,111,145,.14)';
+  c.fill();
+  // line
+  c.strokeStyle = up ? '#5fe6a8' : '#ff6f8c'; c.lineWidth = 2; c.beginPath();
+  for (let i = 0; i < pts.length; i++) { const p = xy(i); i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y); }
+  c.stroke();
+  // last dot
+  c.fillStyle = up ? '#5fe6a8' : '#ff6f8c';
+  c.beginPath(); c.arc(lastP.x, lastP.y, 2.5, 0, Math.PI * 2); c.fill();
+}
+function renderNetWorth() {
+  const host = document.getElementById('networthPanel');
+  if (!host) return;
+  recordNetWorth();
+  const nw = netWorth();
+  const totalEl = document.getElementById('nwTotal');
+  totalEl.textContent = fmt(nw.total);
+  totalEl.className = 'nw-total' + (nw.total < 0 ? ' neg' : '');
+  const chip = (label, val, cls) => `<span class="nw-chip ${cls}"><span class="nwc-k">${label}</span><span class="nwc-v">${fmt(val)}</span></span>`;
+  document.getElementById('nwBreakdown').innerHTML =
+    chip('💵 CASH', nw.cash, nw.cash >= 0 ? 'pos' : 'neg') +
+    chip('🌾 ASSETS', nw.assets, 'pos') +
+    chip('🐉 DEBTS', nw.debts, nw.debts > 0 ? 'neg' : '');
+  const hist = state.nwHistory || [];
+  drawNetWorthSpark(hist);
+  const foot = document.getElementById('nwFoot');
+  if (hist.length >= 2) {
+    const first = hist[0].v, latest = hist[hist.length - 1].v;
+    const delta = latest - first;
+    const days = Math.max(1, Math.round((hist[hist.length - 1].t - hist[0].t) / 86400000));
+    foot.innerHTML = `${delta >= 0 ? '▲' : '▼'} <b class="${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : '−'}${fmt(Math.abs(delta))}</b> since you started tracking (${days} day${days > 1 ? 's' : ''}).`;
+  } else {
+    foot.textContent = '📈 Tracking started — your net-worth trend builds as you keep logging.';
+  }
+}
+
+/* ============================================================
+   SPENDING HEATMAP — a GitHub-style calendar of daily expense
+   intensity, so spending patterns (paydays, weekends) pop out.
+============================================================ */
+function renderHeatmap() {
+  const panel = document.getElementById('heatmapPanel');
+  if (!panel) return;
+  // daily expense totals
+  const spend = {};
+  let days = 0;
+  (state.transactions || []).forEach((t) => {
+    if (t.type !== 'expense') return;
+    const d = new Date(txDate(t));
+    const k = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+    if (!spend[k]) days += 1;
+    spend[k] = (spend[k] || 0) + t.amount;
+  });
+  if (days < 3) { panel.hidden = true; return; }   // too sparse to be a "map"
+  panel.hidden = false;
+
+  const weeks = 18;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - ((weeks - 1) * 7 + today.getDay()));   // Sunday of the earliest week
+  let max = 0;
+  Object.keys(spend).forEach((k) => { if (spend[k] > max) max = spend[k]; });
+  const key = (dt) => dt.getFullYear() + '-' + dt.getMonth() + '-' + dt.getDate();
+  const lvl = (v) => { if (!v) return 0; const r = v / max; return r > 0.75 ? 4 : r > 0.5 ? 3 : r > 0.25 ? 2 : 1; };
+
+  // month labels aligned to week columns
+  let months = '';
+  const seen = {};
+  for (let w = 0; w < weeks; w++) {
+    const col = new Date(start); col.setDate(col.getDate() + w * 7);
+    let lab = '';
+    if (col.getDate() <= 7 && !seen[col.getFullYear() + '-' + col.getMonth()]) { lab = MONTHS[col.getMonth()].slice(0, 3); seen[col.getFullYear() + '-' + col.getMonth()] = 1; }
+    months += `<span class="hm-month">${lab}</span>`;
+  }
+  // cells, row-major: 7 weekday rows × weeks columns
+  let cells = '', peakV = 0, peakD = null;
+  for (let d = 0; d < 7; d++) {
+    for (let w = 0; w < weeks; w++) {
+      const cell = new Date(start); cell.setDate(cell.getDate() + w * 7 + d);
+      if (cell > today) { cells += '<span class="hm-cell empty"></span>'; continue; }
+      const v = spend[key(cell)] || 0;
+      if (v > peakV) { peakV = v; peakD = new Date(cell); }
+      const lab = cell.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      cells += `<span class="hm-cell l${lvl(v)}" title="${lab}: ${v ? fmt(v) : 'no spend'}"></span>`;
+    }
+  }
+  document.getElementById('hmMonths').innerHTML = months;
+  document.getElementById('hmGrid').innerHTML = cells;
+  const peakEl = document.getElementById('hmPeak');
+  if (peakEl) peakEl.textContent = peakD ? '🔥 ' + peakD.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + fmt(peakV) : '';
+}
+
 /* ---------------- SIDE QUESTS (challenges) ---------------- */
 const CHALLENGES = [
   { id: 'first',    icon: '🐣', name: 'FIRST STEPS',     desc: 'Log your first entry',     check: () => ({ cur: Math.min(state.transactions.length, 1), goal: 1 }) },
@@ -1801,9 +2022,12 @@ function renderAll(prevLevel) {
   renderCats();
   renderBudget();
   renderGoal();
+  renderJars();
+  renderNetWorth();
   renderMiniBosses();
   renderStreak();
   renderChart();
+  renderHeatmap();
   renderQuests();
   renderBounties();
   renderForecast();
@@ -4060,6 +4284,56 @@ const deepBgm = (function () {
 })();
 
 /* ---------------- FLOOR 3 — Debt Dungeon (each debt = a monster) ---------------- */
+/* ============================================================
+   DEBT PAYOFF STRATEGIST — simulate clearing all debts month by
+   month under a fixed monthly budget. Snowball pays the smallest
+   balance first (quick wins); avalanche pays the highest APR first
+   (cheapest). Returns months, payoff date, total interest and the
+   order debts fall. Pure math over the debts list.
+============================================================ */
+function payoffPlan(debts, budget, strategy) {
+  const items = (debts || []).map((d) => ({
+    name: d.name,
+    bal: Math.max(0, (Number(d.total) || 0) - (Number(d.paid) || 0)),
+    apr: Math.max(0, Number(d.apr) || 0),
+    min: Math.max(0, Number(d.min) || 0),
+    m: null,
+  })).filter((d) => d.bal > 0.005);
+  if (!items.length) return null;
+
+  const totalMin = items.reduce((s, d) => s + d.min, 0);
+  const monthlyInterest = items.reduce((s, d) => s + d.bal * (d.apr / 100 / 12), 0);
+  // budget must beat the interest the debt generates, or it never clears
+  if (!(budget > 0) || budget <= monthlyInterest + 0.001) {
+    return { feasible: false, monthlyInterest: Math.ceil(monthlyInterest), totalMin: Math.ceil(totalMin) };
+  }
+
+  const rank = (a, b) => (strategy === 'avalanche'
+    ? (b.apr - a.apr) || (a.bal - b.bal)
+    : (a.bal - b.bal) || (b.apr - a.apr));
+
+  let months = 0, totalInterest = 0;
+  const guard = 1200;
+  while (items.some((d) => d.bal > 0.005) && months < guard) {
+    months += 1;
+    // 1) accrue this month's interest
+    items.forEach((d) => { if (d.bal > 0.005) { const it = d.bal * (d.apr / 100 / 12); d.bal += it; totalInterest += it; } });
+    let pool = budget;
+    // 2) cover minimums on every active debt first
+    items.filter((d) => d.bal > 0.005).forEach((d) => { const p = Math.min(d.min, d.bal, pool); d.bal -= p; pool -= p; });
+    // 3) hurl whatever's left at the strategy's top target
+    const targets = items.filter((d) => d.bal > 0.005).sort(rank);
+    for (const d of targets) { if (pool <= 0.005) break; const p = Math.min(pool, d.bal); d.bal -= p; pool -= p; }
+    // 4) record any debt that just fell
+    items.forEach((d) => { if (d.bal <= 0.005 && d.m == null) d.m = months; });
+  }
+  const order = items.slice().sort((a, b) => (a.m || 9999) - (b.m || 9999)).map((d) => ({ name: d.name, month: d.m }));
+  const payoffDate = new Date();
+  payoffDate.setDate(1);
+  payoffDate.setMonth(payoffDate.getMonth() + months);
+  return { feasible: true, months, totalInterest: Math.round(totalInterest), payoffDate, order, budget };
+}
+
 (function debtDungeon() {
   const form = document.getElementById('debtForm');
   const host = document.getElementById('dungeonFloors');
@@ -4098,7 +4372,75 @@ const deepBgm = (function () {
           : `<div class="debt-strike"><div class="debt-amt"><span class="dollar2">${sym}</span><input type="number" min="0.01" step="0.01" class="debt-pay-input" placeholder="PAYMENT" /></div><button type="button" class="debt-pay" data-id="${d.id}">🗡 STRIKE</button></div>`}`;
       host.appendChild(card);
     });
+    renderBattlePlan();
   };
+
+  // ⚔ BATTLE PLAN — compare snowball vs avalanche for the active debts
+  const bpPanel = document.getElementById('battlePlan');
+  const bpBudget = document.getElementById('bpBudget');
+  const bpResult = document.getElementById('bpResult');
+  const bpRun = document.getElementById('bpRun');
+  function renderBattlePlan() {
+    if (!bpPanel) return;
+    const active = (state.debts || []).filter((d) => (Number(d.total) || 0) - (Number(d.paid) || 0) > 0.005);
+    bpPanel.hidden = active.length === 0;
+    if (active.length === 0) return;
+    const sym = cur().symbol;
+    const bpc = document.getElementById('bpCcy'); if (bpc) bpc.textContent = sym;
+    if (bpBudget && state.debtBudget && !bpBudget.value) bpBudget.value = state.debtBudget;
+
+    const budget = parseFloat(bpBudget && bpBudget.value);
+    if (!(budget > 0)) {
+      const totalMin = active.reduce((s, d) => s + (Number(d.min) || 0), 0);
+      const totalRemain = active.reduce((s, d) => s + ((Number(d.total) || 0) - (Number(d.paid) || 0)), 0);
+      bpResult.innerHTML = `<p class="bp-hint">Enter a monthly war chest above to see your payoff plan.` +
+        (totalMin > 0 ? ` Your minimums total <b>${fmt(totalMin)}</b>/mo.` : '') +
+        ` Total debt: <b>${fmt(totalRemain)}</b>.</p>`;
+      return;
+    }
+
+    const snow = payoffPlan(state.debts, budget, 'snowball');
+    const aval = payoffPlan(state.debts, budget, 'avalanche');
+    if (!snow || !aval) { bpResult.innerHTML = ''; return; }
+    if (!snow.feasible || !aval.feasible) {
+      const need = Math.max(snow.monthlyInterest || 0, aval.monthlyInterest || 0);
+      bpResult.innerHTML = `<p class="bp-warn">⚠ That budget barely covers the interest — the debt would never shrink. ` +
+        `You need more than <b>${fmt(need)}</b>/mo (just this month's interest) to make progress.</p>`;
+      return;
+    }
+    const saved = snow.totalInterest - aval.totalInterest;       // avalanche is always ≤ snowball on interest
+    const best = aval.totalInterest <= snow.totalInterest ? 'avalanche' : 'snowball';
+    const firstSnow = snow.order[0], firstAval = aval.order[0];
+
+    const planCard = (title, ico, p, isBest) =>
+      `<div class="bp-card${isBest ? ' best' : ''}">
+        <div class="bp-card-head">${ico} ${title}${isBest ? ' <span class="bp-tag">PICK</span>' : ''}</div>
+        <div class="bp-stat"><span class="bps-v">${p.months}</span><span class="bps-k">MONTHS</span></div>
+        <div class="bp-stat"><span class="bps-v">${dMonth(p.payoffDate)}</span><span class="bps-k">DEBT-FREE</span></div>
+        <div class="bp-stat"><span class="bps-v">${fmt(p.totalInterest)}</span><span class="bps-k">INTEREST PAID</span></div>
+      </div>`;
+
+    let verdict;
+    if (saved > 0) {
+      verdict = `🏆 <b>Avalanche</b> (highest APR first) saves you <b>${fmt(saved)}</b> in interest. ` +
+        (firstSnow && firstAval && firstSnow.name !== firstAval.name
+          ? `Prefer momentum? <b>Snowball</b> kills “${escapeHtml(firstSnow.name)}” first (month ${firstSnow.month}).`
+          : `Both clear “${escapeHtml((firstAval || {}).name || '')}” first.`);
+    } else {
+      verdict = `Both routes cost the same interest here (little/no APR difference). ` +
+        `Go <b>Snowball</b> for motivation — smallest debt “${escapeHtml((firstSnow || {}).name || '')}” falls first.`;
+    }
+
+    bpResult.innerHTML =
+      `<div class="bp-cards">${planCard('SNOWBALL', '⛄', snow, best === 'snowball')}${planCard('AVALANCHE', '🏔️', aval, best === 'avalanche')}</div>` +
+      `<p class="bp-verdict">${verdict}</p>` +
+      `<div class="bp-order"><span class="bp-order-k">PAY ORDER (${best}):</span> ${(best === 'avalanche' ? aval : snow).order.map((o, i) => `${i + 1}. ${escapeHtml(o.name)}`).join('  ›  ')}</div>`;
+  }
+  if (bpRun) bpRun.addEventListener('click', () => {
+    state.debtBudget = Math.max(0, parseFloat(bpBudget && bpBudget.value) || 0);
+    save(); if (sfx.click) sfx.click();
+    renderBattlePlan();
+  });
 
   host.addEventListener('click', (e) => {
     const delBtn = e.target.closest('.debt-del');
@@ -4133,7 +4475,9 @@ const deepBgm = (function () {
     const name = document.getElementById('debtName').value.trim();
     const total = parseFloat(document.getElementById('debtTotal').value);
     if (!name || !(total > 0)) { sfx.error(); return; }
-    state.debts.push({ id: newId(), name, kind: document.getElementById('debtKind').value, total, paid: 0 });
+    const apr = Math.max(0, parseFloat(document.getElementById('debtApr').value) || 0);
+    const min = Math.max(0, parseFloat(document.getElementById('debtMin').value) || 0);
+    state.debts.push({ id: newId(), name, kind: document.getElementById('debtKind').value, total, paid: 0, apr, min });
     save(); sfx.roar(); form.reset();
     renderDungeon(); renderAilments();
     showToast('👹 ' + name + ' SUMMONED — ' + fmt(total));

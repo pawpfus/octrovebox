@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=137" />
+  <link rel="stylesheet" href="styles.css?v=143" />
 </head>
 
 <body>
@@ -126,6 +126,17 @@
       </div>
     </section>
 
+    <!-- ===== NET WORTH TIMELINE ===== -->
+    <section class="panel networth-panel" id="networthPanel" aria-label="Net worth">
+      <div class="mini-head">
+        <h2 class="panel-title">📊 NET WORTH</h2>
+        <span class="nw-total" id="nwTotal">Rp0</span>
+      </div>
+      <div class="nw-breakdown" id="nwBreakdown"></div>
+      <canvas class="nw-spark" id="nwSpark" width="600" height="64"></canvas>
+      <p class="nw-foot" id="nwFoot"></p>
+    </section>
+
     <!-- ===== NEW ENTRY + QUEST LOG (moved up) ===== -->
     <div class="grid">
       <!-- ===== LEFT: ADD QUEST (transaction) ===== -->
@@ -223,6 +234,19 @@
       </div>
     </section>
 
+    <!-- ===== SPENDING HEATMAP — daily intensity calendar (below Spending Map) ===== -->
+    <section class="panel heatmap-panel" id="heatmapPanel" hidden>
+      <div class="log-head">
+        <h2 class="panel-title">🔥 SPENDING HEATMAP</h2>
+        <span class="hm-peak" id="hmPeak"></span>
+      </div>
+      <div class="hm-scroll">
+        <div class="hm-months" id="hmMonths"></div>
+        <div class="hm-grid" id="hmGrid"></div>
+      </div>
+      <div class="hm-legend"><span>less</span><span class="hm-key l0"></span><span class="hm-key l1"></span><span class="hm-key l2"></span><span class="hm-key l3"></span><span class="hm-key l4"></span><span>more</span></div>
+    </section>
+
     <!-- ===== WORLD MAP — MONTH HISTORY ===== -->
     <section class="panel chart-panel">
       <div class="log-head">
@@ -262,6 +286,16 @@
         <button type="button" class="mini-save" id="saveGoalBtn">OK</button>
         <button type="button" class="mini-clear" id="clearGoalBtn">CLEAR</button>
       </div>
+
+      <!-- SAVINGS JARS (envelopes) live inside the Savings Quest -->
+      <div class="jars-divider"><span>🏺 JARS</span><span class="jars-total" id="jarsTotal"></span></div>
+      <div class="jars-list" id="jarsList"></div>
+      <div class="jars-empty" id="jarsEmpty">Split your quest into envelopes — add a jar below. 🏺</div>
+      <form class="jar-form" id="jarForm" autocomplete="off">
+        <input type="text" id="jarName" maxlength="18" placeholder="JAR NAME (e.g. VACATION)" required />
+        <div class="jar-amt"><span class="dollar2" id="jarCcy">Rp</span><input type="number" id="jarTarget" min="1" step="0.01" placeholder="TARGET" required /></div>
+        <button type="submit" class="jar-add">🏺 ADD JAR</button>
+      </form>
     </div>
 
     <!-- ===== BUDGET BOSS (stacked with category bosses) ===== -->
@@ -618,6 +652,18 @@
             <span class="de-art">🕯️ · · · 🕯️</span>
             <p>NO MONSTERS YET.<br />SUMMON A DEBT TO BATTLE BELOW.</p>
           </div>
+
+          <!-- ⚔ BATTLE PLAN — snowball vs avalanche payoff strategist -->
+          <div class="battle-plan" id="battlePlan" hidden>
+            <div class="bp-head">⚔ BATTLE PLAN</div>
+            <p class="bp-sub">How much can you throw at debt each month? I'll plot the fastest route to zero.</p>
+            <div class="bp-controls">
+              <div class="debt-amt"><span class="dollar2" id="bpCcy">Rp</span><input type="number" id="bpBudget" min="0" step="0.01" placeholder="MONTHLY WAR CHEST" /></div>
+              <button type="button" class="bp-run" id="bpRun">📜 PLAN</button>
+            </div>
+            <div class="bp-result" id="bpResult"></div>
+          </div>
+
           <form class="debt-form" id="debtForm" autocomplete="off">
             <input type="text" id="debtName" maxlength="20" placeholder="DEBT NAME" required />
             <div class="select-wrap"><select id="debtKind" aria-label="Debt type">
@@ -627,6 +673,8 @@
               <option value="other">📜 OTHER</option>
             </select></div>
             <div class="debt-amt"><span class="dollar2" id="debtCcy">Rp</span><input type="number" id="debtTotal" min="1" step="0.01" placeholder="TOTAL OWED" required /></div>
+            <div class="debt-amt debt-amt-half"><input type="number" id="debtApr" min="0" max="200" step="0.1" placeholder="APR % (opt)" /></div>
+            <div class="debt-amt debt-amt-half"><span class="dollar2">Rp</span><input type="number" id="debtMin" min="0" step="0.01" placeholder="MIN/MO (opt)" /></div>
             <button type="submit" class="debt-add" id="debtAdd">👹 SUMMON</button>
           </form>
           <p class="dungeon-foot">🗡️ A debt tracker, separate from your Quest Log. Educational only, not financial advice.</p>
@@ -635,7 +683,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=142"></script>
+  <script src="app.js?v=148"></script>
 </body>
 
 </html>

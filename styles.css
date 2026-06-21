@@ -920,6 +920,77 @@ h1 {
 .cat-auto-hint[hidden] { display: none; }
 @keyframes catAutoPop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
 
+/* 🏺 SAVINGS JARS — envelope budgeting */
+.jars-total { font-size: 9px; color: var(--gold); }
+.jars-sub { font-size: 8px; opacity: .8; margin: 6px 0 12px; line-height: 1.5; }
+.jars-empty { font-size: 9px; opacity: .6; text-align: center; padding: 10px 0 14px; }
+.jars-empty[hidden] { display: none; }
+.jars-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.jar-card { background: rgba(0,0,0,.26); border: 2px solid rgba(255,255,255,.12); border-radius: 8px; padding: 10px; }
+.jar-card.done { border-color: var(--gold); background: rgba(255,210,63,.08); }
+.jar-row-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.jar-row-head .jar-ico { font-size: 14px; }
+.jar-row-head .jar-name { font-size: 9px; letter-spacing: .4px; color: var(--ink); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jar-row-head .jar-pct { font-size: 8px; color: var(--gold); }
+.jar-del { background: none; border: none; color: var(--ink-dim); font-size: 10px; cursor: pointer; padding: 2px 4px; }
+.jar-del:hover { color: #ff6f8c; }
+.jar-bar { position: relative; height: 18px; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.14); border-radius: 5px; overflow: hidden; margin-bottom: 9px; }
+.jar-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #4be35a, #5fe6a8); transition: width .4s cubic-bezier(.4,0,.2,1); }
+.jar-card.done .jar-fill { background: linear-gradient(90deg, var(--gold), #ffe98a); }
+.jar-txt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,.6); letter-spacing: .3px; }
+.jar-actions { display: flex; gap: 6px; }
+.jar-amt { flex: 1 1 auto; display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,.3); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; padding: 0 8px; }
+.jar-amt .dollar2 { font-size: 9px; opacity: .7; }
+.jar-amt input { flex: 1 1 auto; width: 100%; padding: 7px 0; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 9px; }
+.jar-dep { flex: 0 0 auto; background: #4be35a; color: #12241a; border: none; border-radius: 6px; padding: 0 11px; font-family: inherit; font-size: 9px; cursor: pointer; box-shadow: 0 3px 0 #2f9e57; }
+.jar-dep:active { transform: translateY(2px); box-shadow: 0 1px 0 #2f9e57; }
+.jar-wd { flex: 0 0 auto; background: rgba(255,255,255,.1); color: var(--ink); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; padding: 0 10px; font-family: inherit; font-size: 11px; cursor: pointer; }
+.jar-form { display: flex; flex-wrap: wrap; gap: 7px; }
+.jar-form input[type="text"] { flex: 1 1 100%; padding: 8px 10px; background: rgba(0,0,0,.3); color: var(--ink); border: 2px solid rgba(255,255,255,.16); border-radius: 6px; font-family: inherit; font-size: 9px; }
+.jar-form .jar-amt { flex: 1 1 auto; }
+.jar-add { flex: 0 0 auto; background: var(--gold); color: #12122c; border: none; border-radius: 6px; padding: 0 14px; font-family: inherit; font-size: 9px; cursor: pointer; box-shadow: 0 3px 0 #b8860b; }
+.jar-add:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8860b; }
+/* divider that introduces the jars inside the Savings Quest panel */
+.jars-divider { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 16px 0 10px; padding-top: 12px; border-top: 2px solid rgba(255,255,255,.1); font-size: 8px; letter-spacing: 1px; color: var(--gold); }
+.jars-divider .jars-total { color: var(--gold); opacity: .85; }
+
+/* 📊 NET WORTH TIMELINE — compact */
+.networth-panel { margin-bottom: 14px; padding: 12px 14px; }
+.networth-panel .panel-title { font-size: 10px; }
+.nw-total { font-size: 12px; color: #5fe6a8; }
+.nw-total.neg { color: #ff6f8c; }
+.nw-breakdown { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0 4px; }
+.nw-chip { display: flex; align-items: baseline; gap: 5px; flex: 1 1 28%; min-width: 84px; background: rgba(0,0,0,.24); border: 1px solid rgba(255,255,255,.1); border-radius: 6px; padding: 4px 7px; }
+.nw-chip .nwc-k { font-size: 6px; letter-spacing: .3px; opacity: .65; }
+.nw-chip .nwc-v { font-size: 8px; color: var(--ink); }
+.nw-chip.pos .nwc-v { color: #5fe6a8; }
+.nw-chip.neg .nwc-v { color: #ff6f8c; }
+.nw-spark { display: block; width: 100%; height: 38px; margin: 2px 0 6px; }
+.nw-foot { font-size: 7px; opacity: .75; letter-spacing: .2px; margin: 0; }
+.nw-foot .up { color: #5fe6a8; }
+.nw-foot .down { color: #ff6f8c; }
+
+/* 🔥 SPENDING HEATMAP */
+.heatmap-panel[hidden] { display: none; }
+.hm-peak { font-size: 8px; color: #ff8a5a; }
+.hm-scroll { overflow-x: auto; padding-bottom: 4px; }
+.hm-months { display: grid; grid-template-columns: repeat(18, 14px); gap: 3px; margin-bottom: 4px; min-width: 306px; }
+.hm-month { font-size: 6px; opacity: .6; letter-spacing: .2px; white-space: nowrap; }
+.hm-grid { display: grid; grid-template-columns: repeat(18, 14px); grid-auto-rows: 14px; gap: 3px; min-width: 306px; }
+.hm-cell { width: 14px; height: 14px; border-radius: 3px; background: rgba(255,255,255,.06); }
+.hm-cell.empty { background: transparent; }
+.hm-cell.l1 { background: rgba(255,210,63,.32); }
+.hm-cell.l2 { background: rgba(255,159,28,.6); }
+.hm-cell.l3 { background: rgba(255,109,60,.82); }
+.hm-cell.l4 { background: #ff4530; }
+.hm-legend { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 9px; font-size: 7px; opacity: .7; }
+.hm-key { width: 11px; height: 11px; border-radius: 3px; }
+.hm-key.l0 { background: rgba(255,255,255,.06); }
+.hm-key.l1 { background: rgba(255,210,63,.32); }
+.hm-key.l2 { background: rgba(255,159,28,.6); }
+.hm-key.l3 { background: rgba(255,109,60,.82); }
+.hm-key.l4 { background: #ff4530; }
+
 input,
 select {
   font-family: inherit;
@@ -3584,6 +3655,32 @@ body.deep-open { overflow: hidden; }
 .debt-amt input { flex: 1 1 auto; width: 100%; padding: 8px 0; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 9px; }
 .debt-add { background: #ff5a5a; box-shadow: 0 3px 0 #9e2f2f; }
 .debt-add:active { box-shadow: 0 1px 0 #9e2f2f; }
+.debt-amt-half { flex: 1 1 46% !important; }
+
+/* ⚔ BATTLE PLAN — debt payoff strategist */
+.battle-plan { margin: 16px 0; padding: 12px; background: rgba(0,0,0,.3); border: 2px solid rgba(255,90,90,.3); border-radius: 9px; }
+.battle-plan[hidden] { display: none; }
+.bp-head { font-size: 10px; letter-spacing: .5px; color: #ff8a8a; }
+.bp-sub { font-size: 8px; opacity: .8; margin: 5px 0 10px; line-height: 1.5; }
+.bp-controls { display: flex; gap: 7px; }
+.bp-controls .debt-amt { flex: 1 1 auto; }
+.bp-run { flex: 0 0 auto; background: #ff5a5a; color: #fff; border: none; border-radius: 6px; padding: 0 14px; font-family: inherit; font-size: 9px; cursor: pointer; box-shadow: 0 3px 0 #9e2f2f; }
+.bp-run:active { transform: translateY(2px); box-shadow: 0 1px 0 #9e2f2f; }
+.bp-result { margin-top: 11px; }
+.bp-hint, .bp-warn { font-size: 12px; font-family: 'VT323', monospace; line-height: 1.45; opacity: .9; }
+.bp-warn { color: #ffb3b3; }
+.bp-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bp-card { background: rgba(0,0,0,.28); border: 2px solid rgba(255,255,255,.12); border-radius: 7px; padding: 9px; }
+.bp-card.best { border-color: var(--gold); background: rgba(255,210,63,.08); }
+.bp-card-head { font-size: 8px; letter-spacing: .4px; margin-bottom: 8px; color: var(--ink); }
+.bp-tag { background: var(--gold); color: #12122c; font-size: 6px; padding: 1px 4px; border-radius: 3px; vertical-align: middle; }
+.bp-stat { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 3px 0; border-top: 1px solid rgba(255,255,255,.07); }
+.bp-stat .bps-v { font-size: 11px; color: var(--ink); }
+.bp-stat .bps-k { font-size: 6px; opacity: .6; letter-spacing: .4px; }
+.bp-verdict { font-family: 'VT323', monospace; font-size: 14px; line-height: 1.5; margin: 11px 0 8px; }
+.bp-verdict b { color: var(--gold); }
+.bp-order { font-size: 8px; line-height: 1.6; opacity: .85; }
+.bp-order .bp-order-k { color: #ff8a8a; letter-spacing: .4px; }
 .dungeon-foot { font-size: 8px; opacity: .55; margin-top: 12px; text-align: center; letter-spacing: .3px; }
 
 /* ============================================================
