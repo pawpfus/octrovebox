@@ -2902,6 +2902,8 @@ function musicTick() {
 }
 function startMusic() {
   if (music.timer) return;
+  // The Deep runs its own ambient BGM — never let the dashboard track overlap it.
+  if (document.body.classList.contains('deep-open')) return;
   try { getAudio(); } catch (e) { return; }
   musicTick();
   music.timer = setInterval(musicTick, curTrack().stepMs);
@@ -3760,20 +3762,19 @@ const deepBgm = (function () {
   if (!enterBtn || !overlay) return;
   const exitBtn = document.getElementById('deepExit');
   const nav = document.getElementById('deepFloorsNav');
-  const titleEl = document.getElementById('deepTitle');
   const FLOORS = {
-    trading: { el: document.getElementById('floorTrading'), title: '≈ THE DEEP · TRADING FLOOR ≈' },
-    invest:  { el: document.getElementById('floorInvest'),  title: '≈ THE DEEP · INVESTMENT FLOOR ≈' },
-    debt:    { el: document.getElementById('floorDebt'),    title: '≈ THE DEEP · DEBT DUNGEON ≈' },
+    trading: document.getElementById('floorTrading'),
+    invest:  document.getElementById('floorInvest'),
+    debt:    document.getElementById('floorDebt'),
   };
 
   function showFloor(f) {
     if (!FLOORS[f]) f = 'trading';
     state.deepFloor = f; save();
-    Object.keys(FLOORS).forEach((k) => { if (FLOORS[k].el) FLOORS[k].el.hidden = k !== f; });
+    Object.keys(FLOORS).forEach((k) => { if (FLOORS[k]) FLOORS[k].hidden = k !== f; });
     overlay.classList.remove('floor-trading', 'floor-invest', 'floor-debt');
     overlay.classList.add('floor-' + f);
-    if (titleEl) titleEl.textContent = FLOORS[f].title;
+    // title stays just "THE DEEP" — the floor is shown by the active tab
     if (nav) nav.querySelectorAll('.df-tab').forEach((b) => b.classList.toggle('active', b.dataset.floor === f));
     deepBgm.setFloor(f);
     if (f === 'invest') renderFarm();

@@ -3203,7 +3203,7 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
    THE PALACE — dashboard portal + fullscreen isometric overlay
 ============================================================ */
 /* portal card on the dashboard */
-.palace-portal { padding: 0; overflow: hidden; }
+.palace-portal { padding: 0; overflow: hidden; margin-bottom: 18px; }  /* breathing room before the Quest Board */
 .palace-enter {
   display: flex; align-items: center; gap: 12px;
   width: 100%; padding: 14px 16px;
@@ -3258,16 +3258,17 @@ body.deep-open { overflow: hidden; }
 }
 .deep-hud {
   flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; padding: 14px 16px; border-bottom: 2px solid rgba(95,208,255,0.25);
+  gap: 10px; padding: 12px 14px; border-bottom: 2px solid rgba(95,208,255,0.25);
   background: rgba(5,12,22,0.55);
 }
 .floor-debt .deep-hud { border-bottom-color: rgba(255,80,80,0.3); background: rgba(12,2,8,0.7); }
 .floor-invest .deep-hud { border-bottom-color: rgba(120,230,140,0.3); }
-.dh-title { font-size: 11px; letter-spacing: 1px; color: var(--gold); text-shadow: 0 2px 0 #05131f; }
+.dh-title { font-size: 12px; letter-spacing: 1px; color: var(--gold); text-shadow: 0 2px 0 #05131f; white-space: nowrap; }
 .dh-exit {
-  font-family: inherit; font-size: 10px; letter-spacing: 1px; color: var(--ink);
+  display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; white-space: nowrap;
+  font-family: inherit; font-size: 9px; letter-spacing: 1px; color: var(--ink);
   background: rgba(255,111,145,0.16); border: 2px solid #ff6f8c; border-radius: 8px;
-  padding: 8px 12px; cursor: pointer; transition: filter .15s, transform .05s;
+  padding: 7px 11px; cursor: pointer; transition: filter .15s, transform .05s;
 }
 .dh-exit:hover { filter: brightness(1.12); }
 .dh-exit:active { transform: translateY(2px); }
@@ -3313,14 +3314,14 @@ body.deep-open { overflow: hidden; }
 ============================================================ */
 /* intro blurbs use the readable VT323 face so they stay tidy on small screens */
 .bot-sub, .farm-sub, .dungeon-sub {
-  font-family: 'VT323', monospace; font-size: 16px; line-height: 1.3; letter-spacing: .4px;
+  font-family: 'VT323', monospace; font-size: 15px; line-height: 1.3; letter-spacing: .4px;
 }
 .bot-sub { opacity: .85; margin: 2px 0 10px; }
 .bot-sub b { color: var(--gold); }
 .bot-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .bot-controls .select-wrap { flex: 1 1 30%; min-width: 92px; }
 .bot-params { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
-.bot-param { display: flex; flex-direction: column; gap: 4px; font-size: 8px; letter-spacing: .5px; opacity: .9; }
+.bot-param { display: flex; flex-direction: column; gap: 4px; font-size: 9px; letter-spacing: .5px; opacity: .9; }
 .bot-param input {
   width: 74px; padding: 6px 8px; font-family: inherit; font-size: 11px;
   background: rgba(0,0,0,.3); color: var(--ink);
@@ -3353,7 +3354,7 @@ body.deep-open { overflow: hidden; }
   width: 100%; height: 170px; display: block; image-rendering: auto;
   background: rgba(0,0,0,.25); border: 2px solid rgba(255,255,255,.12); border-radius: 8px;
 }
-.bot-legend { display: flex; gap: 16px; justify-content: center; font-size: 8px; margin: 6px 0 2px; opacity: .85; }
+.bot-legend { display: flex; gap: 16px; justify-content: center; font-size: 9px; margin: 6px 0 2px; opacity: .85; }
 .bot-legend .bl-bot { color: var(--gold); }
 .bot-legend .bl-hold { color: #5fd0ff; }
 .bot-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; }
@@ -3398,8 +3399,8 @@ body.deep-open { overflow: hidden; }
 .farm-plant { font-size: 26px; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.4)); animation: plantSway 3.4s ease-in-out infinite; }
 .farm-plot:nth-child(even) .farm-plant { animation-delay: -1.7s; }
 @keyframes plantSway { 0%,100% { transform: rotate(-3deg) } 50% { transform: rotate(3deg) } }
-.farm-plot-name { font-size: 6px; letter-spacing: .3px; opacity: .8; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.farm-plot-pct { font-size: 7px; }
+.farm-plot-name { font-size: 7px; letter-spacing: .3px; opacity: .8; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.farm-plot-pct { font-size: 8px; }
 .farm-plot-pct.up { color: #8df0a0; }
 .farm-plot-pct.down { color: #ff9d9d; }
 .farm-empty-note { grid-column: 1/-1; text-align: center; font-size: 9px; opacity: .6; padding: 18px 0; }
@@ -3487,6 +3488,7 @@ body.deep-open { overflow: hidden; }
 /* ============================================================
    STATUS AILMENTS — RPG debuffs from your finances
 ============================================================ */
+.ailments-panel { margin-bottom: 18px; }
 .ailments-panel[hidden] { display: none; }
 .status-ailments { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
 .status-ailments[hidden] { display: none; }
@@ -3501,28 +3503,58 @@ body.deep-open { overflow: hidden; }
 .ailment-badge.frozen { color: #7fd0ff; }
 .ailment-badge.overburdened { color: #ffb04f; }
 
-/* full-screen status tints (under the CRT, above the app) */
-.ail-fx { position: fixed; inset: 0; z-index: 45; pointer-events: none; opacity: 0; transition: opacity .6s ease; }
-body.ail-poisoned .ail-fx,
-body.ail-frozen .ail-fx { opacity: 1; }
-.ail-fx::before, .ail-fx::after { content: ''; position: absolute; inset: 0; opacity: 0; }
+/* full-screen status FX (under the CRT, above the app). Only the dashboard is
+   affected — the Deep overlay (z-index 60) sits above this. */
+.ail-fx { position: fixed; inset: 0; z-index: 45; pointer-events: none; overflow: hidden; }
+.ail-fx::before, .ail-fx::after { content: ''; position: absolute; inset: -25% 0 0 0; opacity: 0; transition: opacity .6s ease; }
+
+/* POISONED — drifting green smoke billowing up from below */
 body.ail-poisoned .ail-fx::before {
-  background: radial-gradient(130% 100% at 50% 120%, rgba(60,220,80,0.22), transparent 55%);
-  opacity: 0.5;  /* static fallback when motion is reduced */
-  animation: poisonPulse 2.6s ease-in-out infinite;
-}
-body.ail-frozen .ail-fx::after {
+  opacity: 1;
   background:
-    radial-gradient(140% 120% at 50% -20%, rgba(120,200,255,0.18), transparent 55%),
-    linear-gradient(180deg, rgba(150,210,255,0.10), transparent 40%, rgba(150,210,255,0.10));
-  box-shadow: inset 0 0 120px rgba(140,200,255,0.25);
-  opacity: 0.9;
+    radial-gradient(42% 32% at 18% 105%, rgba(60,220,90,0.34), transparent 70%),
+    radial-gradient(46% 36% at 52% 108%, rgba(95,245,125,0.30), transparent 72%),
+    radial-gradient(40% 34% at 84% 104%, rgba(48,200,80,0.32), transparent 70%);
+  filter: blur(7px);
+  animation: poisonSmoke 7s ease-in-out infinite;
 }
-@keyframes poisonPulse { 0%,100% { opacity: 0.25 } 50% { opacity: 0.85 } }
-/* overburdened: the world drags — slow the bobbing octo + add weight */
-body.ail-overburdened .pe-octo,
-body.ail-overburdened .logo-octo { animation-duration: 6s !important; }
-body.ail-overburdened .logo-octo { filter: brightness(0.85) saturate(0.8); }
+@keyframes poisonSmoke {
+  0%   { transform: translateY(10%) scale(1);    opacity: .4; }
+  50%  { transform: translateY(-7%) scale(1.18); opacity: .85; }
+  100% { transform: translateY(10%) scale(1);    opacity: .4; }
+}
+
+/* FROZEN — frosted edges, cold tint, the screen stiffens over */
+body.ail-frozen .ail-fx::after {
+  opacity: 1;
+  background:
+    radial-gradient(60% 50% at 50% -18%, rgba(150,220,255,0.22), transparent 60%),
+    linear-gradient(180deg, rgba(170,225,255,0.18), transparent 32%, transparent 68%, rgba(170,225,255,0.18));
+  box-shadow: inset 0 0 100px 28px rgba(160,215,255,0.32), inset 0 0 36px rgba(225,248,255,0.55);
+  animation: frostBreathe 5s ease-in-out infinite;
+}
+@keyframes frostBreathe { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
+/* desaturate + cool the whole dashboard while frozen */
+body.ail-frozen .screen { filter: saturate(.55) brightness(.95) hue-rotate(-12deg); }
+
+/* OVERBURDENED — the dashboard glitches: periodic skew/jitter + scanline tear */
+body.ail-overburdened .screen { animation: glitchSkew 6s steps(1, end) infinite; }
+@keyframes glitchSkew {
+  0%, 85%, 100% { transform: none; }
+  86% { transform: translate(-3px, 1px) skewX(-7deg); }
+  88% { transform: translate(3px, -1px) skewX(5deg); }
+  90% { transform: translate(-2px, 0); }
+  92% { transform: translate(2px, 1px) skewX(-4deg); }
+  94% { transform: none; }
+}
+body.ail-overburdened .ail-fx {
+  background: repeating-linear-gradient(0deg, rgba(255,60,120,0.06) 0 2px, rgba(0,200,255,0.06) 2px 4px);
+  mix-blend-mode: screen;
+  animation: glitchBands 6s steps(1, end) infinite;
+}
+@keyframes glitchBands { 0%, 85%, 100% { opacity: 0; } 86% { opacity: .7; } 90% { opacity: .4; } 93% { opacity: .6; } }
+/* overburdened also weighs the logo down (slower bob) */
+body.ail-overburdened .logo-octo { animation-duration: 6s !important; filter: brightness(0.85) saturate(0.8); }
 
 /* tighten the portal + The Deep on small screens */
 @media (max-width: 600px) {
