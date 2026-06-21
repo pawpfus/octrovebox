@@ -3157,11 +3157,15 @@ if (state.musicOn) {
   const FEE = 0.001;            // 0.1% per simulated trade
   let runToken = 0;             // guards against a stale fetch overwriting a newer run
 
-  // Yahoo blocks direct browser calls, so requests go through a CORS relay.
-  // Set OWN_PROXY to your own Cloudflare Worker (see PROXY-SETUP.md) for a
-  // private, reliable feed; the public proxy is the automatic fallback.
-  const OWN_PROXY = '';   // e.g. 'https://octrovebox-proxy.you.workers.dev/?url='
-  const PROXIES = [OWN_PROXY, 'https://corsproxy.io/?url='].filter(Boolean);
+  // Yahoo blocks direct browser calls, so requests go through a relay. When the
+  // site is served from Cloudflare Pages, a same-origin Pages Function at
+  // /api/yf handles it privately (functions/api/yf.js). We skip that on
+  // github.io / localhost — where it would 404 — and use the public proxy.
+  // OWN_PROXY can also point at a dedicated Worker URL if you prefer.
+  const noFunc = /(^localhost$)|(^127\.)|(\.github\.io$)/.test(location.hostname);
+  const PAGES_PROXY = noFunc ? '' : '/api/yf?url=';
+  const OWN_PROXY = '';   // optional: 'https://octrovebox-proxy.you.workers.dev/?url='
+  const PROXIES = [PAGES_PROXY, OWN_PROXY, 'https://corsproxy.io/?url='].filter(Boolean);
 
   // two markets: gold & precious metals (USD) and Indonesia / IHSG (IDR).
   // both pull real candles from Yahoo Finance via a CORS proxy (Yahoo blocks
