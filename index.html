@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=148" />
+  <link rel="stylesheet" href="styles.css?v=149" />
 </head>
 
 <body>
@@ -80,11 +80,6 @@
     <section class="panel oracle-panel">
       <div class="log-head">
         <h2 class="panel-title">THE ORACLE</h2>
-      </div>
-      <!-- forward-looking forecast banner (filled by renderForecast) -->
-      <div class="oracle-forecast" id="oracleForecast" hidden>
-        <div class="of-headline" id="ofHeadline"></div>
-        <ul class="of-omens" id="ofOmens" aria-live="polite"></ul>
       </div>
       <div class="oracle-stage" id="oracleStage">
         <div class="oracle-orb">
@@ -302,7 +297,7 @@
         <form class="jar-form" id="jarForm" autocomplete="off">
           <input type="text" id="jarName" maxlength="18" placeholder="SINKING FUND NAME (e.g. VACATION)" required />
           <div class="jar-amt"><span class="dollar2" id="jarCcy">Rp</span><input type="number" id="jarTarget" min="1" step="0.01" placeholder="TARGET" required /></div>
-          <button type="submit" class="jar-add">💰 ADD SINKING FUND</button>
+          <button type="submit" class="jar-add">＋ ADD</button>
         </form>
       </div>
     </div>
@@ -692,7 +687,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=153"></script>
+  <script src="app.js?v=154"></script>
 </body>
 
 </html>

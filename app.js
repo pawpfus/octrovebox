@@ -189,7 +189,6 @@ const els = {
   xpFill: $('xpFill'), xpNext: $('xpNext'),
   // oracle
   oracleText: $('oracleText'), oracleStage: $('oracleStage'), oracleMore: $('oracleMore'),
-  oracleForecast: $('oracleForecast'), ofHeadline: $('ofHeadline'), ofOmens: $('ofOmens'),
   // side quests
   questList: $('questList'),
   questToggle: $('questToggle'), questScroll: $('questScroll'), questProgress: $('questProgress'),
@@ -908,6 +907,9 @@ function oracleTips() {
   const { income, expense, balance } = totals();
   const tips = [];
 
+  // the Oracle's forward-looking foresight leads, then the analysis below
+  forecastProphecies().forEach((p) => tips.push(p));
+
   if (state.transactions.length === 0) {
     tips.push('🔮 Add your income and expenses, and I\'ll reveal personalised money insights here.');
   }
@@ -1148,49 +1150,38 @@ function forecast() {
 }
 const dShort = (dt) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const dMonth = (dt) => dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-function renderForecast() {
-  const host = els.oracleForecast;
-  if (!host) return;
+// The Oracle's foresight, spoken in her own voice. These fold into the single
+// dialogue bubble (no separate banner box) and lead the insight rotation.
+// Plain text — the bubble types them out, so no HTML markup here.
+function forecastProphecies() {
   const f = forecast();
-  // net worth now lives in its own dropdown under the Balance card, so the Oracle
-  // is purely forward-looking — no forecast yet means no banner at all.
-  if (!f) { host.hidden = true; return; }
-  host.hidden = false;
-
-  // headline — the forward balance trajectory
-  let tone, ico, txt;
+  if (!f) return [];
+  const out = [];
+  // forward balance trajectory
   if (f.dryDate) {
-    tone = 'bad'; ico = '⚠';
-    txt = `At your current pace, your gold runs dry around <b>${dShort(f.dryDate)}</b> — about ${Math.round(f.dryDays)} days out.`;
+    out.push('🔮 I foresee your gold running dry around ' + dShort(f.dryDate) + ' — barely ' + Math.round(f.dryDays) + ' suns away. Stem the bleed before the coffers echo empty.');
   } else if (f.perDay < 0) {
-    tone = 'warn'; ico = '📉';
-    txt = `At your current pace, your balance slips to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
+    out.push('🔮 The tide pulls against you — at this pace your balance ebbs to ' + fmt(Math.round(f.proj30)) + ' within 30 suns.');
   } else {
-    tone = 'good'; ico = '📈';
-    txt = `At your current pace, your balance grows to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
+    out.push('🔮 The omens shine bright — at this pace your fortune swells to ' + fmt(Math.round(f.proj30)) + ' within 30 suns.');
   }
-  els.ofHeadline.className = 'of-headline ' + tone;
-  els.ofHeadline.innerHTML = `<span class="ofh-ico">${ico}</span><span class="ofh-txt">${txt}</span>`;
-
-  // up to three "omens" — the most actionable reads
-  const omens = [];
+  // recurring obligations on the horizon
   if (f.billsOut > 0) {
-    omens.push(['🗓️', 'warn', `<b>${fmt(f.billsOut)}</b> in recurring bills fall due within 30 days` +
-      (f.billsIn > 0 ? ` (with ${fmt(f.billsIn)} income incoming).` : '.')]);
+    out.push('🗓️ ' + fmt(f.billsOut) + ' in recurring tributes come due within 30 days' +
+      (f.billsIn > 0 ? ' — though ' + fmt(f.billsIn) + ' in gold rides in to meet them.' : '. Ready your coffers.'));
   }
+  // savings-goal divination
   if (f.goalEta) {
-    omens.push(['🎯', 'good', `On track to reach “${escapeHtml(state.goal.name)}” around <b>${dMonth(f.goalEta)}</b>.`]);
+    out.push('🎯 The path to "' + state.goal.name + '" reveals itself — you shall arrive around ' + dMonth(f.goalEta) + '.');
   } else if (f.goalReachable === false) {
-    omens.push(['🎯', 'warn', `“${escapeHtml(state.goal.name)}” is out of reach at your current pace — you aren't net-saving yet.`]);
+    out.push('🎯 "' + state.goal.name + '" lies beyond reach at this pace — you are not yet net-saving. Turn the tide first.');
   }
+  // spending-anomaly omen
   if (f.spendDiff != null) {
-    if (f.spendDiff >= 15) omens.push(['📊', 'bad', `This month's spending is <b>${f.spendDiff}% above</b> your 3-month average.`]);
-    else if (f.spendDiff <= -15) omens.push(['📊', 'good', `This month's spending is <b>${Math.abs(f.spendDiff)}% below</b> your 3-month average — well held.`]);
+    if (f.spendDiff >= 15) out.push('📊 A warning curls in the smoke — this moon\'s spending runs ' + f.spendDiff + '% above your three-month average.');
+    else if (f.spendDiff <= -15) out.push('📊 Well held — this moon\'s spending sits ' + Math.abs(f.spendDiff) + '% beneath your three-month average. The discipline shows.');
   }
-  if (!omens.length) omens.push(['✨', '', 'Your finances read steady. Keep logging and I\'ll foresee more.']);
-
-  els.ofOmens.innerHTML = omens.slice(0, 3).map(([i, c, t]) =>
-    `<li class="of-omen ${c}"><span class="ofo-ico">${i}</span><span class="ofo-txt">${t}</span></li>`).join('');
+  return out;
 }
 
 /* ============================================================
@@ -2044,7 +2035,6 @@ function renderAll(prevLevel) {
   renderHeatmap();
   renderQuests();
   renderBounties();
-  renderForecast();
   renderOracle();
   renderThemes();
   renderChest();
