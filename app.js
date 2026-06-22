@@ -1148,69 +1148,45 @@ function forecast() {
 }
 const dShort = (dt) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const dMonth = (dt) => dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-// net-worth read surfaced inside the Oracle (keeps insight in one place, less box clutter)
-function netWorthOmen() {
-  const nw = netWorth();
-  const hist = state.nwHistory || [];
-  if (hist.length >= 2) {
-    const delta = hist[hist.length - 1].v - hist[0].v;
-    const days = Math.max(1, Math.round((hist[hist.length - 1].t - hist[0].t) / 86400000));
-    return ['💎', delta >= 0 ? 'good' : 'bad',
-      `Net worth <b>${fmt(nw.total)}</b> — ${delta >= 0 ? '▲ +' : '▼ −'}${fmt(Math.abs(delta))} over ${days}d.`];
-  }
-  if ((state.transactions || []).length || (state.invest || []).length || (state.debts || []).length) {
-    return ['💎', '', `Net worth <b>${fmt(nw.total)}</b> (cash + assets − debts).`];
-  }
-  return null;
-}
 function renderForecast() {
   const host = els.oracleForecast;
   if (!host) return;
   const f = forecast();
-  const nwOmen = netWorthOmen();
-  if (!f && !nwOmen) { host.hidden = true; return; }
+  // net worth now lives in its own dropdown under the Balance card, so the Oracle
+  // is purely forward-looking — no forecast yet means no banner at all.
+  if (!f) { host.hidden = true; return; }
   host.hidden = false;
 
-  // headline — the forward balance trajectory (falls back to net worth when there's
-  // not enough history to forecast yet)
-  if (f) {
-    let tone, ico, txt;
-    if (f.dryDate) {
-      tone = 'bad'; ico = '⚠';
-      txt = `At your current pace, your gold runs dry around <b>${dShort(f.dryDate)}</b> — about ${Math.round(f.dryDays)} days out.`;
-    } else if (f.perDay < 0) {
-      tone = 'warn'; ico = '📉';
-      txt = `At your current pace, your balance slips to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
-    } else {
-      tone = 'good'; ico = '📈';
-      txt = `At your current pace, your balance grows to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
-    }
-    els.ofHeadline.className = 'of-headline ' + tone;
-    els.ofHeadline.innerHTML = `<span class="ofh-ico">${ico}</span><span class="ofh-txt">${txt}</span>`;
+  // headline — the forward balance trajectory
+  let tone, ico, txt;
+  if (f.dryDate) {
+    tone = 'bad'; ico = '⚠';
+    txt = `At your current pace, your gold runs dry around <b>${dShort(f.dryDate)}</b> — about ${Math.round(f.dryDays)} days out.`;
+  } else if (f.perDay < 0) {
+    tone = 'warn'; ico = '📉';
+    txt = `At your current pace, your balance slips to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
   } else {
-    const nw = netWorth();
-    els.ofHeadline.className = 'of-headline ' + (nw.total >= 0 ? 'good' : 'bad');
-    els.ofHeadline.innerHTML = `<span class="ofh-ico">💎</span><span class="ofh-txt">Your net worth is <b>${fmt(nw.total)}</b>.</span>`;
+    tone = 'good'; ico = '📈';
+    txt = `At your current pace, your balance grows to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
   }
+  els.ofHeadline.className = 'of-headline ' + tone;
+  els.ofHeadline.innerHTML = `<span class="ofh-ico">${ico}</span><span class="ofh-txt">${txt}</span>`;
 
   // up to three "omens" — the most actionable reads
   const omens = [];
-  if (f) {
-    if (f.billsOut > 0) {
-      omens.push(['🗓️', 'warn', `<b>${fmt(f.billsOut)}</b> in recurring bills fall due within 30 days` +
-        (f.billsIn > 0 ? ` (with ${fmt(f.billsIn)} income incoming).` : '.')]);
-    }
-    if (f.goalEta) {
-      omens.push(['🎯', 'good', `On track to reach “${escapeHtml(state.goal.name)}” around <b>${dMonth(f.goalEta)}</b>.`]);
-    } else if (f.goalReachable === false) {
-      omens.push(['🎯', 'warn', `“${escapeHtml(state.goal.name)}” is out of reach at your current pace — you aren't net-saving yet.`]);
-    }
-    if (f.spendDiff != null) {
-      if (f.spendDiff >= 15) omens.push(['📊', 'bad', `This month's spending is <b>${f.spendDiff}% above</b> your 3-month average.`]);
-      else if (f.spendDiff <= -15) omens.push(['📊', 'good', `This month's spending is <b>${Math.abs(f.spendDiff)}% below</b> your 3-month average — well held.`]);
-    }
+  if (f.billsOut > 0) {
+    omens.push(['🗓️', 'warn', `<b>${fmt(f.billsOut)}</b> in recurring bills fall due within 30 days` +
+      (f.billsIn > 0 ? ` (with ${fmt(f.billsIn)} income incoming).` : '.')]);
   }
-  if (nwOmen) omens.push(nwOmen);   // net-worth insight lives here now, not in its own box
+  if (f.goalEta) {
+    omens.push(['🎯', 'good', `On track to reach “${escapeHtml(state.goal.name)}” around <b>${dMonth(f.goalEta)}</b>.`]);
+  } else if (f.goalReachable === false) {
+    omens.push(['🎯', 'warn', `“${escapeHtml(state.goal.name)}” is out of reach at your current pace — you aren't net-saving yet.`]);
+  }
+  if (f.spendDiff != null) {
+    if (f.spendDiff >= 15) omens.push(['📊', 'bad', `This month's spending is <b>${f.spendDiff}% above</b> your 3-month average.`]);
+    else if (f.spendDiff <= -15) omens.push(['📊', 'good', `This month's spending is <b>${Math.abs(f.spendDiff)}% below</b> your 3-month average — well held.`]);
+  }
   if (!omens.length) omens.push(['✨', '', 'Your finances read steady. Keep logging and I\'ll foresee more.']);
 
   els.ofOmens.innerHTML = omens.slice(0, 3).map(([i, c, t]) =>
@@ -1368,7 +1344,7 @@ function renderNetWorth() {
   const nw = netWorth();
   const totalEl = document.getElementById('nwTotal');
   totalEl.textContent = fmt(nw.total);
-  totalEl.className = 'nw-total' + (nw.total < 0 ? ' neg' : '');
+  totalEl.className = 'nw-tg-total' + (nw.total < 0 ? ' neg' : '');
   // compact one-line breakdown caption under the chart (graph is the star now)
   const seg = (ico, val, cls) => `<span class="nw-seg ${cls}">${ico} ${fmt(val)}</span>`;
   document.getElementById('nwBreakdown').innerHTML =
@@ -2906,6 +2882,22 @@ els.restoreInput.addEventListener('change', (e) => {
 els.editStartBtn.addEventListener('click', toggleStartEditor);
 els.startSave.addEventListener('click', saveStart);
 els.startInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveStart(); });
+
+// net worth dropdown — folds out from the Balance card
+(() => {
+  const toggle = document.getElementById('nwToggle');
+  const panel = document.getElementById('networthPanel');
+  if (!toggle || !panel) return;
+  toggle.addEventListener('click', () => {
+    const open = panel.hidden;
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.classList.toggle('open', open);
+    if (sfx.click) sfx.click();
+    // redraw the sparkline now the panel has real width (canvas was 0-sized while hidden)
+    if (open) renderNetWorth();
+  });
+})();
 
 // custom date picker
 els.dateField.addEventListener('click', openCal);

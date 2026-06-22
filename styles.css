@@ -266,13 +266,17 @@ h1 {
 
 /* =========================== STAT HUD =========================== */
 .stats {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
-  gap: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin-bottom: 22px;
 }
-/* gap after Balance only — Income and Spent stay flush */
-.stats .balance { margin-right: 14px; }
+/* Income + Spent share a row beneath Balance (+ its net-worth dropdown) */
+.stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
 
 /* the signature chunky pixel-bevel box */
 .stat-card,
@@ -960,12 +964,17 @@ h1 {
 .nest-body[hidden] { display: none; }
 
 /* 📊 NET WORTH — graph-dominated; everything else is a small caption */
-.networth-panel { margin-bottom: 14px; padding: 11px 14px; }
-.nw-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
-.nw-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); opacity: .8; white-space: nowrap; }
-.nw-total { font-size: 14px; color: #5fe6a8; text-align: right; }
-.nw-total.neg { color: #ff6f8c; }
-.nw-spark { display: block; width: 100%; height: 120px; margin: 8px 0 6px; }
+/* net worth folds out from the Balance card (toggle lives in the card foot) */
+.nw-toggle { display: flex; align-items: center; gap: 7px; width: 100%; margin-top: auto; padding: 9px 0 0; border: none; border-top: 2px solid rgba(255,255,255,.12); background: none; cursor: pointer; font-family: inherit; }
+.nw-toggle .nw-tg-label { font-size: 7px; letter-spacing: 1px; color: var(--gold); opacity: .85; white-space: nowrap; }
+.nw-toggle .nw-tg-total { flex: 1 1 auto; min-width: 0; text-align: right; font-size: 9px; color: #5fe6a8; overflow: hidden; text-overflow: ellipsis; }
+.nw-toggle .nw-tg-total.neg { color: #ff6f8c; }
+.nw-toggle .nw-tg-chevron { font-size: 8px; color: var(--gold); transition: transform .2s ease; flex: 0 0 auto; }
+.nw-toggle.open .nw-tg-chevron { transform: rotate(180deg); }
+
+.networth-panel { margin: 0; padding: 11px 14px; }
+.networth-panel[hidden] { display: none; }
+.nw-spark { display: block; width: 100%; height: 120px; margin: 2px 0 6px; }
 .nw-spark[hidden] { display: none; }
 .nw-foot { font-size: 8px; opacity: .7; letter-spacing: .2px; margin: 4px 0 0; text-align: center; }
 .nw-foot[hidden] { display: none; }
@@ -2620,12 +2629,7 @@ body[data-theme="midas"] {
 
 /* =========================== RESPONSIVE =========================== */
 @media (max-width: 720px) {
-  .stats {
-    grid-template-columns: 1fr;
-  }
-
-  /* stacked vertically: gap goes below Balance, Income/Spent stay flush */
-  .stats .balance { margin-right: 0; margin-bottom: 14px; }
+  /* Income/Spent stay side-by-side; Balance + net-worth graph stack above them */
 
   /* keep "WORLD MAP · 6-MONTH HISTORY" on a single line on phones */
   .chart-panel .panel-title {
