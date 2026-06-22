@@ -972,9 +972,10 @@ h1 {
 .nw-toggle .nw-tg-chevron { font-size: 8px; color: var(--gold); transition: transform .2s ease; flex: 0 0 auto; }
 .nw-toggle.open .nw-tg-chevron { transform: rotate(180deg); }
 
-.networth-panel { margin: 0; padding: 11px 14px; }
+/* graph lives inside the Balance card now — no own border/padding, no gap */
+.networth-panel { margin: 0; padding: 0; }
 .networth-panel[hidden] { display: none; }
-.nw-spark { display: block; width: 100%; height: 120px; margin: 2px 0 6px; }
+.nw-spark { display: block; width: 100%; height: 120px; margin: 0 0 6px; }
 .nw-spark[hidden] { display: none; }
 .nw-foot { font-size: 8px; opacity: .7; letter-spacing: .2px; margin: 4px 0 0; text-align: center; }
 .nw-foot[hidden] { display: none; }

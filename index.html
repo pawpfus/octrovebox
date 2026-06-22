@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=147" />
+  <link rel="stylesheet" href="styles.css?v=148" />
 </head>
 
 <body>
@@ -115,20 +115,18 @@
           <input type="number" id="startInput" step="1" placeholder="STARTING BALANCE" />
           <button type="button" class="mini-save" id="startSave">OK</button>
         </div>
-        <!-- net worth folds out from the balance card -->
+        <!-- net worth folds out inside the balance card — one continuous block -->
         <button type="button" class="nw-toggle" id="nwToggle" aria-expanded="false" aria-controls="networthPanel">
           <span class="nw-tg-label">📊 NET WORTH</span>
           <span class="nw-tg-total" id="nwTotal">Rp0</span>
           <span class="nw-tg-chevron">▾</span>
         </button>
+        <div class="networth-panel" id="networthPanel" aria-label="Net worth" hidden>
+          <canvas class="nw-spark" id="nwSpark" width="600" height="120"></canvas>
+          <p class="nw-foot" id="nwFoot"></p>
+          <div class="nw-breakdown" id="nwBreakdown"></div>
+        </div>
       </div>
-
-      <!-- net worth graph drops down directly beneath Balance -->
-      <section class="panel networth-panel" id="networthPanel" aria-label="Net worth" hidden>
-        <canvas class="nw-spark" id="nwSpark" width="600" height="120"></canvas>
-        <p class="nw-foot" id="nwFoot"></p>
-        <div class="nw-breakdown" id="nwBreakdown"></div>
-      </section>
 
       <div class="stats-row">
         <div class="stat-card income">
@@ -694,7 +692,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=152"></script>
+  <script src="app.js?v=153"></script>
 </body>
 
 </html>
