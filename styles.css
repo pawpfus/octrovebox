@@ -950,25 +950,29 @@ h1 {
 .jar-form .jar-amt { flex: 1 1 auto; }
 .jar-add { flex: 0 0 auto; background: var(--gold); color: #12122c; border: none; border-radius: 6px; padding: 0 14px; font-family: inherit; font-size: 9px; cursor: pointer; box-shadow: 0 3px 0 #b8860b; }
 .jar-add:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8860b; }
-/* divider that introduces the jars inside the Savings Quest panel */
-.jars-divider { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 16px 0 10px; padding-top: 12px; border-top: 2px solid rgba(255,255,255,.1); font-size: 8px; letter-spacing: 1px; color: var(--gold); }
-.jars-divider .jars-total { color: var(--gold); opacity: .85; }
+/* 🥚 NEST EGGS — collapsible dropdown inside the Savings Quest */
+.nest-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 14px; padding: 10px 0 0; border: none; border-top: 2px solid rgba(255,255,255,.1); background: none; cursor: pointer; font-family: inherit; }
+.nest-toggle .nest-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); }
+.nest-toggle .nest-total { flex: 1 1 auto; text-align: right; font-size: 8px; color: var(--gold); opacity: .85; }
+.nest-toggle .nest-chevron { font-size: 9px; color: var(--gold); transition: transform .2s ease; }
+.nest-toggle.open .nest-chevron { transform: rotate(180deg); }
+.nest-body { margin-top: 11px; }
+.nest-body[hidden] { display: none; }
 
-/* 📊 NET WORTH TIMELINE — compact */
-.networth-panel { margin-bottom: 14px; padding: 12px 14px; }
-.networth-panel .panel-title { font-size: 10px; }
-.nw-total { font-size: 12px; color: #5fe6a8; }
+/* 📊 NET WORTH — graph-dominated; everything else is a small caption */
+.networth-panel { margin-bottom: 14px; padding: 11px 14px; }
+.nw-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.nw-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); opacity: .8; white-space: nowrap; }
+.nw-total { font-size: 14px; color: #5fe6a8; text-align: right; }
 .nw-total.neg { color: #ff6f8c; }
-.nw-breakdown { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0 4px; }
-.nw-chip { display: flex; align-items: baseline; gap: 5px; flex: 1 1 28%; min-width: 84px; background: rgba(0,0,0,.24); border: 1px solid rgba(255,255,255,.1); border-radius: 6px; padding: 4px 7px; }
-.nw-chip .nwc-k { font-size: 6px; letter-spacing: .3px; opacity: .65; }
-.nw-chip .nwc-v { font-size: 8px; color: var(--ink); }
-.nw-chip.pos .nwc-v { color: #5fe6a8; }
-.nw-chip.neg .nwc-v { color: #ff6f8c; }
-.nw-spark { display: block; width: 100%; height: 38px; margin: 2px 0 6px; }
-.nw-foot { font-size: 7px; opacity: .75; letter-spacing: .2px; margin: 0; }
-.nw-foot .up { color: #5fe6a8; }
-.nw-foot .down { color: #ff6f8c; }
+.nw-spark { display: block; width: 100%; height: 120px; margin: 8px 0 6px; }
+.nw-spark[hidden] { display: none; }
+.nw-foot { font-size: 8px; opacity: .7; letter-spacing: .2px; margin: 4px 0 0; text-align: center; }
+.nw-foot[hidden] { display: none; }
+.nw-breakdown { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; margin-top: 4px; }
+.nw-seg { font-size: 8px; opacity: .85; letter-spacing: .2px; }
+.nw-seg.pos { color: #5fe6a8; }
+.nw-seg.neg { color: #ff6f8c; }
 
 /* 🔥 SPENDING HEATMAP */
 .heatmap-panel[hidden] { display: none; }

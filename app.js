@@ -1148,43 +1148,69 @@ function forecast() {
 }
 const dShort = (dt) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const dMonth = (dt) => dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+// net-worth read surfaced inside the Oracle (keeps insight in one place, less box clutter)
+function netWorthOmen() {
+  const nw = netWorth();
+  const hist = state.nwHistory || [];
+  if (hist.length >= 2) {
+    const delta = hist[hist.length - 1].v - hist[0].v;
+    const days = Math.max(1, Math.round((hist[hist.length - 1].t - hist[0].t) / 86400000));
+    return ['💎', delta >= 0 ? 'good' : 'bad',
+      `Net worth <b>${fmt(nw.total)}</b> — ${delta >= 0 ? '▲ +' : '▼ −'}${fmt(Math.abs(delta))} over ${days}d.`];
+  }
+  if ((state.transactions || []).length || (state.invest || []).length || (state.debts || []).length) {
+    return ['💎', '', `Net worth <b>${fmt(nw.total)}</b> (cash + assets − debts).`];
+  }
+  return null;
+}
 function renderForecast() {
   const host = els.oracleForecast;
   if (!host) return;
   const f = forecast();
-  if (!f) { host.hidden = true; return; }
+  const nwOmen = netWorthOmen();
+  if (!f && !nwOmen) { host.hidden = true; return; }
   host.hidden = false;
 
-  // headline — the forward balance trajectory
-  let tone, ico, txt;
-  if (f.dryDate) {
-    tone = 'bad'; ico = '⚠';
-    txt = `At your current pace, your gold runs dry around <b>${dShort(f.dryDate)}</b> — about ${Math.round(f.dryDays)} days out.`;
-  } else if (f.perDay < 0) {
-    tone = 'warn'; ico = '📉';
-    txt = `At your current pace, your balance slips to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
+  // headline — the forward balance trajectory (falls back to net worth when there's
+  // not enough history to forecast yet)
+  if (f) {
+    let tone, ico, txt;
+    if (f.dryDate) {
+      tone = 'bad'; ico = '⚠';
+      txt = `At your current pace, your gold runs dry around <b>${dShort(f.dryDate)}</b> — about ${Math.round(f.dryDays)} days out.`;
+    } else if (f.perDay < 0) {
+      tone = 'warn'; ico = '📉';
+      txt = `At your current pace, your balance slips to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
+    } else {
+      tone = 'good'; ico = '📈';
+      txt = `At your current pace, your balance grows to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
+    }
+    els.ofHeadline.className = 'of-headline ' + tone;
+    els.ofHeadline.innerHTML = `<span class="ofh-ico">${ico}</span><span class="ofh-txt">${txt}</span>`;
   } else {
-    tone = 'good'; ico = '📈';
-    txt = `At your current pace, your balance grows to <b>${fmt(Math.round(f.proj30))}</b> within 30 days.`;
+    const nw = netWorth();
+    els.ofHeadline.className = 'of-headline ' + (nw.total >= 0 ? 'good' : 'bad');
+    els.ofHeadline.innerHTML = `<span class="ofh-ico">💎</span><span class="ofh-txt">Your net worth is <b>${fmt(nw.total)}</b>.</span>`;
   }
-  els.ofHeadline.className = 'of-headline ' + tone;
-  els.ofHeadline.innerHTML = `<span class="ofh-ico">${ico}</span><span class="ofh-txt">${txt}</span>`;
 
   // up to three "omens" — the most actionable reads
   const omens = [];
-  if (f.billsOut > 0) {
-    omens.push(['🗓️', 'warn', `<b>${fmt(f.billsOut)}</b> in recurring bills fall due within 30 days` +
-      (f.billsIn > 0 ? ` (with ${fmt(f.billsIn)} income incoming).` : '.')]);
+  if (f) {
+    if (f.billsOut > 0) {
+      omens.push(['🗓️', 'warn', `<b>${fmt(f.billsOut)}</b> in recurring bills fall due within 30 days` +
+        (f.billsIn > 0 ? ` (with ${fmt(f.billsIn)} income incoming).` : '.')]);
+    }
+    if (f.goalEta) {
+      omens.push(['🎯', 'good', `On track to reach “${escapeHtml(state.goal.name)}” around <b>${dMonth(f.goalEta)}</b>.`]);
+    } else if (f.goalReachable === false) {
+      omens.push(['🎯', 'warn', `“${escapeHtml(state.goal.name)}” is out of reach at your current pace — you aren't net-saving yet.`]);
+    }
+    if (f.spendDiff != null) {
+      if (f.spendDiff >= 15) omens.push(['📊', 'bad', `This month's spending is <b>${f.spendDiff}% above</b> your 3-month average.`]);
+      else if (f.spendDiff <= -15) omens.push(['📊', 'good', `This month's spending is <b>${Math.abs(f.spendDiff)}% below</b> your 3-month average — well held.`]);
+    }
   }
-  if (f.goalEta) {
-    omens.push(['🎯', 'good', `On track to reach “${escapeHtml(state.goal.name)}” around <b>${dMonth(f.goalEta)}</b>.`]);
-  } else if (f.goalReachable === false) {
-    omens.push(['🎯', 'warn', `“${escapeHtml(state.goal.name)}” is out of reach at your current pace — you aren't net-saving yet.`]);
-  }
-  if (f.spendDiff != null) {
-    if (f.spendDiff >= 15) omens.push(['📊', 'bad', `This month's spending is <b>${f.spendDiff}% above</b> your 3-month average.`]);
-    else if (f.spendDiff <= -15) omens.push(['📊', 'good', `This month's spending is <b>${Math.abs(f.spendDiff)}% below</b> your 3-month average — well held.`]);
-  }
+  if (nwOmen) omens.push(nwOmen);   // net-worth insight lives here now, not in its own box
   if (!omens.length) omens.push(['✨', '', 'Your finances read steady. Keep logging and I\'ll foresee more.']);
 
   els.ofOmens.innerHTML = omens.slice(0, 3).map(([i, c, t]) =>
@@ -1215,7 +1241,7 @@ function renderJars() {
     const done = target > 0 && saved >= target;
     return `<div class="jar-card${done ? ' done' : ''}" data-id="${j.id}">
       <div class="jar-row-head">
-        <span class="jar-ico">${done ? '✨' : '🏺'}</span>
+        <span class="jar-ico">${done ? '✨' : '💰'}</span>
         <span class="jar-name">${escapeHtml(j.name)}</span>
         <span class="jar-pct">${Math.round(pct)}%</span>
         <button type="button" class="jar-del" data-id="${j.id}" title="Remove">✕</button>
@@ -1233,6 +1259,16 @@ function renderJars() {
   const form = document.getElementById('jarForm');
   const host = document.getElementById('jarsList');
   if (!form || !host) return;
+  // collapsible "nest eggs" dropdown inside the Savings Quest
+  const toggle = document.getElementById('nestToggle');
+  const body = document.getElementById('nestBody');
+  if (toggle && body) toggle.addEventListener('click', () => {
+    const open = body.hidden;
+    body.hidden = !open;
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.classList.toggle('open', open);
+    if (sfx.click) sfx.click();
+  });
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const name = document.getElementById('jarName').value.trim();
@@ -1240,7 +1276,7 @@ function renderJars() {
     if (!name || !(target > 0)) { sfx.error(); shake(form); return; }
     state.jars.push({ id: newId(), name, target, saved: 0 });
     save(); sfx.coin(); form.reset(); renderJars();
-    showToast('🏺 JAR CREATED: ' + name);
+    showToast('💰 SINKING FUND CREATED: ' + name);
   });
   host.addEventListener('click', (e) => {
     const del = e.target.closest('.jar-del');
@@ -1253,7 +1289,7 @@ function renderJars() {
       if (!(amt > 0)) { sfx.error(); return; }
       const wasDone = (Number(j.saved) || 0) >= (Number(j.target) || 0);
       j.saved = (Number(j.saved) || 0) + amt; save();
-      if (!wasDone && j.saved >= (Number(j.target) || 0)) { sfx.victory(); showToast('✨ JAR FULL: ' + j.name + ' ★'); }
+      if (!wasDone && j.saved >= (Number(j.target) || 0)) { sfx.victory(); showToast('✨ SINKING FUND FULL: ' + j.name + ' ★'); }
       else { sfx.coin(); showToast('🪙 +' + fmt(amt) + ' → ' + j.name); }
       renderJars();
     } else if (e.target.closest('.jar-wd')) {
@@ -1292,7 +1328,7 @@ function drawNetWorthSpark(hist) {
   const cv = document.getElementById('nwSpark');
   if (!cv) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const W = cv.clientWidth || 600, H = 38;
+  const W = cv.clientWidth || 600, H = 120;
   cv.width = W * dpr; cv.height = H * dpr;
   const c = cv.getContext('2d');
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1333,21 +1369,23 @@ function renderNetWorth() {
   const totalEl = document.getElementById('nwTotal');
   totalEl.textContent = fmt(nw.total);
   totalEl.className = 'nw-total' + (nw.total < 0 ? ' neg' : '');
-  const chip = (label, val, cls) => `<span class="nw-chip ${cls}"><span class="nwc-k">${label}</span><span class="nwc-v">${fmt(val)}</span></span>`;
+  // compact one-line breakdown caption under the chart (graph is the star now)
+  const seg = (ico, val, cls) => `<span class="nw-seg ${cls}">${ico} ${fmt(val)}</span>`;
   document.getElementById('nwBreakdown').innerHTML =
-    chip('💵 CASH', nw.cash, nw.cash >= 0 ? 'pos' : 'neg') +
-    chip('🌾 ASSETS', nw.assets, 'pos') +
-    chip('🐉 DEBTS', nw.debts, nw.debts > 0 ? 'neg' : '');
+    seg('💵', nw.cash, nw.cash >= 0 ? 'pos' : 'neg') +
+    seg('🌾', nw.assets, 'pos') +
+    seg('🐉', nw.debts, nw.debts > 0 ? 'neg' : '');
   const hist = state.nwHistory || [];
-  drawNetWorthSpark(hist);
+  const spark = document.getElementById('nwSpark');
   const foot = document.getElementById('nwFoot');
   if (hist.length >= 2) {
-    const first = hist[0].v, latest = hist[hist.length - 1].v;
-    const delta = latest - first;
-    const days = Math.max(1, Math.round((hist[hist.length - 1].t - hist[0].t) / 86400000));
-    foot.innerHTML = `${delta >= 0 ? '▲' : '▼'} <b class="${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : '−'}${fmt(Math.abs(delta))}</b> since you started tracking (${days} day${days > 1 ? 's' : ''}).`;
+    if (spark) spark.hidden = false;
+    drawNetWorthSpark(hist);
+    foot.hidden = true;            // trend insight now lives in the Oracle
   } else {
-    foot.textContent = '📈 Tracking started — your net-worth trend builds as you keep logging.';
+    if (spark) spark.hidden = true;   // nothing to chart yet — don't leave an empty box
+    foot.hidden = false;
+    foot.textContent = '📈 Tracking started — graph builds as you log.';
   }
 }
 
