@@ -957,15 +957,13 @@ h1 {
 .jar-add { flex: 1 1 100%; display: flex; align-items: center; justify-content: center; background: var(--gold); color: #12122c; border: none; border-radius: 6px; padding: 9px 14px; font-family: inherit; font-size: 9px; letter-spacing: .5px; cursor: pointer; box-shadow: 0 3px 0 #b8860b; }
 .jar-add:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8860b; }
 /* 🥚 NEST EGGS — collapsible dropdown inside the Savings Quest */
-/* Sinking Funds — toggle + body read as one connected, organized card */
-.nest-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 14px; padding: 11px 12px; border: 2px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(0,0,0,.22); cursor: pointer; font-family: inherit; transition: background .15s ease, border-color .15s ease; }
-.nest-toggle:hover { border-color: var(--gold); background: rgba(255,210,63,.06); }
-.nest-toggle.open { border-bottom-color: transparent; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+/* Sinking Funds — same flush dropdown style as the Net Worth toggle */
+.nest-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 14px; padding: 10px 0 0; border: none; border-top: 2px solid rgba(255,255,255,.12); background: none; cursor: pointer; font-family: inherit; }
 .nest-toggle .nest-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); }
 .nest-toggle .nest-total { flex: 1 1 auto; text-align: right; font-size: 8px; color: var(--gold); opacity: .85; }
 .nest-toggle .nest-chevron { font-size: 9px; color: var(--gold); transition: transform .2s ease; flex: 0 0 auto; }
 .nest-toggle.open .nest-chevron { transform: rotate(180deg); }
-.nest-body { padding: 12px; border: 2px solid rgba(255,255,255,.14); border-top: none; border-radius: 0 0 8px 8px; background: rgba(0,0,0,.12); }
+.nest-body { margin-top: 11px; }
 .nest-body[hidden] { display: none; }
 
 /* 📊 NET WORTH — graph-dominated; everything else is a small caption */
