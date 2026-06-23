@@ -2589,9 +2589,9 @@ body[data-theme="midas"] {
 }
 
 /* =========================== POWER TOOLS (import / scan / afford) =========================== */
-/* ⚡ quick add — a solid beveled rectangle, like the other pixel pills */
-.quick-add { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; padding: 0 6px 0 11px; background: var(--bg-2); border: 3px solid var(--shadow); box-shadow: inset 2px 2px 0 rgba(255,255,255,.12), inset -3px -3px 0 rgba(0,0,0,.4); }
-.quick-add:focus-within { box-shadow: inset 2px 2px 0 rgba(255,210,63,.3), inset -3px -3px 0 var(--gold-dk); }
+/* ⚡ quick add — clean solid rectangle (no top-left highlight bar) */
+.quick-add { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; padding: 0 6px 0 11px; background: var(--bg-2); border: 3px solid var(--shadow); box-shadow: inset -3px -3px 0 rgba(0,0,0,.4); }
+.quick-add:focus-within { border-color: var(--gold); box-shadow: inset -3px -3px 0 var(--gold-dk); }
 .quick-add input { flex: 1 1 auto; min-width: 0; padding: 11px 4px; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 9px; }
 .qa-go { flex: 0 0 auto; align-self: stretch; min-width: 38px; margin: 4px 0; display: flex; align-items: center; justify-content: center; background: var(--gold); color: #06250f; border: 3px solid var(--shadow); font-family: inherit; font-size: 11px; cursor: pointer; box-shadow: inset 2px 2px 0 rgba(255,255,255,.5), inset -3px -3px 0 var(--gold-dk); }
 .qa-go:hover { filter: brightness(1.08); }
