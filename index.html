@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=150" />
+  <link rel="stylesheet" href="styles.css?v=151" />
 </head>
 
 <body>
@@ -140,6 +140,21 @@
       <!-- ===== LEFT: ADD QUEST (transaction) ===== -->
       <section class="panel form-panel">
         <h2 class="panel-title">+ NEW ENTRY</h2>
+
+        <!-- ⚡ QUICK ADD — type shorthand like "kopi 25k" or "gaji 8jt salary" -->
+        <form class="quick-add" id="quickAddForm" autocomplete="off">
+          <span class="qa-spark">⚡</span>
+          <input type="text" id="quickAddInput" maxlength="60" placeholder='QUICK ADD — e.g. "kopi 25k"' aria-label="Quick add entry" />
+          <button type="submit" class="qa-go" id="quickAddGo" title="Add">⮞</button>
+        </form>
+        <div class="qa-preview" id="qaPreview" hidden></div>
+
+        <!-- power tools: import a statement, scan a receipt, or stress-test a purchase -->
+        <div class="entry-tools" role="group" aria-label="Entry tools">
+          <button type="button" class="entry-tool" id="openImport">📥 IMPORT</button>
+          <button type="button" class="entry-tool" id="openScan">📷 SCAN</button>
+          <button type="button" class="entry-tool" id="openAfford">🔮 AFFORD?</button>
+        </div>
 
         <div class="type-toggle" role="group" aria-label="Entry type">
           <button type="button" class="toggle-btn active" data-type="expense" id="btnExpense">▼ SPEND</button>
@@ -500,6 +515,103 @@
   <!-- print-only report (filled in by exportPDF) -->
   <div class="print-report" id="printReport" aria-hidden="true"></div>
 
+  <!-- ===== CSV / STATEMENT IMPORT overlay ===== -->
+  <div class="tool-overlay" id="importOverlay" hidden>
+    <div class="tool-card import-card">
+      <button type="button" class="tool-close" id="importClose">✕</button>
+      <div class="tool-title">📥 IMPORT STATEMENT</div>
+      <p class="tool-sub">Paste a bank / e-wallet CSV, or choose a file. Everything stays on this device.</p>
+
+      <div class="import-input" id="importInput">
+        <textarea id="importText" rows="5" placeholder="Paste CSV rows here…  (date, amount, description)"></textarea>
+        <div class="import-actions">
+          <label class="tool-btn file-btn">📂 CHOOSE FILE<input type="file" id="importFile" accept=".csv,.txt,text/csv,text/plain" hidden /></label>
+          <button type="button" class="tool-btn primary" id="importDetect">DETECT &amp; PREVIEW ⮞</button>
+        </div>
+        <div class="import-hint" id="importHint" hidden></div>
+      </div>
+
+      <div class="import-map" id="importMap" hidden>
+        <div class="map-row">
+          <label>DATE<div class="select-wrap"><select id="mapDate"></select></div></label>
+          <label>DESCRIPTION<div class="select-wrap"><select id="mapDesc"></select></div></label>
+        </div>
+        <div class="map-row">
+          <label>AMOUNT<div class="select-wrap"><select id="mapAmt"></select></div></label>
+          <label>SIGN<div class="select-wrap"><select id="mapSign">
+            <option value="auto">Auto (− = spend)</option>
+            <option value="spend">All spending</option>
+            <option value="earn">All income</option>
+          </select></div></label>
+        </div>
+        <div class="import-summary" id="importSummary"></div>
+        <div class="import-preview" id="importPreview"></div>
+        <button type="button" class="tool-btn primary wide" id="importCommit">IMPORT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RECEIPT SCAN (on-device OCR) overlay ===== -->
+  <div class="tool-overlay" id="scanOverlay" hidden>
+    <div class="tool-card scan-card">
+      <button type="button" class="tool-close" id="scanClose">✕</button>
+      <div class="tool-title">📷 SCAN RECEIPT</div>
+      <p class="tool-sub">Reads the total &amp; date from a photo — fully on-device, nothing uploaded.</p>
+
+      <label class="scan-drop" id="scanDrop">
+        <span class="scan-drop-ico">🧾</span>
+        <span class="scan-drop-txt">TAKE PHOTO · UPLOAD IMAGE</span>
+        <input type="file" id="scanFile" accept="image/*" capture="environment" hidden />
+      </label>
+
+      <div class="scan-stage" id="scanStage" hidden>
+        <img id="scanThumb" class="scan-thumb" alt="receipt preview" />
+        <div class="scan-status" id="scanStatus">Reading…</div>
+        <div class="scan-prog"><span class="scan-prog-fill" id="scanProgFill"></span></div>
+      </div>
+
+      <div class="scan-result" id="scanResult" hidden>
+        <label class="field"><span class="field-label">AMOUNT</span>
+          <div class="amount-wrap"><span class="dollar" id="scanCcy">Rp</span><input type="number" id="scanAmt" min="0.01" step="0.01" placeholder="0.00" /></div>
+        </label>
+        <label class="field"><span class="field-label">DESCRIPTION</span>
+          <input type="text" id="scanDesc" maxlength="28" placeholder="MERCHANT" />
+        </label>
+        <div class="map-row">
+          <label>CATEGORY<div class="select-wrap"><select id="scanCat"></select></div></label>
+          <label>DATE<div class="select-wrap"><input type="date" id="scanDate" class="scan-date" /></div></label>
+        </div>
+        <div class="scan-raw-wrap"><button type="button" class="scan-raw-toggle" id="scanRawToggle">show raw text ▾</button><pre class="scan-raw" id="scanRaw" hidden></pre></div>
+        <button type="button" class="tool-btn primary wide" id="scanCommit">＋ ADD ENTRY</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== "CAN I AFFORD THIS?" simulator overlay ===== -->
+  <div class="tool-overlay" id="affordOverlay" hidden>
+    <div class="tool-card afford-card">
+      <button type="button" class="tool-close" id="affordClose">✕</button>
+      <div class="tool-title">🔮 CAN I AFFORD THIS?</div>
+      <p class="tool-sub">Stress-test a purchase against your real run-rate.</p>
+
+      <label class="field"><span class="field-label">PURCHASE</span>
+        <div class="amount-wrap"><span class="dollar" id="affordCcy">Rp</span><input type="number" id="affordAmt" min="0.01" step="0.01" placeholder="0.00" /></div>
+      </label>
+      <input type="text" id="affordName" class="afford-name" maxlength="24" placeholder="WHAT IS IT? (optional)" />
+      <div class="afford-mode" role="group" aria-label="Purchase type">
+        <button type="button" class="afford-mode-btn active" data-mode="once">ONE-TIME</button>
+        <button type="button" class="afford-mode-btn" data-mode="monthly">REPEATS MONTHLY</button>
+      </div>
+
+      <div class="afford-result" id="affordResult" hidden>
+        <canvas class="afford-spark" id="affordSpark" width="600" height="120"></canvas>
+        <div class="afford-rows" id="affordRows"></div>
+        <div class="afford-verdict" id="affordVerdict"></div>
+      </div>
+      <p class="afford-empty" id="affordEmpty">Enter an amount to see the impact.</p>
+    </div>
+  </div>
+
   <!-- custom date picker overlay -->
   <div class="cal-overlay" id="calOverlay" hidden>
     <div class="cal-card">
@@ -687,7 +799,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=154"></script>
+  <script src="app.js?v=155"></script>
 </body>
 
 </html>

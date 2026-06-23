@@ -96,6 +96,102 @@ function learnCategory(desc, type, cat) {
   state.catMemory[type][key] = cat;
 }
 
+/* ============================================================
+   AMOUNT PARSING — turn human money strings into numbers.
+   Handles k/rb/ribu (×1e3), jt/juta/m (×1e6), thousand
+   separators (. or ,) and a decimal part. Bilingual EN/ID.
+============================================================ */
+function parseMoney(raw) {
+  if (raw == null) return NaN;
+  let s = String(raw).toLowerCase().replace(/\s/g, '').replace(/rp|idr|usd|\$|€|£/g, '');
+  if (!s) return NaN;
+  let mult = 1, mm;
+  if ((mm = s.match(/(juta|jt|m)$/))) { mult = 1e6; s = s.slice(0, -mm[1].length); }
+  else if ((mm = s.match(/(ribu|rb|k)$/))) { mult = 1e3; s = s.slice(0, -mm[1].length); }
+  if (!/\d/.test(s)) return NaN;
+  if (mult !== 1) {
+    // small decimal like 1,5 / 1.5 / 8 — comma or dot is the decimal point
+    s = s.replace(',', '.');
+    const parts = s.split('.');
+    if (parts.length > 2) s = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+    const n = parseFloat(s);
+    return isFinite(n) ? n * mult : NaN;
+  }
+  // no multiplier: decide whether the last separator is a decimal point or a grouping mark
+  const lastSep = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
+  if (lastSep >= 0) {
+    const sepChar = s[lastSep];
+    const decimals = s.length - lastSep - 1;
+    const occ = s.split(sepChar).length - 1;
+    if (decimals >= 1 && decimals <= 2 && occ === 1) {
+      const n = parseFloat(s.slice(0, lastSep).replace(/[.,]/g, '') + '.' + s.slice(lastSep + 1));
+      return isFinite(n) ? n : NaN;
+    }
+  }
+  const n = parseFloat(s.replace(/[.,]/g, ''));
+  return isFinite(n) ? n : NaN;
+}
+
+/* parse a quick-add shorthand ("kopi 25k", "+gaji 8jt salary", "-bensin 150rb")
+   into { type, amount, desc, category }, or null when no amount is found. */
+function parseQuickAdd(input) {
+  const raw = (input || '').trim();
+  if (!raw) return null;
+  let type = null, body = raw;
+  if (/^\+/.test(body)) { type = 'income'; body = body.slice(1).trim(); }
+  else if (/^-/.test(body)) { type = 'expense'; body = body.slice(1).trim(); }
+  const tokens = body.split(/\s+/);
+  let amount = NaN, amtIdx = -1;
+  for (let i = 0; i < tokens.length; i++) {
+    if (/\d/.test(tokens[i])) {
+      const v = parseMoney(tokens[i]);
+      if (isFinite(v) && v > 0) { amount = v; amtIdx = i; break; }
+    }
+  }
+  if (!(amount > 0)) return null;
+  let desc = tokens.filter((_, i) => i !== amtIdx).join(' ').trim();
+  if (!type) {
+    const inHit = guessCategory(desc, 'income');
+    const exHit = guessCategory(desc, 'expense');
+    type = (inHit && !exHit) ? 'income' : 'expense';
+  }
+  const category = guessCategory(desc, type) || 'other';
+  if (!desc) desc = catInfo(type, category).name;
+  return { type, amount, desc: desc.slice(0, 28), category };
+}
+
+// build a transaction object (shared by quick-add, import & receipt scan)
+function makeTx(o) {
+  return {
+    id: newId(), date: o.date || Date.now(), type: o.type,
+    desc: (o.desc || '').slice(0, 28), amount: o.amount,
+    category: o.category || 'other', owner: o.owner || activePlayer(),
+  };
+}
+
+/* lightweight date parser for imports/receipts. Accepts YYYY-MM-DD, DD/MM/YYYY,
+   DD-MM-YYYY, D.M.YY, etc. Indonesian day-first when ambiguous. → ms ts (local
+   noon) or NaN. */
+function parseDateLoose(str) {
+  if (!str) return NaN;
+  const s = String(str).trim();
+  let m;
+  if ((m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/))) {
+    return new Date(+m[1], +m[2] - 1, +m[3], 12).getTime();
+  }
+  if ((m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/))) {
+    let a = +m[1], b = +m[2], y = +m[3];
+    if (y < 100) y += 2000;
+    // day-first unless the first field can't be a day but the second can
+    let day = a, mon = b;
+    if (a > 12 && b <= 12) { day = a; mon = b; }
+    else if (b > 12 && a <= 12) { day = b; mon = a; }
+    return new Date(y, mon - 1, day, 12).getTime();
+  }
+  const t = Date.parse(s);
+  return isNaN(t) ? NaN : t;
+}
+
 /* ---------------- state ---------------- */
 let state = {
   transactions: [],
@@ -1265,6 +1361,459 @@ function renderJars() {
       showToast('↩ -' + fmt(amt) + ' from ' + j.name);
     }
   });
+})();
+
+/* ============================================================
+   ⚡ QUICK ADD — parse shorthand and log in one tap, with a live
+   preview of how it'll be understood.
+============================================================ */
+(function quickAdd() {
+  const form = document.getElementById('quickAddForm');
+  const input = document.getElementById('quickAddInput');
+  const preview = document.getElementById('qaPreview');
+  if (!form || !input) return;
+  const arrow = (t) => t === 'income' ? '▲' : '▼';
+  input.addEventListener('input', () => {
+    const p = parseQuickAdd(input.value);
+    if (!p || !input.value.trim()) { preview.hidden = true; return; }
+    const ci = catInfo(p.type, p.category);
+    preview.hidden = false;
+    preview.innerHTML = `${arrow(p.type)} <b>${fmt(p.amount)}</b> · ${ci.icon} ${escapeHtml(ci.name)} — ${escapeHtml(p.desc)}`;
+  });
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const p = parseQuickAdd(input.value);
+    if (!p) { sfx.error(); shake(form); return; }
+    state.transactions.push(makeTx(p));
+    learnCategory(p.desc, p.type, p.category);
+    save();
+    p.type === 'income' ? sfx.coin() : sfx.spend();
+    renderAll();
+    if (p.type === 'income') flyCoinsTo(els.balanceCard); else hitBoss(p.amount);
+    showToast(`${arrow(p.type)} ${fmt(p.amount)} · ${escapeHtml(p.desc)}`);
+    input.value = ''; preview.hidden = true; input.focus();
+  });
+})();
+
+/* ============================================================
+   CSV PARSING — delimiter sniff + quote-aware splitter, then a
+   column classifier (date / description / amount, or debit+credit
+   merged into a synthetic NET column). Bilingual EN/ID headers.
+============================================================ */
+function detectDelimiter(text) {
+  const line = (text.split(/\r?\n/).find((l) => l.trim()) || '');
+  const counts = { ',': (line.match(/,/g) || []).length, ';': (line.match(/;/g) || []).length, '\t': (line.match(/\t/g) || []).length };
+  let best = ',', n = -1;
+  for (const d in counts) if (counts[d] > n) { n = counts[d]; best = d; }
+  return n > 0 ? best : ',';
+}
+function parseCSV(text) {
+  const delim = detectDelimiter(text);
+  const s = String(text).replace(/\r\n?/g, '\n');
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += c;
+    } else if (c === '"') q = true;
+    else if (c === delim) { row.push(field); field = ''; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.map((r) => r.map((c) => c.trim())).filter((r) => r.some((c) => c !== ''));
+}
+function isDateCell(v) { return /\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(v) && !isNaN(parseDateLoose(v)); }
+// returns { headers, rows, dateIdx, descIdx, amtIdx, signMode } or null
+function classifyColumns(raw) {
+  if (!raw.length) return null;
+  const head = raw[0].map((h) => h.toLowerCase());
+  const hasLabels = head.some((h) => /date|tanggal|tgl|waktu|amount|jumlah|nominal|debit|debet|kredit|credit|desc|keterangan|uraian|mutasi|saldo|balance|narasi|memo|transaksi|detail/.test(h));
+  const dataStart = hasLabels ? 1 : 0;
+  const data = raw.slice(dataStart);
+  if (!data.length) return null;
+  const ncol = Math.max.apply(null, raw.map((r) => r.length));
+  const headers = [];
+  const stat = [];
+  for (let c = 0; c < ncol; c++) {
+    let dates = 0, nums = 0, len = 0, cells = 0;
+    for (const r of data) {
+      const v = (r[c] || '').trim(); if (!v) continue; cells++;
+      if (isDateCell(v)) dates++;
+      if (isFinite(parseMoney(v))) nums++;
+      len += v.length;
+    }
+    stat.push({ c, dateF: cells ? dates / cells : 0, numF: cells ? nums / cells : 0, avgLen: cells ? len / cells : 0, cells });
+    headers.push(hasLabels ? (raw[0][c] || ('COL ' + (c + 1))) : ('COL ' + (c + 1)));
+  }
+  const hname = (c) => hasLabels ? head[c] || '' : '';
+  // date: header match first, else highest date fraction
+  let dateIdx = stat.findIndex((s) => /date|tanggal|tgl|waktu/.test(hname(s.c)));
+  if (dateIdx < 0) { const d = stat.filter((s) => s.dateF > 0.5).sort((a, b) => b.dateF - a.dateF)[0]; dateIdx = d ? d.c : -1; }
+  // debit / credit columns
+  const debIdx = stat.findIndex((s) => /debit|debet|keluar|pengeluaran|withdraw/.test(hname(s.c)));
+  const creIdx = stat.findIndex((s) => /kredit|credit|masuk|pemasukan|deposit/.test(hname(s.c)));
+  let amtIdx = -1, signMode = 'auto';
+  let rows = data;
+  if (debIdx >= 0 && creIdx >= 0) {
+    // synthesize a NET column = credit − debit (pad short rows so it lands at ncol)
+    rows = data.map((r) => {
+      const rr = r.slice(); rr.length = ncol;
+      const out = parseMoney(r[debIdx]) || 0, inc = parseMoney(r[creIdx]) || 0;
+      rr[ncol] = String(inc - out);
+      return rr;
+    });
+    headers.push('⟐ NET (CR−DB)');
+    amtIdx = ncol; signMode = 'auto';
+  } else {
+    // single amount column — prefer header, skip running-balance columns
+    let cand = stat.filter((s) => s.c !== dateIdx && s.numF > 0.6 && !/saldo|balance/.test(hname(s.c)));
+    const named = cand.find((s) => /amount|jumlah|nominal|mutasi|nilai|value|harga|total/.test(hname(s.c)));
+    const pick = named || cand.sort((a, b) => b.numF - a.numF)[0];
+    amtIdx = pick ? pick.c : -1;
+    // any negatives → signed; otherwise treat the column as spending by default
+    let neg = false;
+    if (amtIdx >= 0) for (const r of rows) { const v = parseMoney(r[amtIdx]); if (isFinite(v) && v < 0) { neg = true; break; } }
+    signMode = neg ? 'auto' : 'spend';
+  }
+  // description: header match, else longest text column that isn't date/amount
+  let descIdx = stat.findIndex((s) => /desc|keterangan|uraian|narasi|memo|note|transaksi|detail|description|berita/.test(hname(s.c)));
+  if (descIdx < 0) {
+    const t = stat.filter((s) => s.c !== dateIdx && s.c !== amtIdx && s.numF < 0.5).sort((a, b) => b.avgLen - a.avgLen)[0];
+    descIdx = t ? t.c : -1;
+  }
+  return { headers, rows, dateIdx, descIdx, amtIdx, signMode };
+}
+
+/* ============================================================
+   📥 IMPORT — paste/upload, auto-map, dedupe, preview, commit.
+============================================================ */
+(function importTool() {
+  const ov = document.getElementById('importOverlay');
+  if (!ov) return;
+  const elText = document.getElementById('importText');
+  const elFile = document.getElementById('importFile');
+  const elDetect = document.getElementById('importDetect');
+  const elHint = document.getElementById('importHint');
+  const elMap = document.getElementById('importMap');
+  const mapDate = document.getElementById('mapDate'), mapDesc = document.getElementById('mapDesc'),
+    mapAmt = document.getElementById('mapAmt'), mapSign = document.getElementById('mapSign');
+  const elSummary = document.getElementById('importSummary');
+  const elPreview = document.getElementById('importPreview');
+  const elCommit = document.getElementById('importCommit');
+  let model = null;     // { headers, rows, ... }
+  let built = [];       // candidate {tx, dup, valid}
+
+  function open() { ov.hidden = false; }
+  function close() { ov.hidden = true; }
+  document.getElementById('openImport').addEventListener('click', open);
+  document.getElementById('importClose').addEventListener('click', close);
+
+  function hint(msg, kind) { elHint.hidden = false; elHint.className = 'import-hint ' + (kind || ''); elHint.textContent = msg; }
+  function fillSel(sel, headers, chosen) {
+    sel.innerHTML = headers.map((h, i) => `<option value="${i}">${escapeHtml(h)}</option>`).join('') + '<option value="-1">— none —</option>';
+    sel.value = String(chosen);
+  }
+  function existingKeys() {
+    const set = new Set();
+    (state.transactions || []).forEach((t) => set.add(dedupKey(t.type, t.amount, txDate(t), t.desc)));
+    return set;
+  }
+  function dedupKey(type, amount, ts, desc) {
+    return type + '|' + Math.round(amount) + '|' + tsToYmd(ts) + '|' + String(desc || '').toLowerCase().slice(0, 16);
+  }
+  function build() {
+    const di = +mapDate.value, ci = +mapDesc.value, ai = +mapAmt.value, sign = mapSign.value;
+    const keys = existingKeys();
+    const seen = new Set();
+    built = model.rows.map((r) => {
+      const amtRaw = parseMoney(r[ai]);
+      const desc = ci >= 0 ? (r[ci] || '') : '';
+      const ts = di >= 0 ? parseDateLoose(r[di]) : Date.now();
+      let type, amount;
+      if (sign === 'spend') { type = 'expense'; amount = Math.abs(amtRaw); }
+      else if (sign === 'earn') { type = 'income'; amount = Math.abs(amtRaw); }
+      else { type = amtRaw < 0 ? 'expense' : 'income'; amount = Math.abs(amtRaw); }
+      const valid = isFinite(amount) && amount > 0;
+      const date = isFinite(ts) ? ts : Date.now();
+      const category = guessCategory(desc, type) || 'other';
+      const key = dedupKey(type, amount, date, desc);
+      const dup = !valid ? false : (keys.has(key) || seen.has(key));
+      if (valid && !dup) seen.add(key);
+      return { type, amount, desc, date, category, valid, dup };
+    });
+    render();
+  }
+  function render() {
+    const ok = built.filter((b) => b.valid && !b.dup).length;
+    const dups = built.filter((b) => b.valid && b.dup).length;
+    const bad = built.filter((b) => !b.valid).length;
+    elSummary.textContent = `${ok} new · ${dups} duplicate${dups !== 1 ? 's' : ''}` + (bad ? ` · ${bad} skipped` : '');
+    elPreview.innerHTML = built.slice(0, 80).map((b) => {
+      const ci = catInfo(b.type, b.category);
+      const flag = !b.valid ? '<span class="imp-flag" title="invalid">⚠</span>' : b.dup ? '<span class="imp-flag" title="duplicate">⊘</span>' : '<span class="imp-flag" title="new">✓</span>';
+      const d = isFinite(b.date) ? new Date(b.date) : null;
+      const ds = d ? (d.getMonth() + 1) + '/' + d.getDate() : '—';
+      return `<div class="imp-row${b.dup || !b.valid ? ' dup' : ''}">
+        <span class="imp-date">${ds}</span>
+        <span class="imp-cat">${ci.icon}</span>
+        <span class="imp-desc">${escapeHtml(b.desc || '—')}</span>
+        <span class="imp-amt ${b.type === 'income' ? 'in' : 'out'}">${b.type === 'income' ? '+' : '−'}${fmt(b.amount)}</span>
+        ${flag}</div>`;
+    }).join('');
+    elCommit.textContent = ok ? `IMPORT ${ok} ENTR${ok > 1 ? 'IES' : 'Y'}` : 'NOTHING TO IMPORT';
+    elCommit.disabled = !ok;
+  }
+  function detect() {
+    const text = elText.value.trim();
+    if (!text) { hint('Paste some CSV rows or choose a file first.', 'err'); elMap.hidden = true; return; }
+    const raw = parseCSV(text);
+    model = classifyColumns(raw);
+    if (!model || model.amtIdx < 0) { hint("Couldn't find an amount column. Check the data and try again.", 'err'); elMap.hidden = true; return; }
+    elHint.hidden = true;
+    fillSel(mapDate, model.headers, model.dateIdx);
+    fillSel(mapDesc, model.headers, model.descIdx);
+    fillSel(mapAmt, model.headers, model.amtIdx);
+    mapSign.value = model.signMode;
+    elMap.hidden = false;
+    build();
+  }
+  elDetect.addEventListener('click', detect);
+  [mapDate, mapDesc, mapAmt, mapSign].forEach((s) => s.addEventListener('change', () => { if (model) build(); }));
+  elFile.addEventListener('change', () => {
+    const f = elFile.files && elFile.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { elText.value = String(rd.result || ''); detect(); };
+    rd.readAsText(f);
+  });
+  elCommit.addEventListener('click', () => {
+    const add = built.filter((b) => b.valid && !b.dup);
+    if (!add.length) { sfx.error(); return; }
+    add.forEach((b) => { state.transactions.push(makeTx(b)); learnCategory(b.desc, b.type, b.category); });
+    save(); sfx.coin(); renderAll();
+    showToast('📥 IMPORTED ' + add.length + ' ENTR' + (add.length > 1 ? 'IES' : 'Y'));
+    close();
+    elText.value = ''; elMap.hidden = true; model = null; built = [];
+  });
+})();
+
+/* ============================================================
+   📷 RECEIPT SCAN — lazy-loaded on-device OCR (Tesseract WASM via
+   CDN). Pulls total + date; you confirm before it's logged.
+============================================================ */
+(function scanTool() {
+  const ov = document.getElementById('scanOverlay');
+  if (!ov) return;
+  const drop = document.getElementById('scanDrop'), file = document.getElementById('scanFile');
+  const stage = document.getElementById('scanStage'), thumb = document.getElementById('scanThumb');
+  const status = document.getElementById('scanStatus'), prog = document.getElementById('scanProgFill');
+  const result = document.getElementById('scanResult');
+  const elAmt = document.getElementById('scanAmt'), elDesc = document.getElementById('scanDesc'),
+    elCat = document.getElementById('scanCat'), elDate = document.getElementById('scanDate'),
+    elRaw = document.getElementById('scanRaw'), elRawToggle = document.getElementById('scanRawToggle'),
+    elCcy = document.getElementById('scanCcy');
+  let _tess = null;
+
+  function open() {
+    ov.hidden = false;
+    elCcy.textContent = cur().symbol;
+    elCat.innerHTML = CATEGORIES.expense.map((c) => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+    reset();
+  }
+  function reset() { stage.hidden = true; result.hidden = true; drop.hidden = false; file.value = ''; prog.style.width = '0'; }
+  function close() { ov.hidden = true; }
+  document.getElementById('openScan').addEventListener('click', open);
+  document.getElementById('scanClose').addEventListener('click', close);
+  elRawToggle.addEventListener('click', () => { elRaw.hidden = !elRaw.hidden; elRawToggle.textContent = (elRaw.hidden ? 'show' : 'hide') + ' raw text ' + (elRaw.hidden ? '▾' : '▴'); });
+
+  function loadTesseract() {
+    if (_tess) return _tess;
+    _tess = new Promise((res, rej) => {
+      if (window.Tesseract) return res(window.Tesseract);
+      const sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      sc.onload = () => res(window.Tesseract);
+      sc.onerror = () => rej(new Error('offline'));
+      document.head.appendChild(sc);
+    });
+    return _tess;
+  }
+  function parseReceipt(text) {
+    const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+    const lineAmt = (l) => {
+      const toks = l.match(/\d[\d.,]*/g) || [];
+      let best = NaN;
+      toks.forEach((t) => { const v = parseMoney(t); if (isFinite(v) && (!(best > 0) || v > best)) best = v; });
+      return best;
+    };
+    // total: prefer lines mentioning total/grand total/jumlah, biggest amount among them
+    let total = NaN;
+    const totalLines = lines.filter((l) => /total|grand\s*total|jumlah|total\s*bayar|amount\s*due|tagihan|net\s*total|grand/i.test(l));
+    totalLines.forEach((l) => { const v = lineAmt(l); if (isFinite(v) && (!(total > 0) || v > total)) total = v; });
+    if (!(total > 0)) { lines.forEach((l) => { const v = lineAmt(l); if (isFinite(v) && (!(total > 0) || v > total)) total = v; }); }
+    // date: first date-looking token in the text
+    let date = NaN;
+    const dm = text.match(/\d{1,4}[-/.]\d{1,2}[-/.]\d{2,4}/);
+    if (dm) date = parseDateLoose(dm[0]);
+    const merchant = (lines[0] || '').replace(/[^a-z0-9 &.-]/gi, '').trim().slice(0, 28);
+    return { total, date, merchant, raw: text };
+  }
+  function showResult(r) {
+    stage.hidden = true; result.hidden = false;
+    elAmt.value = r.total > 0 ? Math.round(r.total) : '';
+    elDesc.value = r.merchant || '';
+    elDate.value = isFinite(r.date) ? tsToYmd(r.date) : tsToYmd(Date.now());
+    const g = guessCategory(r.merchant, 'expense') || 'shop';
+    elCat.value = CATEGORIES.expense.some((c) => c.id === g) ? g : 'shop';
+    elRaw.textContent = r.raw || '(no text recognised)';
+  }
+  async function run(f) {
+    drop.hidden = true; stage.hidden = false; result.hidden = true;
+    thumb.src = URL.createObjectURL(f);
+    status.textContent = 'Loading reader…'; prog.style.width = '8%';
+    let T;
+    try { T = await loadTesseract(); }
+    catch (e) { status.textContent = 'Reader needs a connection — enter it manually.'; showResult({ total: NaN, date: NaN, merchant: '', raw: '' }); return; }
+    status.textContent = 'Reading…';
+    try {
+      const { data } = await T.recognize(f, 'eng', { logger: (m) => { if (m.status === 'recognizing text') prog.style.width = Math.round(8 + m.progress * 92) + '%'; } });
+      prog.style.width = '100%';
+      showResult(parseReceipt(data.text || ''));
+    } catch (e) {
+      status.textContent = 'Could not read that image — enter it manually.';
+      showResult({ total: NaN, date: NaN, merchant: '', raw: '' });
+    }
+  }
+  file.addEventListener('change', () => { const f = file.files && file.files[0]; if (f) run(f); });
+  document.getElementById('scanCommit').addEventListener('click', () => {
+    const amount = parseFloat(elAmt.value);
+    const desc = elDesc.value.trim() || 'RECEIPT';
+    if (!(amount > 0)) { sfx.error(); shake(result); return; }
+    const date = ymdToTs(elDate.value);
+    state.transactions.push(makeTx({ type: 'expense', desc, amount, category: elCat.value, date }));
+    learnCategory(desc, 'expense', elCat.value);
+    save(); sfx.spend(); renderAll(); hitBoss(amount);
+    showToast('🧾 ' + fmt(amount) + ' · ' + escapeHtml(desc));
+    close();
+  });
+})();
+
+/* ============================================================
+   FORECAST PRIMITIVES — shared run-rate math (used by the Oracle
+   and the affordability simulator).
+============================================================ */
+function runRatePerDay() {
+  const txs = state.transactions || [];
+  if (!txs.length) return 0;
+  const now = Date.now(), day = 86400000;
+  const earliest = Math.min.apply(null, txs.map(txDate));
+  const span = Math.max(1, (now - earliest) / day);
+  const w = Math.min(90, Math.max(7, Math.round(span)));
+  const since = now - w * day;
+  let net = 0;
+  txs.forEach((t) => { if (txDate(t) >= since) net += (t.type === 'income' ? t.amount : -t.amount); });
+  return net / w;
+}
+function dryFromPace(balance, perDay) {
+  if (perDay >= 0 || balance <= 0) return null;
+  const d = balance / -perDay;
+  return d <= 3650 ? new Date(Date.now() + d * 86400000) : null;
+}
+function etaFromPace(balance, perDay, target) {
+  if (perDay <= 0 || balance >= target) return null;
+  const d = (target - balance) / perDay;
+  return d <= 3650 ? new Date(Date.now() + d * 86400000) : null;
+}
+
+/* ============================================================
+   🔮 CAN I AFFORD THIS? — stress-test a purchase against your
+   real run-rate: 30-day balance, run-dry date, savings-goal ETA.
+============================================================ */
+(function affordTool() {
+  const ov = document.getElementById('affordOverlay');
+  if (!ov) return;
+  const elAmt = document.getElementById('affordAmt'), elName = document.getElementById('affordName');
+  const elCcy = document.getElementById('affordCcy');
+  const elResult = document.getElementById('affordResult'), elEmpty = document.getElementById('affordEmpty');
+  const elRows = document.getElementById('affordRows'), elVerdict = document.getElementById('affordVerdict');
+  const cv = document.getElementById('affordSpark');
+  const modeBtns = ov.querySelectorAll('.afford-mode-btn');
+  let mode = 'once';
+
+  function open() { ov.hidden = false; elCcy.textContent = cur().symbol; compute(); elAmt.focus(); }
+  function close() { ov.hidden = true; }
+  document.getElementById('openAfford').addEventListener('click', open);
+  document.getElementById('affordClose').addEventListener('click', close);
+  modeBtns.forEach((b) => b.addEventListener('click', () => {
+    modeBtns.forEach((x) => x.classList.remove('active')); b.classList.add('active'); mode = b.dataset.mode; compute();
+  }));
+  elAmt.addEventListener('input', compute);
+
+  function drawSpark(before, after) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 300, h = cv.clientHeight || 120;
+    cv.width = w * dpr; cv.height = h * dpr;
+    const x = cv.getContext('2d'); x.scale(dpr, dpr);
+    x.clearRect(0, 0, w, h);
+    const all = before.concat(after);
+    let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    if (lo === hi) { hi = lo + 1; }
+    lo = Math.min(lo, 0); // always show the zero line if balance dips negative
+    const pad = 8;
+    const px = (i, n) => pad + (i / (n - 1)) * (w - pad * 2);
+    const py = (v) => h - pad - ((v - lo) / (hi - lo)) * (h - pad * 2);
+    // zero baseline
+    if (lo < 0) { const zy = py(0); x.strokeStyle = 'rgba(255,255,255,.18)'; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(pad, zy); x.lineTo(w - pad, zy); x.stroke(); x.setLineDash([]); }
+    const line = (arr, color, width) => {
+      x.strokeStyle = color; x.lineWidth = width; x.beginPath();
+      arr.forEach((v, i) => { const X = px(i, arr.length), Y = py(v); i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+      x.stroke();
+    };
+    line(before, 'rgba(255,255,255,.35)', 2);
+    const last = after[after.length - 1];
+    line(after, last >= 0 ? '#5fe6a8' : '#ff6f8c', 3);
+  }
+
+  function compute() {
+    const amt = parseFloat(elAmt.value);
+    if (!(amt > 0)) { elResult.hidden = true; elEmpty.hidden = false; return; }
+    elEmpty.hidden = true; elResult.hidden = false;
+    const bal = totals().balance;
+    const perDay = runRatePerDay();
+    const goal = state.goal && state.goal.target > 0 ? state.goal : null;
+    // before
+    const beforeArr = [], afterArr = [];
+    const perA = mode === 'monthly' ? perDay - amt / 30 : perDay;
+    const balA = mode === 'monthly' ? bal : bal - amt;
+    for (let i = 0; i <= 30; i++) { beforeArr.push(bal + perDay * i); afterArr.push(balA + perA * i); }
+    const proj30 = bal + perDay * 30, proj30A = balA + perA * 30;
+    const dryB = dryFromPace(bal, perDay), dryA = dryFromPace(balA, perA);
+    const etaB = goal ? etaFromPace(bal, perDay, goal.target) : null;
+    const etaA = goal ? etaFromPace(balA, perA, goal.target) : null;
+    drawSpark(beforeArr, afterArr);
+
+    const rows = [];
+    const row = (label, before, after, cls) => rows.push(
+      `<div class="afford-line"><span class="al-label">${label}</span><span class="al-before">${before}</span><span class="al-arrow">→</span><span class="al-after ${cls || ''}">${after}</span></div>`);
+    row('Balance in 30d', fmt(Math.round(proj30)), fmt(Math.round(proj30A)), proj30A < 0 ? 'bad' : proj30A >= proj30 ? 'good' : '');
+    row('Run-dry date', dryB ? dShort(dryB) : 'never', dryA ? dShort(dryA) : 'never', dryA && (!dryB || dryA < dryB) ? 'bad' : 'good');
+    if (goal) row(`"${escapeHtml(state.goal.name)}"`, etaB ? dMonth(etaB) : '—', etaA ? dMonth(etaA) : (perA > 0 ? '—' : 'stalled'), etaA && etaB && etaA > etaB ? 'bad' : 'good');
+    elRows.innerHTML = rows.join('');
+
+    // verdict
+    let vClass = 'good', vText;
+    const name = elName.value.trim() || 'it';
+    if (mode === 'once' && balA < 0) { vClass = 'bad'; vText = `That would overdraw you by ${fmt(Math.abs(balA))}. Not yet.`; }
+    else if (dryA && (!dryB || dryA < dryB)) { vClass = 'bad'; vText = `Doable, but your gold would run dry around ${dShort(dryA)}. Risky.`; }
+    else if (etaA && etaB && etaA > etaB) {
+      const months = Math.max(1, Math.round((etaA - etaB) / (30 * 86400000)));
+      vClass = 'good'; vText = `Affordable — but it pushes "${escapeHtml(state.goal.name)}" back about ${months} month${months > 1 ? 's' : ''}.`;
+    } else if (mode === 'monthly' && perA < 0 && perDay >= 0) { vClass = 'bad'; vText = `Adding ${fmt(amt)}/mo would tip you into spending more than you earn.`; }
+    else { vClass = 'good'; vText = `Comfortable — ${escapeHtml(name)} fits within your run-rate.`; }
+    elVerdict.className = 'afford-verdict ' + vClass;
+    elVerdict.textContent = vText;
+  }
 })();
 
 /* ============================================================
@@ -4551,4 +5100,11 @@ function payoffPlan(debts, budget, strategy) {
     showFloor(btn.dataset.floor);
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !overlay.hidden) close(); });
+})();
+
+/* dismiss the power-tool modals on backdrop tap or Escape */
+(function toolOverlayDismiss() {
+  const ovs = ['importOverlay', 'scanOverlay', 'affordOverlay'].map((id) => document.getElementById(id)).filter(Boolean);
+  ovs.forEach((ov) => ov.addEventListener('click', (e) => { if (e.target === ov) ov.hidden = true; }));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') ovs.forEach((ov) => { ov.hidden = true; }); });
 })();
