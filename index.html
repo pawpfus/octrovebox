@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=151" />
+  <link rel="stylesheet" href="styles.css?v=152" />
 </head>
 
 <body>
@@ -149,8 +149,13 @@
         </form>
         <div class="qa-preview" id="qaPreview" hidden></div>
 
-        <!-- power tools: import a statement, scan a receipt, or stress-test a purchase -->
-        <div class="entry-tools" role="group" aria-label="Entry tools">
+        <!-- power tools — collapsible dropdown like Net Worth / Sinking Funds -->
+        <button type="button" class="tools-toggle" id="toolsToggle" aria-expanded="false" aria-controls="toolsBody">
+          <span class="tools-label">🧰 TOOLS</span>
+          <span class="tools-hint">IMPORT · SCAN · AFFORD</span>
+          <span class="tools-chevron">▾</span>
+        </button>
+        <div class="tools-body" id="toolsBody" role="group" aria-label="Entry tools" hidden>
           <button type="button" class="entry-tool" id="openImport">📥 IMPORT</button>
           <button type="button" class="entry-tool" id="openScan">📷 SCAN</button>
           <button type="button" class="entry-tool" id="openAfford">🔮 AFFORD?</button>
@@ -799,7 +804,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=155"></script>
+  <script src="app.js?v=156"></script>
 </body>
 
 </html>

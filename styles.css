@@ -2588,20 +2588,26 @@ body[data-theme="midas"] {
 }
 
 /* =========================== POWER TOOLS (import / scan / afford) =========================== */
-/* ⚡ quick add bar */
-.quick-add { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; background: rgba(0,0,0,.3); border: 2px solid rgba(255,255,255,.16); border-radius: 7px; padding: 0 6px 0 9px; }
+/* ⚡ quick add — a rounded pill input */
+.quick-add { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; background: rgba(0,0,0,.3); border: 2px solid rgba(255,255,255,.16); border-radius: 22px; padding: 0 6px 0 12px; }
 .quick-add:focus-within { border-color: var(--gold); }
 .qa-spark { font-size: 11px; flex: 0 0 auto; }
-.quick-add input { flex: 1 1 auto; min-width: 0; padding: 9px 4px; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 9px; }
-.qa-go { flex: 0 0 auto; background: var(--gold); color: #12122c; border: none; border-radius: 5px; padding: 6px 11px; font-family: inherit; font-size: 11px; cursor: pointer; box-shadow: 0 3px 0 #b8860b; }
+.quick-add input { flex: 1 1 auto; min-width: 0; padding: 10px 4px; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 9px; }
+.qa-go { flex: 0 0 auto; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: var(--gold); color: #12122c; border: none; border-radius: 50%; font-family: inherit; font-size: 11px; cursor: pointer; box-shadow: 0 3px 0 #b8860b; }
 .qa-go:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8860b; }
-.qa-preview { font-family: 'VT323', monospace; font-size: 14px; line-height: 1.3; color: var(--ink); background: rgba(91,230,168,.08); border-left: 3px solid #5fe6a8; padding: 6px 9px; margin: -3px 0 9px; border-radius: 0 5px 5px 0; }
+.qa-preview { font-family: 'VT323', monospace; font-size: 14px; line-height: 1.3; color: var(--ink); background: rgba(91,230,168,.08); border-left: 3px solid #5fe6a8; padding: 6px 11px; margin: -3px 0 9px; border-radius: 0 5px 5px 0; }
 .qa-preview[hidden] { display: none; }
 .qa-preview b { color: #5fe6a8; }
 
-/* tool launcher row */
-.entry-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
-.entry-tool { background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.14); border-radius: 6px; padding: 8px 4px; font-family: inherit; font-size: 7.5px; letter-spacing: .3px; color: var(--ink); cursor: pointer; transition: border-color .15s, background .15s; }
+/* TOOLS — same flush dropdown style as the Net Worth / Sinking Funds toggles */
+.tools-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 14px; padding: 10px 0 0; border: none; border-top: 2px solid rgba(255,255,255,.12); background: none; cursor: pointer; font-family: inherit; }
+.tools-toggle .tools-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); }
+.tools-toggle .tools-hint { flex: 1 1 auto; text-align: right; font-size: 7px; letter-spacing: .5px; color: var(--gold); opacity: .7; }
+.tools-toggle .tools-chevron { font-size: 9px; color: var(--gold); transition: transform .2s ease; flex: 0 0 auto; }
+.tools-toggle.open .tools-chevron { transform: rotate(180deg); }
+.tools-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 11px 0 14px; }
+.tools-body[hidden] { display: none; }
+.entry-tool { background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.14); border-radius: 6px; padding: 9px 4px; font-family: inherit; font-size: 7.5px; letter-spacing: .3px; color: var(--ink); cursor: pointer; transition: border-color .15s, background .15s; }
 .entry-tool:hover { border-color: var(--gold); background: rgba(255,210,63,.08); color: var(--gold); }
 
 /* shared tool modal shell */

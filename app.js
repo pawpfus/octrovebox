@@ -1393,6 +1393,16 @@ function renderJars() {
     showToast(`${arrow(p.type)} ${fmt(p.amount)} · ${escapeHtml(p.desc)}`);
     input.value = ''; preview.hidden = true; input.focus();
   });
+  // collapsible TOOLS dropdown (mirrors the Net Worth / Sinking Funds toggles)
+  const tt = document.getElementById('toolsToggle');
+  const tb = document.getElementById('toolsBody');
+  if (tt && tb) tt.addEventListener('click', () => {
+    const open = tb.hidden;
+    tb.hidden = !open;
+    tt.setAttribute('aria-expanded', open ? 'true' : 'false');
+    tt.classList.toggle('open', open);
+    if (sfx.click) sfx.click();
+  });
 })();
 
 /* ============================================================
