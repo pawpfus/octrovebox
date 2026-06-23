@@ -1859,6 +1859,32 @@ function recordNetWorth() {
     save();                                  // a brand-new day's point is worth persisting
   }
 }
+// Build the net-worth curve. Daily snapshots (nwHistory) only grow one point
+// per calendar day, so a fresh user never sees a curve no matter how many
+// transactions they log. Reconstruct the trajectory straight from the ledger:
+// cash at each dated transaction = opening + running income − expense, plus the
+// current assets−debts offset (those have no per-day history, so hold constant).
+// This gives a real curve the moment there are ≥2 dated points. Fall back to
+// stored snapshots only when the ledger is too thin to draw.
+function netWorthSeries() {
+  const txs = (state.transactions || []).slice().sort((a, b) => txDate(a) - txDate(b));
+  if (txs.length >= 2) {
+    const nw = netWorth();
+    const offset = nw.assets - nw.debts;          // vertical shift; trend is in the cash flow
+    const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
+    let running = state.openingBalance || 0;
+    const byDay = new Map();
+    byDay.set('__open', running);                  // anchor: balance before the first entry
+    txs.forEach((t) => {
+      running += (t.type === 'income' ? t.amount : -t.amount);
+      byDay.set(dayKey(txDate(t)), running);       // last running balance for that day wins
+    });
+    const series = [];
+    byDay.forEach((cash, d) => series.push({ d, v: cash + offset }));
+    return series;
+  }
+  return (state.nwHistory || []).map((p) => ({ d: p.d, v: p.v }));
+}
 function drawNetWorthSpark(hist) {
   const cv = document.getElementById('nwSpark');
   if (!cv) return;
@@ -1910,7 +1936,7 @@ function renderNetWorth() {
     seg('💵', nw.cash, nw.cash >= 0 ? 'pos' : 'neg') +
     seg('🌾', nw.assets, 'pos') +
     seg('🐉', nw.debts, nw.debts > 0 ? 'neg' : '');
-  const hist = state.nwHistory || [];
+  const hist = netWorthSeries();
   const spark = document.getElementById('nwSpark');
   const foot = document.getElementById('nwFoot');
   if (hist.length >= 2) {
