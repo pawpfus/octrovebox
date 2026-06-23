@@ -1373,8 +1373,16 @@ function renderJars() {
   const preview = document.getElementById('qaPreview');
   if (!form || !input) return;
   const arrow = (t) => t === 'income' ? '▲' : '▼';
-  input.addEventListener('input', () => {
+  // quick entry follows the active SPEND/EARN tab: forces that type, re-guesses
+  // its category, ignoring any +/- prefix or income-word auto-detection.
+  function resolve() {
     const p = parseQuickAdd(input.value);
+    if (!p) return null;
+    const type = currentType;
+    return { type, amount: p.amount, desc: p.desc, category: guessCategory(p.desc, type) || 'other' };
+  }
+  input.addEventListener('input', () => {
+    const p = resolve();
     if (!p || !input.value.trim()) { preview.hidden = true; return; }
     const ci = catInfo(p.type, p.category);
     preview.hidden = false;
@@ -1382,7 +1390,7 @@ function renderJars() {
   });
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const p = parseQuickAdd(input.value);
+    const p = resolve();
     if (!p) { sfx.error(); shake(form); return; }
     state.transactions.push(makeTx(p));
     learnCategory(p.desc, p.type, p.category);
@@ -1403,6 +1411,7 @@ function renderJars() {
     tt.classList.toggle('open', open);
     if (sfx.click) sfx.click();
   });
+  syncQuickAddType();   // set the initial QUICK SPEND / ▼ label
 })();
 
 /* ============================================================
@@ -2624,10 +2633,20 @@ function setType(type) {
   els.btnExpense.classList.toggle('active', type === 'expense');
   els.btnIncome.classList.toggle('active', type === 'income');
   els.submit.textContent = type === 'income' ? '⮞ COLLECT GOLD' : '⮞ ADD ENTRY';
+  syncQuickAddType();
   fillCategories();
   catTouched = false;       // fresh type → let auto-categorization take over again
   applyAutoCat();
   sfx.click();
+}
+// the quick-entry bar reflects the active tab: QUICK SPEND vs FAST EARN
+function syncQuickAddType() {
+  const input = document.getElementById('quickAddInput');
+  const spark = document.getElementById('qaSpark');
+  if (!input) return;
+  if (currentType === 'income') { input.placeholder = 'FAST EARN — e.g. "gaji 8jt"'; if (spark) spark.textContent = '▲'; }
+  else { input.placeholder = 'QUICK SPEND — e.g. "kopi 25k"'; if (spark) spark.textContent = '▼'; }
+  input.dispatchEvent(new Event('input'));   // re-evaluate the live preview for the new type
 }
 
 // auto-pick a category from the current description, unless the user picked one

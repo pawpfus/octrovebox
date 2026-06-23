@@ -958,10 +958,15 @@ h1 {
 .jar-add:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8860b; }
 /* 🥚 NEST EGGS — collapsible dropdown inside the Savings Quest */
 /* Sinking Funds — same flush dropdown style as the Net Worth toggle */
-.nest-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 14px; padding: 10px 0 0; border: none; border-top: 2px solid rgba(255,255,255,.12); background: none; cursor: pointer; font-family: inherit; }
+/* Sinking Funds — solid beveled rectangle pill, like the Tools toggle */
+.nest-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 14px; padding: 12px 12px; background: var(--bg-2); border: 3px solid var(--shadow); box-shadow: inset 2px 2px 0 rgba(255,255,255,.12), inset -3px -3px 0 rgba(0,0,0,.4); cursor: pointer; font-family: inherit; transition: transform .05s; }
+.nest-toggle:hover { filter: brightness(1.08); }
+.nest-toggle:active { transform: translate(1px,1px); }
+.nest-toggle.open { background: var(--gold); box-shadow: inset 2px 2px 0 rgba(255,255,255,.5), inset -3px -3px 0 var(--gold-dk); }
 .nest-toggle .nest-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); }
 .nest-toggle .nest-total { flex: 1 1 auto; text-align: right; font-size: 8px; color: var(--gold); opacity: .85; }
 .nest-toggle .nest-chevron { font-size: 9px; color: var(--gold); transition: transform .2s ease; flex: 0 0 auto; }
+.nest-toggle.open .nest-label, .nest-toggle.open .nest-total, .nest-toggle.open .nest-chevron { color: #06250f; opacity: 1; }
 .nest-toggle.open .nest-chevron { transform: rotate(180deg); }
 .nest-body { margin-top: 11px; }
 .nest-body[hidden] { display: none; }

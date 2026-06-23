@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=153" />
+  <link rel="stylesheet" href="styles.css?v=154" />
 </head>
 
 <body>
@@ -141,30 +141,18 @@
       <section class="panel form-panel">
         <h2 class="panel-title">+ NEW ENTRY</h2>
 
-        <!-- ⚡ QUICK ADD — type shorthand like "kopi 25k" or "gaji 8jt salary" -->
-        <form class="quick-add" id="quickAddForm" autocomplete="off">
-          <span class="qa-spark">⚡</span>
-          <input type="text" id="quickAddInput" maxlength="60" placeholder='QUICK ADD — e.g. "kopi 25k"' aria-label="Quick add entry" />
-          <button type="submit" class="qa-go" id="quickAddGo" title="Add">⮞</button>
-        </form>
-        <div class="qa-preview" id="qaPreview" hidden></div>
-
-        <!-- power tools — collapsible dropdown like Net Worth / Sinking Funds -->
-        <button type="button" class="tools-toggle" id="toolsToggle" aria-expanded="false" aria-controls="toolsBody">
-          <span class="tools-label">🧰 TOOLS</span>
-          <span class="tools-hint">IMPORT · SCAN · AFFORD</span>
-          <span class="tools-chevron">▾</span>
-        </button>
-        <div class="tools-body" id="toolsBody" role="group" aria-label="Entry tools" hidden>
-          <button type="button" class="entry-tool" id="openImport">📥 IMPORT</button>
-          <button type="button" class="entry-tool" id="openScan">📷 SCAN</button>
-          <button type="button" class="entry-tool" id="openAfford">🔮 AFFORD?</button>
-        </div>
-
         <div class="type-toggle" role="group" aria-label="Entry type">
           <button type="button" class="toggle-btn active" data-type="expense" id="btnExpense">▼ SPEND</button>
           <button type="button" class="toggle-btn" data-type="income" id="btnIncome">▲ EARN</button>
         </div>
+
+        <!-- ⚡ context-aware quick entry: QUICK SPEND on the SPEND tab, FAST EARN on EARN -->
+        <form class="quick-add" id="quickAddForm" autocomplete="off">
+          <span class="qa-spark" id="qaSpark">⚡</span>
+          <input type="text" id="quickAddInput" maxlength="60" placeholder='QUICK SPEND — e.g. "kopi 25k"' aria-label="Quick entry" />
+          <button type="submit" class="qa-go" id="quickAddGo" title="Add">⮞</button>
+        </form>
+        <div class="qa-preview" id="qaPreview" hidden></div>
 
         <form id="txForm" autocomplete="off">
           <label class="field">
@@ -203,6 +191,18 @@
               </select>
             </div>
           </label>
+
+          <!-- power tools dropdown — sits below Repeat -->
+          <button type="button" class="tools-toggle" id="toolsToggle" aria-expanded="false" aria-controls="toolsBody">
+            <span class="tools-label">🧰 TOOLS</span>
+            <span class="tools-hint">IMPORT · SCAN · AFFORD</span>
+            <span class="tools-chevron">▾</span>
+          </button>
+          <div class="tools-body" id="toolsBody" role="group" aria-label="Entry tools" hidden>
+            <button type="button" class="entry-tool" id="openImport">📥 IMPORT</button>
+            <button type="button" class="entry-tool" id="openScan">📷 SCAN</button>
+            <button type="button" class="entry-tool" id="openAfford">🔮 AFFORD?</button>
+          </div>
 
           <button type="submit" class="submit-btn" id="submitBtn">⮞ ADD ENTRY</button>
         </form>
@@ -804,7 +804,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=156"></script>
+  <script src="app.js?v=157"></script>
 </body>
 
 </html>
