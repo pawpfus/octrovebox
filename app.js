@@ -2642,10 +2642,8 @@ function setType(type) {
 // the quick-entry bar reflects the active tab: QUICK SPEND vs FAST EARN
 function syncQuickAddType() {
   const input = document.getElementById('quickAddInput');
-  const spark = document.getElementById('qaSpark');
   if (!input) return;
-  if (currentType === 'income') { input.placeholder = 'FAST EARN — e.g. "gaji 8jt"'; if (spark) spark.textContent = '▲'; }
-  else { input.placeholder = 'QUICK SPEND — e.g. "kopi 25k"'; if (spark) spark.textContent = '▼'; }
+  input.placeholder = currentType === 'income' ? 'FAST EARN — e.g. "gaji 8jt"' : 'QUICK SPEND — e.g. "kopi 25k"';
   input.dispatchEvent(new Event('input'));   // re-evaluate the live preview for the new type
 }
 
