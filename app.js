@@ -538,24 +538,48 @@ function totals() {
 
 const prevStat = { income: 0, expense: 0, balance: 0 };
 // shrink the stat font as the Rupiah figure grows (lots of zeros = long string)
+// Hero figures past ~Rp100M get shrunk to fit, which makes them hard to read.
+// Above that threshold we abbreviate (Rp1,25B / Rp320M) so the number stays
+// bold; tapping any stat toggles back to the exact figure.
+let statsExpanded = false;
+const ABBREV_AT = 100000000;   // 100 million
+function statFmt(n) {
+  const a = Math.abs(n);
+  if (statsExpanded || a < ABBREV_AT) return fmt(n);
+  const c = cur();
+  const sign = n < 0 ? '-' : '';
+  if (a >= 1e9) return sign + c.symbol + (a / 1e9).toLocaleString(c.locale, { maximumFractionDigits: 2 }) + 'B';
+  return sign + c.symbol + (a / 1e6).toLocaleString(c.locale, { maximumFractionDigits: 1 }) + 'M';
+}
 function fitStat(el, a, b) {
-  const len = Math.max(fmt(a).length, fmt(b).length);
+  const len = Math.max(statFmt(a).length, statFmt(b).length);
   el.classList.remove('len-m', 'len-l', 'len-xl', 'len-xxl');
   if (len >= 14) el.classList.add('len-xxl');        // Rp1.000.000.000+
   else if (len >= 12) el.classList.add('len-xl');     // Rp100.000.000+
   else if (len >= 10) el.classList.add('len-l');      // Rp1.000.000+
   else if (len >= 8) el.classList.add('len-m');       // Rp10.000+
+  // a pointer cue only when there's an abbreviated figure to expand
+  el.classList.toggle('abbrev', !statsExpanded && Math.max(Math.abs(a), Math.abs(b)) >= ABBREV_AT);
 }
 function animateValue(el, from, to, dur = 650) {
-  if (from === to) { el.textContent = fmt(to); return; }
+  if (from === to) { el.textContent = statFmt(to); return; }
   const start = performance.now();
   function frame(t) {
     const k = Math.min(1, (t - start) / dur);
     const eased = 1 - Math.pow(1 - k, 3);
-    el.textContent = fmt(Math.round(from + (to - from) * eased));
-    if (k < 1) requestAnimationFrame(frame); else el.textContent = fmt(to);
+    el.textContent = statFmt(Math.round(from + (to - from) * eased));
+    if (k < 1) requestAnimationFrame(frame); else el.textContent = statFmt(to);
   }
   requestAnimationFrame(frame);
+}
+// repaint the three stats in place (no count-up) — used by the tap-to-expand toggle
+function repaintStats() {
+  const { income, expense, balance } = totals();
+  [['income', income], ['expense', expense], ['balance', balance]].forEach(([k, v]) => {
+    if (!els[k]) return;
+    fitStat(els[k], v, v);
+    els[k].textContent = statFmt(v);
+  });
 }
 
 function renderStats(prevLevel) {
@@ -1866,6 +1890,15 @@ function recordNetWorth() {
 // current assets−debts offset (those have no per-day history, so hold constant).
 // This gives a real curve the moment there are ≥2 dated points. Fall back to
 // stored snapshots only when the ledger is too thin to draw.
+let nwRangeDays = 0;   // 0 = ALL, otherwise trailing window (7 / 30 days) for the chart
+// keep only the points inside the selected trailing window (the synthetic
+// '__open' anchor has no date, so it's dropped whenever a window is active)
+function clampSeriesToRange(series) {
+  if (!nwRangeDays) return series;
+  const cutoff = Date.now() - nwRangeDays * 86400000;
+  const inRange = series.filter((p) => p.d !== '__open' && new Date(p.d + 'T00:00').getTime() >= cutoff);
+  return inRange.length >= 2 ? inRange : series;   // too sparse for the window → show everything
+}
 function netWorthSeries() {
   const txs = (state.transactions || []).slice().sort((a, b) => txDate(a) - txDate(b));
   if (txs.length >= 2) {
@@ -1936,7 +1969,11 @@ function renderNetWorth() {
     seg('💵', nw.cash, nw.cash >= 0 ? 'pos' : 'neg') +
     seg('🌾', nw.assets, 'pos') +
     seg('🐉', nw.debts, nw.debts > 0 ? 'neg' : '');
-  const hist = netWorthSeries();
+  const full = netWorthSeries();
+  const hist = clampSeriesToRange(full);
+  // hide the range switch until there's enough history for windows to matter
+  const rangeBox = document.getElementById('nwRange');
+  if (rangeBox) rangeBox.style.display = full.length >= 3 ? '' : 'none';
   const spark = document.getElementById('nwSpark');
   const foot = document.getElementById('nwFoot');
   if (hist.length >= 2) {
@@ -2519,6 +2556,44 @@ function renderRecurring() {
       <button class="rc-del" title="Stop repeating" data-id="${r.id}">✕</button>`;
     els.recurList.appendChild(row);
   });
+  renderHorizon();
+}
+
+// Forward-looking projection: walk every recurring rule out 30 days, sort the
+// occurrences by date, and show the running balance AFTER each one — so a dip
+// ("⚡ Rent in 4 days → Rp200k left") is concrete instead of a vague Oracle line.
+function renderHorizon() {
+  const box = document.getElementById('horizonList');
+  if (!box) return;
+  const now = Date.now(), day = 86400000, cap = now + 30 * day;
+  const events = [];
+  (state.recurring || []).forEach((r) => {
+    let due = r.nextDue, guard = 0;
+    while (due && due <= cap && guard < 60) {
+      if (due >= now) events.push({ due, type: r.type, amount: r.amount, desc: r.desc });
+      due = addPeriod(due, r.freq); guard += 1;
+    }
+  });
+  if (!events.length) { box.hidden = true; box.innerHTML = ''; return; }
+  // fold away with the rest of the panel when the "ON REPEAT" head is collapsed
+  if (els.recurInline && els.recurInline.classList.contains('collapsed')) { box.hidden = true; return; }
+  events.sort((a, b) => a.due - b.due);
+  let bal = totals().balance;
+  let html = '<div class="horizon-head">📅 ON THE HORIZON · 30 DAYS</div>';
+  events.slice(0, 8).forEach((e) => {
+    bal += (e.type === 'income' ? e.amount : -e.amount);
+    const days = Math.max(0, Math.round((e.due - now) / day));
+    const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : 'in ' + days + 'd';
+    const low = bal < 0;
+    html += `<div class="horizon-row${low ? ' danger' : ''}">
+      <span class="hz-ico">${e.type === 'income' ? '💰' : '⚡'}</span>
+      <span class="hz-body"><span class="hz-name">${escapeHtml(e.desc)}</span><span class="hz-when">${when}</span></span>
+      <span class="hz-amt ${e.type}">${e.type === 'income' ? '+' : '−'}${fmt(e.amount).replace('-', '')}</span>
+      <span class="hz-bal${low ? ' neg' : ''}">${fmt(Math.round(bal))}</span>
+    </div>`;
+  });
+  box.innerHTML = html;
+  box.hidden = false;
 }
 function removeRecurring(id) {
   state.recurring = (state.recurring || []).filter((r) => r.id !== Number(id));
@@ -2636,6 +2711,42 @@ function renderAll(prevLevel) {
   renderZone();
   renderWeather();
   renderAilments();
+  renderCatRing();
+  renderQuestBoard();
+}
+
+// First-run coaching: a short checklist that ticks off as a new player takes
+// their first actions, then retires itself for good. Established players (lots
+// of history) skip it silently — it only ever shows for genuine newcomers.
+const FIRST_QUESTS = [
+  { icon: '⚔️', label: 'Log your first expense',   done: () => (state.transactions || []).some((t) => t.type === 'expense') },
+  { icon: '💰', label: 'Record your first income', done: () => (state.transactions || []).some((t) => t.type === 'income') },
+  { icon: '🛡️', label: 'Set a monthly budget',     done: () => !!state.budget },
+  { icon: '🎯', label: 'Set a savings goal',        done: () => !!state.goal },
+];
+function renderQuestBoard() {
+  const board = document.getElementById('questBoard');
+  if (!board) return;
+  if (state.questBoardDone) { board.hidden = true; return; }
+  // veteran data → never tutorialise; bow out quietly
+  if ((state.transactions || []).length >= 8) { state.questBoardDone = true; save(); board.hidden = true; return; }
+  const results = FIRST_QUESTS.map((q) => ({ icon: q.icon, label: q.label, ok: q.done() }));
+  const doneCount = results.filter((r) => r.ok).length;
+  if (doneCount === FIRST_QUESTS.length) {     // all cleared → celebrate once, then retire
+    state.questBoardDone = true; save();
+    board.hidden = true;
+    if (sfx.victory) sfx.victory();
+    showToast('🏆 ALL FIRST QUESTS COMPLETE!');
+    return;
+  }
+  document.getElementById('questBoardList').innerHTML = results.map((r) => `
+    <div class="qboard-item${r.ok ? ' done' : ''}">
+      <span class="qbi-check">${r.ok ? '✓' : ''}</span>
+      <span class="qbi-icon">${r.icon}</span>
+      <span class="qbi-label">${r.label}</span>
+    </div>`).join('');
+  document.getElementById('questBoardSub').textContent = doneCount + ' / ' + FIRST_QUESTS.length + ' complete — keep questing!';
+  board.hidden = false;
 }
 
 /* ============================================================
@@ -2663,6 +2774,7 @@ function setType(type) {
   fillCategories();
   catTouched = false;       // fresh type → let auto-categorization take over again
   applyAutoCat();
+  renderCatRing();
   sfx.click();
 }
 // the quick-entry bar reflects the active tab: QUICK SPEND vs FAST EARN
@@ -2681,6 +2793,36 @@ function applyAutoCat() {
   const hit = g && CATEGORIES[currentType].some((c) => c.id === g);
   if (hit && els.category.value !== g) els.category.value = g;
   if (els.catAutoHint) els.catAutoHint.hidden = !hit;
+  renderCatRing();
+}
+
+// Live budget ring under the CATEGORY field: when the chosen expense category
+// has a monthly limit (a mini-boss), show how much of it is already spent so the
+// decision happens at the moment of logging, not after the fact.
+const CAT_RING_CIRC = 2 * Math.PI * 15.5;   // r=15.5 in the SVG
+function renderCatRing() {
+  const box = document.getElementById('catRing');
+  if (!box) return;
+  const id = els.category.value;
+  const limit = (state.catBudgets || {})[id];
+  if (currentType !== 'expense' || !(limit > 0)) { box.hidden = true; return; }
+  const spent = catSpend(id);
+  const ratio = spent / limit;
+  const over = spent > limit;
+  const c = catInfo('expense', id);
+  const hex = over ? '#ff5d5d' : ratio > 0.8 ? '#ffd23f' : '#4be35a';
+  const fill = document.getElementById('catRingFill');
+  fill.style.strokeDasharray = CAT_RING_CIRC.toFixed(2);
+  fill.style.strokeDashoffset = (CAT_RING_CIRC * (1 - Math.min(ratio, 1))).toFixed(2);
+  fill.style.stroke = hex;
+  const pctEl = document.getElementById('catRingPct');
+  pctEl.textContent = over ? 'OVER' : Math.round(ratio * 100) + '%';
+  pctEl.style.color = hex;
+  const remaining = limit - spent;
+  document.getElementById('catRingText').innerHTML = over
+    ? `${c.icon} ${c.name} · over by ${fmt(Math.abs(remaining))}`
+    : `${c.icon} ${c.name} · ${fmt(spent)} / ${fmt(limit)} · ${fmt(remaining)} left`;
+  box.hidden = false;
 }
 
 function submitLabel() { return currentType === 'income' ? '⮞ COLLECT GOLD' : '⮞ ADD ENTRY'; }
@@ -3306,7 +3448,7 @@ els.btnExpense.addEventListener('click', () => setType('expense'));
 els.btnIncome.addEventListener('click', () => setType('income'));
 // smart auto-categorization: guess from the description as you type
 els.desc.addEventListener('input', applyAutoCat);
-els.category.addEventListener('change', () => { catTouched = true; if (els.catAutoHint) els.catAutoHint.hidden = true; });
+els.category.addEventListener('change', () => { catTouched = true; if (els.catAutoHint) els.catAutoHint.hidden = true; renderCatRing(); });
 els.reset.addEventListener('click', resetAll);
 els.exportBtn.addEventListener('click', exportPDF);
 els.backupBtn.addEventListener('click', exportBackup);
@@ -3406,6 +3548,7 @@ if (els.recurHead) els.recurHead.addEventListener('click', () => {
   const opening = els.recurList.hidden;
   els.recurList.hidden = !opening;
   els.recurInline.classList.toggle('collapsed', !opening);
+  renderHorizon();   // fold/unfold the forecast along with the rules list
   if (opening) beep([330, 440, 587], 0.06, 'square', 0.04); else sfx.click();
 });
 // stop a rule from the inline list in the New Entry panel
@@ -3475,6 +3618,20 @@ els.editStartBtn.addEventListener('click', toggleStartEditor);
 els.startSave.addEventListener('click', saveStart);
 els.startInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveStart(); });
 
+// tap any stat figure to flip between abbreviated (Rp1,25B) and exact display
+[els.balance, els.income, els.expense].forEach((el) => {
+  if (!el) return;
+  el.addEventListener('click', () => { statsExpanded = !statsExpanded; repaintStats(); if (sfx.click) sfx.click(); });
+});
+
+// dismiss the first-run quest board for good
+const questBoardDismiss = document.getElementById('questBoardDismiss');
+if (questBoardDismiss) questBoardDismiss.addEventListener('click', () => {
+  state.questBoardDone = true; save();
+  document.getElementById('questBoard').hidden = true;
+  if (sfx.click) sfx.click();
+});
+
 // net worth dropdown — folds out from the Balance card
 (() => {
   const toggle = document.getElementById('nwToggle');
@@ -3488,6 +3645,16 @@ els.startInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveS
     if (sfx.click) sfx.click();
     // redraw the sparkline now the panel has real width (canvas was 0-sized while hidden)
     if (open) renderNetWorth();
+  });
+  // 7D · 30D · ALL range switch
+  const range = document.getElementById('nwRange');
+  if (range) range.addEventListener('click', (e) => {
+    const btn = e.target.closest('.nw-range-btn');
+    if (!btn) return;
+    nwRangeDays = Number(btn.dataset.range) || 0;
+    range.querySelectorAll('.nw-range-btn').forEach((b) => b.classList.toggle('is-on', b === btn));
+    if (sfx.click) sfx.click();
+    renderNetWorth();
   });
 })();
 

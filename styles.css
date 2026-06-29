@@ -331,6 +331,8 @@ h1 {
 .stat-value.len-xxl {
   font-size: clamp(9px, 1.9vw, 11px);
 }
+/* abbreviated big figure — tappable to reveal the exact amount */
+.stat-value.abbrev { cursor: pointer; }
 
 .stat-foot {
   font-size: 7px;
@@ -924,6 +926,51 @@ h1 {
 .cat-auto-hint[hidden] { display: none; }
 @keyframes catAutoPop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
 
+/* live category budget ring */
+.cat-ring {
+  display: flex; align-items: center; gap: 9px;
+  margin: -4px 0 9px; padding: 8px 10px;
+  background: rgba(0,0,0,.22); border-left: 3px solid var(--gold);
+}
+.cat-ring[hidden] { display: none; }
+.cat-ring-dial { position: relative; width: 34px; height: 34px; flex: 0 0 auto; }
+.cat-ring-svg { width: 34px; height: 34px; display: block; transform: rotate(-90deg); }
+.cat-ring-svg .cr-track { fill: none; stroke: rgba(255,255,255,.12); stroke-width: 4; }
+.cat-ring-svg .cr-fill {
+  fill: none; stroke: var(--gold); stroke-width: 4; stroke-linecap: round;
+  transition: stroke-dashoffset .4s ease, stroke .2s linear;
+}
+.cat-ring-pct {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 7px; letter-spacing: 0; pointer-events: none;
+}
+.cat-ring-text { font-size: 8px; line-height: 1.5; opacity: .9; letter-spacing: .2px; }
+
+/* ⚔️ FIRST QUESTS — one-time onboarding checklist */
+.questboard[hidden] { display: none; }
+.qboard-head { display: flex; align-items: center; justify-content: space-between; }
+.qboard-dismiss {
+  font-family: inherit; font-size: 10px; color: var(--ink-dim);
+  background: transparent; border: none; cursor: pointer; padding: 2px 4px; flex-shrink: 0;
+}
+.qboard-dismiss:hover { color: var(--red); }
+.qboard-sub { font-size: 8px; color: var(--gold); margin: 6px 0 12px; line-height: 1.5; }
+.qboard-list { display: flex; flex-direction: column; gap: 7px; }
+.qboard-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 8px; background: var(--bg-2);
+  border: 3px solid var(--shadow); box-shadow: inset -3px -3px 0 rgba(0,0,0,.4);
+}
+.qboard-item.done { border-color: var(--green); box-shadow: inset -3px -3px 0 rgba(0,0,0,.3); opacity: .85; }
+.qbi-check {
+  width: 16px; height: 16px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: #0c0a1e; background: var(--shadow); border: 2px solid var(--shadow);
+}
+.qboard-item.done .qbi-check { background: var(--green); border-color: var(--green); }
+.qbi-icon { font-size: 13px; flex: 0 0 auto; }
+.qbi-label { font-size: 8px; line-height: 1.5; flex: 1; }
+.qboard-item.done .qbi-label { text-decoration: line-through; color: var(--ink-dim); }
+
 /* 🏺 SAVINGS JARS — envelope budgeting */
 .jars-total { font-size: 9px; color: var(--gold); }
 .jars-sub { font-size: 8px; opacity: .8; margin: 6px 0 12px; line-height: 1.5; }
@@ -962,7 +1009,7 @@ h1 {
 .nest-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 14px; padding: 10px 0 0; border: none; border-top: 2px solid rgba(255,255,255,.12); background: none; cursor: pointer; font-family: inherit; }
 .nest-toggle .nest-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); }
 .nest-toggle .nest-total { flex: 1 1 auto; text-align: right; font-size: 8px; color: var(--gold); opacity: .85; }
-.nest-toggle .nest-chevron { font-size: 9px; color: var(--gold); transition: transform .2s ease; flex: 0 0 auto; }
+.nest-toggle .nest-chevron { font-size: 10px; color: var(--gold); transition: transform .3s; flex: 0 0 auto; }
 .nest-toggle.open .nest-chevron { transform: rotate(180deg); }
 .nest-body { margin-top: 11px; }
 .nest-body[hidden] { display: none; }
@@ -973,12 +1020,24 @@ h1 {
 .nw-toggle .nw-tg-label { font-size: 7px; letter-spacing: 1px; color: var(--gold); opacity: .85; white-space: nowrap; }
 .nw-toggle .nw-tg-total { flex: 1 1 auto; min-width: 0; text-align: right; font-size: 9px; color: #5fe6a8; overflow: hidden; text-overflow: ellipsis; }
 .nw-toggle .nw-tg-total.neg { color: #ff6f8c; }
-.nw-toggle .nw-tg-chevron { font-size: 8px; color: var(--gold); transition: transform .2s ease; flex: 0 0 auto; }
+.nw-toggle .nw-tg-chevron { font-size: 10px; color: var(--gold); transition: transform .3s; flex: 0 0 auto; }
 .nw-toggle.open .nw-tg-chevron { transform: rotate(180deg); }
 
 /* graph lives inside the Balance card now — no own border/padding, no gap */
 .networth-panel { margin: 0; padding: 0; }
 .networth-panel[hidden] { display: none; }
+.nw-range { display: flex; justify-content: flex-end; gap: 5px; margin: 2px 0 6px; }
+.nw-range-btn {
+  font-family: inherit; font-size: 7px; letter-spacing: .5px; color: var(--ink);
+  padding: 5px 8px; cursor: pointer;
+  background: var(--bg-2); border: 2px solid var(--shadow);
+  box-shadow: inset -2px -2px 0 rgba(0,0,0,.4);
+}
+.nw-range-btn:hover { color: var(--gold); }
+.nw-range-btn.is-on {
+  color: #0c0a1e; background: var(--gold);
+  border-color: var(--gold-dk); box-shadow: inset -2px -2px 0 var(--gold-dk);
+}
 .nw-spark { display: block; width: 100%; height: 120px; margin: 0 0 6px; }
 .nw-spark[hidden] { display: none; }
 .nw-foot { font-size: 8px; opacity: .7; letter-spacing: .2px; margin: 4px 0 0; text-align: center; }
@@ -2607,7 +2666,7 @@ body[data-theme="midas"] {
 .tools-toggle.open { background: var(--gold); box-shadow: inset 2px 2px 0 rgba(255,255,255,.5), inset -3px -3px 0 var(--gold-dk); }
 .tools-toggle .tools-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); }
 .tools-toggle .tools-hint { flex: 1 1 auto; text-align: right; font-size: 7px; letter-spacing: .5px; color: var(--gold); opacity: .7; }
-.tools-toggle .tools-chevron { font-size: 9px; color: var(--gold); transition: transform .2s ease; flex: 0 0 auto; }
+.tools-toggle .tools-chevron { font-size: 10px; color: var(--gold); transition: transform .3s; flex: 0 0 auto; }
 .tools-toggle.open .tools-label, .tools-toggle.open .tools-hint, .tools-toggle.open .tools-chevron { color: #06250f; opacity: 1; }
 .tools-toggle.open .tools-chevron { transform: rotate(180deg); }
 .tools-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 14px; }
@@ -3105,9 +3164,10 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 }
 .recur-inline-head:active { transform: translateY(1px); }
 .recur-head-label .recur-sub { color: var(--ink-dim); }
-.recur-arrow { color: var(--gold); flex-shrink: 0; transition: transform .15s; }
+/* matches every other collapsible: ▼ points down when collapsed, flips up when open */
+.recur-arrow { color: var(--gold); flex-shrink: 0; transition: transform .3s; transform: rotate(180deg); }
 .recur-inline.collapsed .recur-inline-head { margin-bottom: 0; }
-.recur-inline.collapsed .recur-arrow { transform: rotate(-90deg); }
+.recur-inline.collapsed .recur-arrow { transform: rotate(0); }
 /* scrolls like the Deeds list once there are several rules */
 .recur-list {
   max-height: 168px;
@@ -3159,6 +3219,33 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
   flex-shrink: 0;
 }
 .rc-del:hover { color: var(--red); }
+
+/* 📅 ON THE HORIZON — forward projection of upcoming recurring bills */
+.horizon { margin-top: 9px; }
+.horizon[hidden] { display: none; }
+.horizon-head {
+  font-size: 7px; letter-spacing: .5px; color: var(--gold);
+  margin: 0 0 6px; opacity: .9;
+}
+.horizon-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; margin-bottom: 5px;
+  background: rgba(0,0,0,.2); border-left: 3px solid var(--panel-lt);
+}
+.horizon-row:last-child { margin-bottom: 0; }
+.horizon-row.danger { border-left-color: var(--red); background: rgba(255,93,93,.1); }
+.hz-ico { font-size: 12px; flex-shrink: 0; }
+.hz-body { flex: 1; min-width: 0; }
+.hz-name { display: block; font-size: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hz-when { display: block; font-size: 7px; color: var(--ink-dim); margin-top: 4px; }
+.hz-amt { font-size: 8px; white-space: nowrap; flex-shrink: 0; }
+.hz-amt.income { color: var(--green); }
+.hz-amt.expense { color: var(--red); }
+.hz-bal {
+  font-size: 8px; white-space: nowrap; flex-shrink: 0;
+  min-width: 58px; text-align: right; color: var(--ink-dim);
+}
+.hz-bal.neg { color: var(--red); }
 
 /* PWA install button + status */
 .install-btn { width: 100%; margin-bottom: 12px; }
