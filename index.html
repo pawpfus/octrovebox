@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=165" />
+  <link rel="stylesheet" href="styles.css?v=168" />
 </head>
 
 <body>
@@ -376,21 +376,28 @@
       </div>
     </div>
 
-    <!-- ===== CATEGORY MINI-BOSSES ===== -->
+    <!-- ===== CATEGORY MINI-BOSSES — collapsed by default; the live ring under -->
+    <!-- the CATEGORY field already shows per-category limits at point of entry -->
     <section class="panel mboss-panel">
-      <h2 class="panel-title">CATEGORY BOSSES</h2>
-      <div class="mboss-list" id="mbossList"></div>
-      <div class="empty-state small" id="mbossEmpty">
-        <p>NO CATEGORY LIMITS YET.<br />ASSIGN A MINI-BOSS BELOW!</p>
-      </div>
-      <div class="editor mboss-editor" id="catBudgetEditor">
-        <div class="select-wrap mboss-select"><select id="catBudgetSelect"></select></div>
-        <span class="dollar2">Rp</span>
-        <input type="number" id="catBudgetInput" min="1" step="1" placeholder="LIMIT" />
-        <button type="button" class="mini-save" id="catBudgetSave">SET</button>
+      <button type="button" class="mb-toggle" id="mbossToggle" aria-expanded="false" aria-controls="mbossBody">
+        <span class="mb-label">👾 CATEGORY BOSSES</span>
+        <span class="mb-count" id="mbossSub"></span>
+        <span class="mb-chevron">▼</span>
+      </button>
+      <div class="mboss-body" id="mbossBody" hidden>
+        <div class="mboss-list" id="mbossList"></div>
+        <div class="empty-state small" id="mbossEmpty">
+          <p>NO CATEGORY LIMITS YET.<br />ASSIGN A MINI-BOSS BELOW!</p>
+        </div>
+        <div class="editor mboss-editor" id="catBudgetEditor">
+          <div class="select-wrap mboss-select"><select id="catBudgetSelect"></select></div>
+          <span class="dollar2">Rp</span>
+          <input type="number" id="catBudgetInput" min="1" step="1" placeholder="LIMIT" />
+          <button type="button" class="mini-save" id="catBudgetSave">SET</button>
+        </div>
       </div>
 
-      <!-- status ailments — live debuffs, merged into the boss panel -->
+      <!-- status ailments stay visible (they only appear when a debuff is active) -->
       <div class="ailments-block" id="ailmentsPanel" hidden>
         <div class="ailments-divider">⚠ STATUS AILMENTS</div>
         <div class="status-ailments" id="statusAilments" aria-live="polite"></div>
@@ -832,7 +839,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=165"></script>
+  <script src="app.js?v=168"></script>
 </body>
 
 </html>

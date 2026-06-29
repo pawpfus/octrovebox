@@ -278,6 +278,7 @@ const els = {
   saveGoalBtn: $('saveGoalBtn'), clearGoalBtn: $('clearGoalBtn'),
   // category mini-bosses
   mbossList: $('mbossList'), mbossEmpty: $('mbossEmpty'),
+  mbossToggle: $('mbossToggle'), mbossBody: $('mbossBody'), mbossSub: $('mbossSub'),
   catBudgetSelect: $('catBudgetSelect'), catBudgetInput: $('catBudgetInput'), catBudgetSave: $('catBudgetSave'),
   // world map chart + streak
   chart: $('chart'), monthStreak: $('monthStreak'),
@@ -887,6 +888,12 @@ function renderMiniBosses() {
   const entries = Object.entries(state.catBudgets);
   els.mbossEmpty.style.display = entries.length ? 'none' : 'block';
   els.mbossList.innerHTML = '';
+  // keep the collapsed header informative (how many limits, any over budget)
+  if (els.mbossSub) {
+    const over = entries.filter(([id, lim]) => catSpend(id) > lim).length;
+    els.mbossSub.textContent = !entries.length ? 'PER-CATEGORY LIMITS'
+      : entries.length + ' LIMIT' + (entries.length > 1 ? 'S' : '') + (over ? ' · ' + over + ' OVER' : '');
+  }
 
   // order by how close to the limit (most threatened first)
   entries
@@ -1285,11 +1292,8 @@ function forecastProphecies() {
   } else {
     out.push('🔮 The omens shine bright — at this pace your fortune swells to ' + fmt(Math.round(f.proj30)) + ' within 30 suns.');
   }
-  // recurring obligations on the horizon
-  if (f.billsOut > 0) {
-    out.push('🗓️ ' + fmt(f.billsOut) + ' in recurring tributes come due within 30 days' +
-      (f.billsIn > 0 ? ' — though ' + fmt(f.billsIn) + ' in gold rides in to meet them.' : '. Ready your coffers.'));
-  }
+  // (recurring obligations now live concretely in the "On the Horizon" list under
+  // the New Entry panel — no longer echoed here to avoid saying it twice)
   // savings-goal divination
   if (f.goalEta) {
     out.push('🎯 The path to "' + state.goal.name + '" reveals itself — you shall arrive around ' + dMonth(f.goalEta) + '.');
@@ -3457,6 +3461,13 @@ els.recapClose.addEventListener('click', closeRecap);
 els.recapOverlay.addEventListener('click', (e) => { if (e.target === els.recapOverlay) closeRecap(); });
 els.oracleStage.addEventListener('click', oracleTap);
 els.questToggle.addEventListener('click', toggleQuestBoard);
+if (els.mbossToggle) els.mbossToggle.addEventListener('click', () => {
+  const opening = els.mbossBody.hidden;
+  els.mbossBody.hidden = !opening;
+  els.mbossToggle.classList.toggle('open', opening);
+  els.mbossToggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  sfx.click();
+});
 if (els.guildToggle) els.guildToggle.addEventListener('click', toggleGuild);
 els.deedsToggle.addEventListener('click', toggleDeeds);
 els.vaultToggle.addEventListener('click', toggleVault);

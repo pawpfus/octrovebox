@@ -1537,6 +1537,14 @@ select {
 .goal-panel { margin-bottom: 18px; }          /* savings quest sits in the top cluster */
 .boss-panel { margin-bottom: 0; }             /* budget boss stacked flush with category bosses */
 .mboss-panel { margin-bottom: 18px; }         /* space after the boss stack */
+/* flush dropdown header — same minimal style as the Sinking Funds toggle */
+.mb-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 0; border: none; background: none; cursor: pointer; font-family: inherit; }
+.mb-toggle .mb-label { font-size: 8px; letter-spacing: 1px; color: var(--gold); white-space: nowrap; }
+.mb-toggle .mb-count { flex: 1 1 auto; text-align: right; font-size: 8px; color: var(--gold); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-toggle .mb-chevron { font-size: 10px; color: var(--gold); transition: transform .3s; flex: 0 0 auto; }
+.mb-toggle.open .mb-chevron { transform: rotate(180deg); }
+.mboss-body { margin-top: 12px; }             /* collapsible body under the toggle */
+.mboss-body[hidden] { display: none; }
 .cat-panel { margin-bottom: 0; }              /* spending map sits flush against world map */
 .chart-panel { margin-bottom: 0; }            /* world map stacked flush with savings quest */
 .cat-bars { display: flex; flex-direction: column; gap: 14px; }
