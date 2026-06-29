@@ -2823,9 +2823,11 @@ function renderCatRing() {
   pctEl.textContent = over ? 'OVER' : Math.round(ratio * 100) + '%';
   pctEl.style.color = hex;
   const remaining = limit - spent;
+  // the CATEGORY dropdown right above already names the category, so the ring
+  // just states the budget standing (% lives in the ring itself)
   document.getElementById('catRingText').innerHTML = over
-    ? `${c.icon} ${c.name} · over by ${fmt(Math.abs(remaining))}`
-    : `${c.icon} ${c.name} · ${fmt(spent)} / ${fmt(limit)} · ${fmt(remaining)} left`;
+    ? `<span class="crt-sub over">${fmt(Math.abs(remaining))} over budget</span>`
+    : `<span class="crt-sub">${fmt(remaining)} left of ${fmt(limit)}</span>`;
   box.hidden = false;
 }
 
