@@ -564,7 +564,8 @@ h1 {
   font-size: 7px;
   color: var(--ink-dim);
   margin-top: 9px;
-  letter-spacing: 1px;
+  letter-spacing: .4px;   /* tight enough that the budget figures stay on one line */
+  line-height: 1.6;       /* clean spacing if it does wrap on a tiny screen */
 }
 
 /* HP / XP bars share the Spending Map bar theme (flat track, pixel notches,
@@ -1537,7 +1538,7 @@ select {
 
 /* =========================== CATEGORY BARS (inventory style) =========================== */
 .goal-panel { margin-bottom: 18px; }          /* savings quest sits in the top cluster */
-.boss-panel { margin-bottom: 0; }             /* budget boss stacked flush with category bosses */
+.boss-panel { margin-bottom: 18px; }          /* Category Bosses now nest inside, so it needs its own gap below */
 /* Category Bosses nest inside the Budget Boss panel, same flush dropdown
    treatment as the Sinking Funds toggle inside the Savings Quest */
 .mb-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 14px; padding: 10px 0 0; border: none; border-top: 2px solid rgba(255,255,255,.12); background: none; cursor: pointer; font-family: inherit; }
@@ -3929,6 +3930,12 @@ body.ail-overburdened .logo-octo { animation-duration: 6s !important; filter: br
 @media (max-width: 600px) {
   .pe-title { font-size: 9px; }
   .pe-sub { font-size: 13px; }
+  /* Budget Boss / Savings Quest: give the figures more room so they don't
+     wrap into the sprite — smaller mascot + tighter gap + flatter spacing */
+  .boss-stage { gap: 10px; }
+  .boss-sprite, .goal-chest { font-size: 30px; width: 46px; height: 46px; }
+  .bar-name { margin-bottom: 8px; }
+  .bar-text { letter-spacing: .2px; margin-top: 8px; }
   /* The Deep: shrink chrome so floors stay organized on mobile */
   .deep-hud { padding: 12px 12px; }
   .dh-title { font-size: 9px; }
