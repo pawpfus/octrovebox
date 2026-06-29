@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=72" />
   <link rel="preload" href="fonts/press-start-2p-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/vt323-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=168" />
+  <link rel="stylesheet" href="styles.css?v=169" />
 </head>
 
 <body>
@@ -374,11 +374,9 @@
         <button type="button" class="mini-save" id="saveBudgetBtn">OK</button>
         <button type="button" class="mini-clear" id="clearBudgetBtn">CLEAR</button>
       </div>
-    </div>
 
-    <!-- ===== CATEGORY MINI-BOSSES — collapsed by default; the live ring under -->
-    <!-- the CATEGORY field already shows per-category limits at point of entry -->
-    <section class="panel mboss-panel">
+      <!-- CATEGORY BOSSES — per-category limits, folds out inside the Budget Boss
+           the same way Sinking Funds nest inside the Savings Quest -->
       <button type="button" class="mb-toggle" id="mbossToggle" aria-expanded="false" aria-controls="mbossBody">
         <span class="mb-label">👾 CATEGORY BOSSES</span>
         <span class="mb-count" id="mbossSub"></span>
@@ -403,7 +401,7 @@
         <div class="status-ailments" id="statusAilments" aria-live="polite"></div>
         <p class="ailments-hint">Bad money habits inflict RPG debuffs. Clear the cause to cure them.</p>
       </div>
-    </section>
+    </div>
 
     <!-- ===== THE PALACE — walkable isometric mode ===== -->
     <section class="panel palace-portal">
@@ -839,7 +837,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=168"></script>
+  <script src="app.js?v=169"></script>
 </body>
 
 </html>
