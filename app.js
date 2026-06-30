@@ -210,6 +210,7 @@ let state = {
   themesSeen: [],       // skins already announced as unlocked
   lastChest: null,      // YYYY-MM-DD of last daily-chest open
   chestStreak: 0,       // consecutive days opening the chest
+  bonusXp: 0,           // XP earned by *playing* (logging, chests, quests) — added on top of income
   rainbow: false,       // konami-code rainbow mode
   bounties: null,       // { week:'YYYY-MM-DD'(Monday), done:[ids] } — weekly bounty progress
   bountyStreak: 0,      // weeks where all bounties were cleared
@@ -450,7 +451,24 @@ function catInfo(type, id) {
   return CATEGORIES[type].find((c) => c.id === id) || { name: id, icon: '❓' };
 }
 function levelFor(income) {
-  return Math.max(1, Math.floor(income / 1000) + 1); // +1 level per $1000 earned
+  return Math.max(1, Math.floor(income / 1000) + 1); // +1 level per 1000 XP
+}
+// XP = lifetime income PLUS bonus XP earned by *playing* (logging, chests, quests…).
+// Income still counts, so existing players keep their level — actions now also push it.
+function totalXp() { return Math.max(0, totals().income) + (state.bonusXp || 0); }
+// silent XP bump + floating "+N XP" — the following renderStats handles any level-up
+function addXp(amount) {
+  if (!(amount > 0)) return;
+  state.bonusXp = (state.bonusXp || 0) + amount;
+  floatXp(amount);
+}
+// XP bump that immediately re-checks for a level-up — use OUTSIDE the add-entry flow
+// (chest, bounties, quests) where no renderAll(prevLevel) follows
+function gainXp(amount) {
+  if (!(amount > 0)) return;
+  const prev = levelFor(totalXp());
+  addXp(amount); save();
+  renderStats(prev);
 }
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 // effective date of an entry — uses the editable `date`, falling back to id (old entries)
@@ -488,6 +506,7 @@ function migrate() {
   if (!Array.isArray(state.debts)) state.debts = [];
   if (!Array.isArray(state.jars)) state.jars = [];
   if (!Array.isArray(state.nwHistory)) state.nwHistory = [];
+  if (typeof state.bonusXp !== 'number' || !isFinite(state.bonusXp)) state.bonusXp = 0;
   state.schema = SCHEMA;
 }
 // per-player income/expense/net split
@@ -595,11 +614,11 @@ function renderStats(prevLevel) {
 
   els.balanceFoot.textContent = balance >= 0 ? 'KEEP GOING!' : 'GAME OVER?';
 
-  const level = levelFor(income);
+  const level = levelFor(totalXp());
   els.streak.textContent = 'LV.' + level;
 
-  // XP bar: progress through the current level (1000 income = 1 level)
-  const xpInto = Math.max(0, income) % 1000;
+  // XP bar: progress through the current level (1000 XP per level; income + action XP)
+  const xpInto = totalXp() % 1000;
   els.xpFill.style.width = (xpInto / 1000 * 100) + '%';
   els.xpNext.textContent = Math.floor(xpInto) + ' / 1000 XP';
 
@@ -814,6 +833,7 @@ function renderGoal() {
     if (!state.goalCelebrated) {
       state.goalCelebrated = true; save();
       sfx.victory(); showToast('🏆 QUEST COMPLETE: ' + state.goal.name + '!');
+      if (appReady) gainXp(75);
     }
   } else {
     els.goalChest.textContent = '💰';
@@ -1429,16 +1449,6 @@ function renderJars() {
     showToast(`${arrow(p.type)} ${fmt(p.amount)} · ${escapeHtml(p.desc)}`);
     input.value = ''; preview.hidden = true; input.focus();
   });
-  // collapsible TOOLS dropdown (mirrors the Net Worth / Sinking Funds toggles)
-  const tt = document.getElementById('toolsToggle');
-  const tb = document.getElementById('toolsBody');
-  if (tt && tb) tt.addEventListener('click', () => {
-    const open = tb.hidden;
-    tb.hidden = !open;
-    tt.setAttribute('aria-expanded', open ? 'true' : 'false');
-    tt.classList.toggle('open', open);
-    if (sfx.click) sfx.click();
-  });
   syncQuickAddType();   // set the initial QUICK SPEND / ▼ label
 })();
 
@@ -1643,224 +1653,6 @@ function classifyColumns(raw) {
     close();
     elText.value = ''; elMap.hidden = true; model = null; built = [];
   });
-})();
-
-/* ============================================================
-   📷 RECEIPT SCAN — lazy-loaded on-device OCR (Tesseract WASM via
-   CDN). Pulls total + date; you confirm before it's logged.
-============================================================ */
-(function scanTool() {
-  const ov = document.getElementById('scanOverlay');
-  if (!ov) return;
-  const drop = document.getElementById('scanDrop'), file = document.getElementById('scanFile');
-  const stage = document.getElementById('scanStage'), thumb = document.getElementById('scanThumb');
-  const status = document.getElementById('scanStatus'), prog = document.getElementById('scanProgFill');
-  const result = document.getElementById('scanResult');
-  const elAmt = document.getElementById('scanAmt'), elDesc = document.getElementById('scanDesc'),
-    elCat = document.getElementById('scanCat'), elDate = document.getElementById('scanDate'),
-    elRaw = document.getElementById('scanRaw'), elRawToggle = document.getElementById('scanRawToggle'),
-    elCcy = document.getElementById('scanCcy');
-  let _tess = null;
-
-  function open() {
-    ov.hidden = false;
-    elCcy.textContent = cur().symbol;
-    elCat.innerHTML = CATEGORIES.expense.map((c) => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
-    reset();
-  }
-  function reset() { stage.hidden = true; result.hidden = true; drop.hidden = false; file.value = ''; prog.style.width = '0'; }
-  function close() { ov.hidden = true; }
-  document.getElementById('openScan').addEventListener('click', open);
-  document.getElementById('scanClose').addEventListener('click', close);
-  elRawToggle.addEventListener('click', () => { elRaw.hidden = !elRaw.hidden; elRawToggle.textContent = (elRaw.hidden ? 'show' : 'hide') + ' raw text ' + (elRaw.hidden ? '▾' : '▴'); });
-
-  function loadTesseract() {
-    if (_tess) return _tess;
-    _tess = new Promise((res, rej) => {
-      if (window.Tesseract) return res(window.Tesseract);
-      const sc = document.createElement('script');
-      sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-      sc.onload = () => res(window.Tesseract);
-      sc.onerror = () => rej(new Error('offline'));
-      document.head.appendChild(sc);
-    });
-    return _tess;
-  }
-  function parseReceipt(text) {
-    const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
-    const lineAmt = (l) => {
-      const toks = l.match(/\d[\d.,]*/g) || [];
-      let best = NaN;
-      toks.forEach((t) => { const v = parseMoney(t); if (isFinite(v) && (!(best > 0) || v > best)) best = v; });
-      return best;
-    };
-    // total: prefer lines mentioning total/grand total/jumlah, biggest amount among them
-    let total = NaN;
-    const totalLines = lines.filter((l) => /total|grand\s*total|jumlah|total\s*bayar|amount\s*due|tagihan|net\s*total|grand/i.test(l));
-    totalLines.forEach((l) => { const v = lineAmt(l); if (isFinite(v) && (!(total > 0) || v > total)) total = v; });
-    if (!(total > 0)) { lines.forEach((l) => { const v = lineAmt(l); if (isFinite(v) && (!(total > 0) || v > total)) total = v; }); }
-    // date: first date-looking token in the text
-    let date = NaN;
-    const dm = text.match(/\d{1,4}[-/.]\d{1,2}[-/.]\d{2,4}/);
-    if (dm) date = parseDateLoose(dm[0]);
-    const merchant = (lines[0] || '').replace(/[^a-z0-9 &.-]/gi, '').trim().slice(0, 28);
-    return { total, date, merchant, raw: text };
-  }
-  function showResult(r) {
-    stage.hidden = true; result.hidden = false;
-    elAmt.value = r.total > 0 ? Math.round(r.total) : '';
-    elDesc.value = r.merchant || '';
-    elDate.value = isFinite(r.date) ? tsToYmd(r.date) : tsToYmd(Date.now());
-    const g = guessCategory(r.merchant, 'expense') || 'shop';
-    elCat.value = CATEGORIES.expense.some((c) => c.id === g) ? g : 'shop';
-    elRaw.textContent = r.raw || '(no text recognised)';
-  }
-  async function run(f) {
-    drop.hidden = true; stage.hidden = false; result.hidden = true;
-    thumb.src = URL.createObjectURL(f);
-    status.textContent = 'Loading reader…'; prog.style.width = '8%';
-    let T;
-    try { T = await loadTesseract(); }
-    catch (e) { status.textContent = 'Reader needs a connection — enter it manually.'; showResult({ total: NaN, date: NaN, merchant: '', raw: '' }); return; }
-    status.textContent = 'Reading…';
-    try {
-      const { data } = await T.recognize(f, 'eng', { logger: (m) => { if (m.status === 'recognizing text') prog.style.width = Math.round(8 + m.progress * 92) + '%'; } });
-      prog.style.width = '100%';
-      showResult(parseReceipt(data.text || ''));
-    } catch (e) {
-      status.textContent = 'Could not read that image — enter it manually.';
-      showResult({ total: NaN, date: NaN, merchant: '', raw: '' });
-    }
-  }
-  file.addEventListener('change', () => { const f = file.files && file.files[0]; if (f) run(f); });
-  document.getElementById('scanCommit').addEventListener('click', () => {
-    const amount = parseFloat(elAmt.value);
-    const desc = elDesc.value.trim() || 'RECEIPT';
-    if (!(amount > 0)) { sfx.error(); shake(result); return; }
-    const date = ymdToTs(elDate.value);
-    state.transactions.push(makeTx({ type: 'expense', desc, amount, category: elCat.value, date }));
-    learnCategory(desc, 'expense', elCat.value);
-    save(); sfx.spend(); renderAll(); hitBoss(amount);
-    showToast('🧾 ' + fmt(amount) + ' · ' + escapeHtml(desc));
-    close();
-  });
-})();
-
-/* ============================================================
-   FORECAST PRIMITIVES — shared run-rate math (used by the Oracle
-   and the affordability simulator).
-============================================================ */
-function runRatePerDay() {
-  const txs = state.transactions || [];
-  if (!txs.length) return 0;
-  const now = Date.now(), day = 86400000;
-  const earliest = Math.min.apply(null, txs.map(txDate));
-  const span = Math.max(1, (now - earliest) / day);
-  const w = Math.min(90, Math.max(7, Math.round(span)));
-  const since = now - w * day;
-  let net = 0;
-  txs.forEach((t) => { if (txDate(t) >= since) net += (t.type === 'income' ? t.amount : -t.amount); });
-  return net / w;
-}
-function dryFromPace(balance, perDay) {
-  if (perDay >= 0 || balance <= 0) return null;
-  const d = balance / -perDay;
-  return d <= 3650 ? new Date(Date.now() + d * 86400000) : null;
-}
-function etaFromPace(balance, perDay, target) {
-  if (perDay <= 0 || balance >= target) return null;
-  const d = (target - balance) / perDay;
-  return d <= 3650 ? new Date(Date.now() + d * 86400000) : null;
-}
-
-/* ============================================================
-   🔮 CAN I AFFORD THIS? — stress-test a purchase against your
-   real run-rate: 30-day balance, run-dry date, savings-goal ETA.
-============================================================ */
-(function affordTool() {
-  const ov = document.getElementById('affordOverlay');
-  if (!ov) return;
-  const elAmt = document.getElementById('affordAmt'), elName = document.getElementById('affordName');
-  const elCcy = document.getElementById('affordCcy');
-  const elResult = document.getElementById('affordResult'), elEmpty = document.getElementById('affordEmpty');
-  const elRows = document.getElementById('affordRows'), elVerdict = document.getElementById('affordVerdict');
-  const cv = document.getElementById('affordSpark');
-  const modeBtns = ov.querySelectorAll('.afford-mode-btn');
-  let mode = 'once';
-
-  function open() { ov.hidden = false; elCcy.textContent = cur().symbol; compute(); elAmt.focus(); }
-  function close() { ov.hidden = true; }
-  document.getElementById('openAfford').addEventListener('click', open);
-  document.getElementById('affordClose').addEventListener('click', close);
-  modeBtns.forEach((b) => b.addEventListener('click', () => {
-    modeBtns.forEach((x) => x.classList.remove('active')); b.classList.add('active'); mode = b.dataset.mode; compute();
-  }));
-  elAmt.addEventListener('input', compute);
-
-  function drawSpark(before, after) {
-    const dpr = window.devicePixelRatio || 1;
-    const w = cv.clientWidth || 300, h = cv.clientHeight || 120;
-    cv.width = w * dpr; cv.height = h * dpr;
-    const x = cv.getContext('2d'); x.scale(dpr, dpr);
-    x.clearRect(0, 0, w, h);
-    const all = before.concat(after);
-    let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
-    if (lo === hi) { hi = lo + 1; }
-    lo = Math.min(lo, 0); // always show the zero line if balance dips negative
-    const pad = 8;
-    const px = (i, n) => pad + (i / (n - 1)) * (w - pad * 2);
-    const py = (v) => h - pad - ((v - lo) / (hi - lo)) * (h - pad * 2);
-    // zero baseline
-    if (lo < 0) { const zy = py(0); x.strokeStyle = 'rgba(255,255,255,.18)'; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(pad, zy); x.lineTo(w - pad, zy); x.stroke(); x.setLineDash([]); }
-    const line = (arr, color, width) => {
-      x.strokeStyle = color; x.lineWidth = width; x.beginPath();
-      arr.forEach((v, i) => { const X = px(i, arr.length), Y = py(v); i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
-      x.stroke();
-    };
-    line(before, 'rgba(255,255,255,.35)', 2);
-    const last = after[after.length - 1];
-    line(after, last >= 0 ? '#5fe6a8' : '#ff6f8c', 3);
-  }
-
-  function compute() {
-    const amt = parseFloat(elAmt.value);
-    if (!(amt > 0)) { elResult.hidden = true; elEmpty.hidden = false; return; }
-    elEmpty.hidden = true; elResult.hidden = false;
-    const bal = totals().balance;
-    const perDay = runRatePerDay();
-    const goal = state.goal && state.goal.target > 0 ? state.goal : null;
-    // before
-    const beforeArr = [], afterArr = [];
-    const perA = mode === 'monthly' ? perDay - amt / 30 : perDay;
-    const balA = mode === 'monthly' ? bal : bal - amt;
-    for (let i = 0; i <= 30; i++) { beforeArr.push(bal + perDay * i); afterArr.push(balA + perA * i); }
-    const proj30 = bal + perDay * 30, proj30A = balA + perA * 30;
-    const dryB = dryFromPace(bal, perDay), dryA = dryFromPace(balA, perA);
-    const etaB = goal ? etaFromPace(bal, perDay, goal.target) : null;
-    const etaA = goal ? etaFromPace(balA, perA, goal.target) : null;
-    drawSpark(beforeArr, afterArr);
-
-    const rows = [];
-    const row = (label, before, after, cls) => rows.push(
-      `<div class="afford-line"><span class="al-label">${label}</span><span class="al-before">${before}</span><span class="al-arrow">→</span><span class="al-after ${cls || ''}">${after}</span></div>`);
-    row('Balance in 30d', fmt(Math.round(proj30)), fmt(Math.round(proj30A)), proj30A < 0 ? 'bad' : proj30A >= proj30 ? 'good' : '');
-    row('Run-dry date', dryB ? dShort(dryB) : 'never', dryA ? dShort(dryA) : 'never', dryA && (!dryB || dryA < dryB) ? 'bad' : 'good');
-    if (goal) row(`"${escapeHtml(state.goal.name)}"`, etaB ? dMonth(etaB) : '—', etaA ? dMonth(etaA) : (perA > 0 ? '—' : 'stalled'), etaA && etaB && etaA > etaB ? 'bad' : 'good');
-    elRows.innerHTML = rows.join('');
-
-    // verdict
-    let vClass = 'good', vText;
-    const name = elName.value.trim() || 'it';
-    if (mode === 'once' && balA < 0) { vClass = 'bad'; vText = `That would overdraw you by ${fmt(Math.abs(balA))}. Not yet.`; }
-    else if (dryA && (!dryB || dryA < dryB)) { vClass = 'bad'; vText = `Doable, but your gold would run dry around ${dShort(dryA)}. Risky.`; }
-    else if (etaA && etaB && etaA > etaB) {
-      const months = Math.max(1, Math.round((etaA - etaB) / (30 * 86400000)));
-      vClass = 'good'; vText = `Affordable — but it pushes "${escapeHtml(state.goal.name)}" back about ${months} month${months > 1 ? 's' : ''}.`;
-    } else if (mode === 'monthly' && perA < 0 && perDay >= 0) { vClass = 'bad'; vText = `Adding ${fmt(amt)}/mo would tip you into spending more than you earn.`; }
-    else { vClass = 'good'; vText = `Comfortable — ${escapeHtml(name)} fits within your run-rate.`; }
-    elVerdict.className = 'afford-verdict ' + vClass;
-    elVerdict.textContent = vText;
-  }
 })();
 
 /* ============================================================
@@ -2089,7 +1881,7 @@ function renderQuests() {
     if (done && !state.questsDone.includes(c.id)) {
       state.questsDone.push(c.id);
       save();
-      if (appReady) { sfx.victory(); showToast('🗺️ QUEST COMPLETE: ' + c.name + '!'); }
+      if (appReady) { sfx.victory(); showToast('🗺️ QUEST COMPLETE: ' + c.name + '!'); gainXp(40); }
     }
   });
 
@@ -2209,6 +2001,7 @@ function openChest() {
   coinRain(28);
   showToast('🎁 ' + CHEST_REWARDS[Math.floor(Math.random() * CHEST_REWARDS.length)]);
   renderChest();
+  gainXp(25);   // +25 XP for showing up daily
 }
 
 /* ---------------- UNLOCKABLE THEMES ---------------- */
@@ -2224,7 +2017,7 @@ const THEMES = [
 ];
 function themeUnlocked(t) {
   if (t.req) return t.req();
-  return levelFor(totals().income) >= (t.lv || 1);
+  return levelFor(totalXp()) >= (t.lv || 1);
 }
 function themeReq(t) {
   return t.req ? t.reqLabel : ('LV.' + t.lv);
@@ -2359,7 +2152,7 @@ function renderBounties() {
       doneCount++;
       if (!state.bounties.done.includes(b.id)) {
         state.bounties.done.push(b.id); save();
-        if (appReady) { sfx.victory(); coinRain(10); showToast('⚔ BOUNTY DONE: ' + b.name + '!'); }
+        if (appReady) { sfx.victory(); coinRain(10); showToast('⚔ BOUNTY DONE: ' + b.name + '!'); gainXp(20); }
       }
     }
     const row = document.createElement('div');
@@ -2384,7 +2177,7 @@ function renderBounties() {
     if (state.bountyClaimed !== state.bounties.week) {
       state.bountyClaimed = state.bounties.week;
       state.bountyStreak = (state.bountyStreak || 0) + 1; save();
-      if (appReady) { coinRain(40); sfx.victory(); showToast('🏆 WEEKLY BOUNTIES COMPLETE — WEEK ' + state.bountyStreak + '!'); }
+      if (appReady) { coinRain(40); sfx.victory(); showToast('🏆 WEEKLY BOUNTIES COMPLETE — WEEK ' + state.bountyStreak + '!'); gainXp(100); }
     }
   } else {
     els.bountyReward.textContent = doneCount + ' / ' + picks.length + ' CLEARED · FINISH ALL FOR A REWARD';
@@ -2454,6 +2247,17 @@ function coinRain(n = 24) {
     document.body.appendChild(c);
     setTimeout(() => c.remove(), 3800);
   }
+}
+// floating "+N XP" pop near the XP bar — a visible reward for an action
+function floatXp(amount) {
+  if (!appReady || !(amount > 0)) return;
+  const row = document.querySelector('.xp-row');
+  if (!row) return;
+  const pop = document.createElement('span');
+  pop.className = 'xp-pop';
+  pop.textContent = '+' + amount + ' XP';
+  row.appendChild(pop);
+  setTimeout(() => pop.remove(), 1200);
 }
 // coins fly from the form area up into the balance card (on income)
 function flyCoinsTo(el, n = 6) {
@@ -2820,7 +2624,10 @@ function renderCatRing() {
   fill.style.strokeDashoffset = (CAT_RING_CIRC * (1 - Math.min(ratio, 1))).toFixed(2);
   fill.style.stroke = hex;
   const pctEl = document.getElementById('catRingPct');
-  pctEl.textContent = over ? 'OVER' : Math.round(ratio * 100) + '%';
+  // "OVER" is too wide for the 34px dial — show a bold "!" alert instead
+  // (the red ring + "… over budget" text beside it already say what's wrong)
+  pctEl.textContent = over ? '!' : Math.round(ratio * 100) + '%';
+  pctEl.classList.toggle('alert', over);
   pctEl.style.color = hex;
   const remaining = limit - spent;
   // the CATEGORY dropdown right above already names the category, so the ring
@@ -2904,7 +2711,7 @@ function addTx(e) {
     return;
   }
 
-  const prevLevel = levelFor(totals().income);
+  const prevLevel = levelFor(totalXp());
 
   const category = els.category.value;
   learnCategory(desc, currentType, category);   // adapt future guesses to your wording
@@ -2929,6 +2736,7 @@ function addTx(e) {
     showToast('🔁 REPEAT SET: ' + freqLabel(rep) + ' "' + desc + '"');
   }
   if (els.repeatInput) els.repeatInput.value = 'off';
+  addXp(10);            // +10 XP for logging an entry — leveling now rewards *playing*
   save();
 
   currentType === 'income' ? sfx.coin() : sfx.spend();
@@ -3068,7 +2876,7 @@ function buildReport() {
       <div class="pr-grid">
         <div class="pr-line"><span class="k">Total Income</span><span class="v pr-pos">${fmt(income)}</span></div>
         <div class="pr-line"><span class="k">Total Spent</span><span class="v pr-neg">${fmt(expense)}</span></div>
-        <div class="pr-line"><span class="k">Level</span><span class="v">LV.${levelFor(income)}</span></div>
+        <div class="pr-line"><span class="k">Level</span><span class="v">LV.${levelFor(totalXp())}</span></div>
         <div class="pr-line"><span class="k">Budget Streak</span><span class="v">${state.budget ? streakMonths() + ' months' : '—'}</span></div>
       </div>
     </div>`;
@@ -3177,6 +2985,7 @@ function importBackup(file) {
     state.themesSeen = Array.isArray(data.themesSeen) ? data.themesSeen : [];
     state.lastChest = data.lastChest || null;
     state.chestStreak = Number(data.chestStreak) || 0;
+    state.bonusXp = Number(data.bonusXp) || 0;
     state.rainbow = !!data.rainbow;
     applyTheme(state.theme);
     document.body.classList.toggle('rainbow', state.rainbow);
@@ -3254,7 +3063,7 @@ function openRecap() {
     ['SAVINGS RATE', rate + '%'],
     ['BUDGET BOSS', budgetResult],
     ['TOP SPEND', top ? catInfo('expense', top[0]).name + ' (' + fmt(top[1]) + ')' : '—'],
-    ['LEVEL', 'LV.' + levelFor(totals().income)],
+    ['LEVEL', 'LV.' + levelFor(totalXp())],
   ];
   els.recapRows.innerHTML = rows.map((r) => `<div class="recap-row"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('');
   els.recapOverlay.hidden = false;
@@ -3599,9 +3408,23 @@ els.goalChest.addEventListener('click', () => {
   wiggle(els.goalChest);
   beep([784, 1047, 1319], 0.06, 'square', 0.05); vibe(10);
 });
-// poke the title mascot → friendly blip
+// poke the title mascot → squish + friendly blip, with the odd cheeky quip
+const OCTO_QUIPS = [
+  '🐙 blub blub!',
+  '🐙 keep stacking those coins!',
+  '🐙 you got this, captain!',
+  '🐙 *happy little wiggle*',
+  '🐙 to the moon… responsibly.',
+  '🐙 every coin counts!',
+];
 const logoOcto = document.getElementById('logoOcto');
-if (logoOcto) logoOcto.addEventListener('click', () => { wiggle(logoOcto); sfx.coin(); });
+let octoTaps = 0;
+if (logoOcto) logoOcto.addEventListener('click', () => {
+  logoOcto.classList.remove('squish'); void logoOcto.offsetWidth; logoOcto.classList.add('squish');
+  setTimeout(() => logoOcto.classList.remove('squish'), 360);
+  sfx.coin();
+  if (++octoTaps % 4 === 0) showToast(OCTO_QUIPS[Math.floor(Math.random() * OCTO_QUIPS.length)]);
+});
 
 // Konami code (keyboard) → rainbow cheat
 const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
@@ -3708,6 +3531,57 @@ els.list.addEventListener('click', (e) => {
   const del = e.target.closest('.tx-del');
   if (del) deleteTx(del.dataset.id);
 });
+
+/* ---- swipe a ledger row: left → delete, right → edit (touch only) ---- */
+(function swipeRows() {
+  const list = els.list;
+  if (!list) return;
+  const THRESH = 72;              // px past which the gesture commits
+  let row = null, startX = 0, startY = 0, dx = 0, decided = false, horiz = false;
+  list.addEventListener('touchstart', (e) => {
+    const li = e.target.closest('.tx-item');
+    // ignore taps that start on the edit/delete buttons
+    if (!li || e.target.closest('.tx-actions')) { row = null; return; }
+    row = li; startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+    dx = 0; decided = false; horiz = false;
+    row.style.transition = 'none';
+  }, { passive: true });
+  list.addEventListener('touchmove', (e) => {
+    if (!row) return;
+    const ddx = e.touches[0].clientX - startX;
+    const ddy = e.touches[0].clientY - startY;
+    if (!decided) {
+      if (Math.abs(ddx) < 8 && Math.abs(ddy) < 8) return;
+      horiz = Math.abs(ddx) > Math.abs(ddy);
+      decided = true;
+      if (!horiz) { row.style.transition = ''; row = null; return; }  // let the page scroll
+    }
+    dx = ddx;
+    row.style.transform = 'translateX(' + dx + 'px)';
+    row.classList.toggle('swipe-del', dx < -20);
+    row.classList.toggle('swipe-edit', dx > 20);
+  }, { passive: true });
+  function endSwipe() {
+    if (!row) return;
+    const r = row, moved = dx;
+    const id = r.querySelector('.tx-del') && r.querySelector('.tx-del').dataset.id;
+    r.style.transition = 'transform .18s ease';
+    r.classList.remove('swipe-del', 'swipe-edit');
+    if (moved <= -THRESH && id) {
+      r.style.transform = 'translateX(-110%)';
+      sfx.delete && sfx.delete();
+      setTimeout(() => deleteTx(id), 150);
+    } else if (moved >= THRESH && id) {
+      r.style.transform = '';
+      startEdit(id);
+    } else {
+      r.style.transform = '';
+    }
+    row = null; dx = 0;
+  }
+  list.addEventListener('touchend', endSwipe, { passive: true });
+  list.addEventListener('touchcancel', endSwipe, { passive: true });
+})();
 
 els.filters.addEventListener('click', (e) => {
   const btn = e.target.closest('.filter-btn');
@@ -5337,7 +5211,7 @@ function payoffPlan(debts, budget, strategy) {
 
 /* dismiss the power-tool modals on backdrop tap or Escape */
 (function toolOverlayDismiss() {
-  const ovs = ['importOverlay', 'scanOverlay', 'affordOverlay'].map((id) => document.getElementById(id)).filter(Boolean);
+  const ovs = ['importOverlay'].map((id) => document.getElementById(id)).filter(Boolean);
   ovs.forEach((ov) => ov.addEventListener('click', (e) => { if (e.target === ov) ov.hidden = true; }));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') ovs.forEach((ov) => { ov.hidden = true; }); });
 })();

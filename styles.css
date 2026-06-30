@@ -208,6 +208,18 @@ h1 {
   cursor: pointer;            /* pokeable — see app.js */
 }
 
+/* squish-and-spring when the mascot is poked (overrides the idle hover briefly) */
+.logo-octo.squish {
+  animation: octoSquish .36s ease;
+}
+
+@keyframes octoSquish {
+  0% { transform: scale(1, 1); }
+  35% { transform: scale(1.18, .8) translateY(2px); }
+  70% { transform: scale(.92, 1.12) translateY(-2px); }
+  100% { transform: scale(1, 1); }
+}
+
 .player-row {
   display: flex;
   justify-content: center;
@@ -235,6 +247,25 @@ h1 {
   gap: 10px;
   max-width: 320px;
   margin: 14px auto 0;
+  position: relative;          /* anchors the floating "+N XP" pop */
+}
+
+/* floating reward that drifts up off the XP bar when you earn XP */
+.xp-pop {
+  position: absolute;
+  right: 0;
+  top: -4px;
+  font-size: 8px;
+  color: var(--gold);
+  text-shadow: 1px 1px 0 var(--shadow);
+  pointer-events: none;
+  animation: xpPop 1.2s ease-out forwards;
+}
+
+@keyframes xpPop {
+  0% { opacity: 0; transform: translateY(4px) scale(.8); }
+  20% { opacity: 1; transform: translateY(-4px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-22px) scale(1); }
 }
 
 .xp-track {
@@ -945,6 +976,7 @@ h1 {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 7px; letter-spacing: 0; pointer-events: none;
 }
+.cat-ring-pct.alert { font-size: 14px; }   /* a single bold "!" when over budget */
 .cat-ring-text { display: flex; flex-direction: column; min-width: 0; letter-spacing: .2px; }
 .crt-sub { font-size: 8px; line-height: 1.5; color: var(--ink-dim); }
 .crt-sub.over { color: #ff6f8c; }
@@ -1433,7 +1465,13 @@ select {
   border: 3px solid var(--shadow);
   margin-bottom: 10px;
   animation: slideIn .25s ease;
+  position: relative;
+  touch-action: pan-y;          /* we own horizontal swipes; page keeps vertical scroll */
 }
+
+/* swipe affordances: left reveals delete (red, right edge), right reveals edit (blue, left edge) */
+.tx-item.swipe-del { background: linear-gradient(90deg, var(--bg-2) 40%, rgba(255, 93, 93, .35)); }
+.tx-item.swipe-edit { background: linear-gradient(90deg, rgba(79, 169, 255, .35), var(--bg-2) 60%); }
 
 @keyframes slideIn {
   from {
@@ -2196,6 +2234,12 @@ select {
   transform: translateY(2px);
 }
 
+/* IMPORT CSV — green to set it apart from the blue data buttons */
+#openImport {
+  color: #06250f;
+  background: var(--green);
+}
+
 /* =========================== PRINT / PDF REPORT =========================== */
 .print-report {
   display: none;
@@ -2841,7 +2885,8 @@ body[data-theme="midas"] {
     margin-left: 0;
   }
 
-  /* Options tools: row 1 = RECAP/BACKUP/RESTORE (3 equal), row 2 = EXPORT/ERASE (2 equal) */
+  /* Options tools: two even rows of three —
+     RECAP / BACKUP / RESTORE, then IMPORT / EXPORT / ERASE */
   .foot-actions {
     grid-template-columns: repeat(6, 1fr);
     gap: 7px;
@@ -2851,19 +2896,8 @@ body[data-theme="midas"] {
     font-size: 6.5px;
     padding: 10px 3px;
     letter-spacing: 0;
+    grid-column: span 2;   /* 3 equal pills per row */
   }
-
-  .foot-actions button:nth-child(-n+3) {
-    grid-column: span 2;
-  }
-
-  /* recap/backup/restore */
-  .foot-actions button:nth-child(4),
-  .foot-actions button:nth-child(5) {
-    grid-column: span 3;
-  }
-
-  /* export pdf / erase */
 
   /* combo popup sits tighter to the corner on small screens */
   .combo-pop { top: 70px; right: 8px; font-size: 8px; padding: 6px 8px; }
