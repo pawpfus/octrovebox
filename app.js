@@ -211,6 +211,7 @@ let state = {
   lastChest: null,      // YYYY-MM-DD of last daily-chest open
   chestStreak: 0,       // consecutive days opening the chest
   bonusXp: 0,           // XP earned by *playing* (logging, chests, quests) — added on top of income
+  puzzleSolved: '',     // YYYY-MM-DD the vault puzzle last awarded XP (once per day)
   rainbow: false,       // konami-code rainbow mode
   bounties: null,       // { week:'YYYY-MM-DD'(Monday), done:[ids] } — weekly bounty progress
   bountyStreak: 0,      // weeks where all bounties were cleared
@@ -2986,6 +2987,7 @@ function importBackup(file) {
     state.lastChest = data.lastChest || null;
     state.chestStreak = Number(data.chestStreak) || 0;
     state.bonusXp = Number(data.bonusXp) || 0;
+    state.puzzleSolved = data.puzzleSolved || '';
     state.rainbow = !!data.rainbow;
     applyTheme(state.theme);
     document.body.classList.toggle('rainbow', state.rainbow);
@@ -3282,6 +3284,90 @@ if (els.mbossToggle) els.mbossToggle.addEventListener('click', () => {
 if (els.guildToggle) els.guildToggle.addEventListener('click', toggleGuild);
 els.deedsToggle.addEventListener('click', toggleDeeds);
 els.vaultToggle.addEventListener('click', toggleVault);
+
+/* ---------------- 🧩 VAULT SLIDE PUZZLE (3×3 / 8-tile) ----------------
+   A self-contained minigame in the quest board. Scrambled by walking the
+   blank randomly so it's always solvable. First solve of the day pays XP. */
+(function slidePuzzle() {
+  const grid = document.getElementById('puzzleGrid');
+  const toggle = document.getElementById('puzzleToggle');
+  const wrap = document.getElementById('puzzleWrap');
+  const movesEl = document.getElementById('puzzleMoves');
+  const statusEl = document.getElementById('puzzleStatus');
+  const shuffleBtn = document.getElementById('puzzleShuffle');
+  if (!grid || !toggle || !wrap) return;
+  const N = 3, BLANK = 8;                 // values 0..8; 8 renders as the empty slot
+  let board = [0, 1, 2, 3, 4, 5, 6, 7, 8];  // solved when board[i] === i
+  let moves = 0, playing = false;
+
+  const solved = () => board.every((v, i) => v === i);
+  function neighbors(i) {
+    const r = Math.floor(i / N), c = i % N, out = [];
+    if (r > 0) out.push(i - N); if (r < N - 1) out.push(i + N);
+    if (c > 0) out.push(i - 1); if (c < N - 1) out.push(i + 1);
+    return out;
+  }
+  function render() {
+    grid.innerHTML = '';
+    board.forEach((v, idx) => {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'ptile' + (v === BLANK ? ' blank' : '');
+      cell.textContent = v === BLANK ? '' : (v + 1);
+      cell.dataset.idx = idx;
+      grid.appendChild(cell);
+    });
+    movesEl.textContent = 'MOVES: ' + moves;
+  }
+  function tryMove(idx) {
+    const blankIdx = board.indexOf(BLANK);
+    if (!neighbors(idx).includes(blankIdx)) return;
+    const t = board[idx]; board[idx] = board[blankIdx]; board[blankIdx] = t;
+    moves++;
+    if (state.soundOn) { try { beep([660], 0.03, 'square', 0.03); } catch (e) {} }
+    render();
+    if (playing && solved()) win();
+  }
+  function shuffle() {
+    board = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    let blank = BLANK, prev = -1;
+    for (let k = 0; k < 100; k++) {
+      const opts = neighbors(blank).filter((n) => n !== prev);
+      const pick = opts[Math.floor(Math.random() * opts.length)];
+      const t = board[blank]; board[blank] = board[pick]; board[pick] = t;
+      prev = blank; blank = pick;
+    }
+    if (solved()) return shuffle();        // vanishingly rare, but never start solved
+    moves = 0; playing = true;
+    statusEl.textContent = 'IN PROGRESS';
+    render();
+  }
+  function win() {
+    playing = false;
+    sfx.victory(); coinRain(24);
+    const today = todayStr();
+    if (state.puzzleSolved !== today) {
+      state.puzzleSolved = today; save();
+      showToast('🧩 VAULT CRACKED in ' + moves + ' moves! +40 XP');
+      gainXp(40);
+    } else {
+      showToast('🧩 SOLVED in ' + moves + ' moves! (come back tomorrow for more XP)');
+    }
+    statusEl.textContent = 'SOLVED ✓';
+  }
+  grid.addEventListener('click', (e) => {
+    const t = e.target.closest('.ptile');
+    if (t && playing) tryMove(Number(t.dataset.idx));
+  });
+  shuffleBtn.addEventListener('click', () => { shuffle(); sfx.click(); });
+  toggle.addEventListener('click', () => {
+    const opening = wrap.hidden;
+    wrap.hidden = !opening;
+    toggle.classList.toggle('open', opening);
+    if (opening) { beep([523, 659], 0.06, 'triangle', 0.04); if (solved()) shuffle(); }
+    else sfx.click();
+  });
+})();
 els.optToggle.addEventListener('click', () => {
   const opening = els.optScroll.hidden;
   els.optScroll.hidden = !opening;
