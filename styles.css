@@ -3125,23 +3125,6 @@ html[data-zone="undersea"] .bubbles { display: block; animation: bubbleRise 14s 
 .deeds-toggle .qb-arrow { margin-left: 8px; }
 .deeds-toggle.open .qb-arrow { transform: rotate(180deg); }
 .quest-grid:not([hidden]) { margin-top: 10px; }
-
-/* 🧩 VAULT SLIDE PUZZLE — a 3×3 minigame nested in the quest board */
-.puzzle-wrap[hidden] { display: none; }
-.puzzle-wrap { margin-top: 10px; }
-.puzzle-hint { font-family: 'VT323', monospace; font-size: 13px; color: var(--ink-dim); line-height: 1.3; margin: 0 0 9px; }
-.puzzle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; max-width: 240px; margin: 0 auto; }
-.ptile {
-  display: flex; align-items: center; justify-content: center; aspect-ratio: 1 / 1;
-  font-family: 'Press Start 2P', monospace; font-size: 15px; color: #06250f;
-  background: var(--gold); border: 3px solid var(--shadow);
-  box-shadow: inset 2px 2px 0 rgba(255,255,255,.5), inset -3px -3px 0 var(--gold-dk);
-  cursor: pointer; transition: transform .08s;
-}
-.ptile:active { transform: scale(.94); }
-.ptile.blank { background: transparent; border-color: transparent; box-shadow: none; cursor: default; }
-.puzzle-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
-.puzzle-moves { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--ink-dim); }
 /* the hidden attribute must win over .quest-grid's display:grid */
 .quest-grid[hidden] { display: none; }
 
